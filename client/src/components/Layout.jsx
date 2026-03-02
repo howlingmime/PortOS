@@ -50,6 +50,7 @@ import {
   Compass,
   Eye,
   Scale,
+  LayoutDashboard,
   Lightbulb
 } from 'lucide-react';
 import packageJson from '../../package.json';
@@ -203,11 +204,15 @@ export default function Layout() {
     if (item.dynamic !== 'apps') return item;
     return {
       ...item,
-      children: sidebarApps.map(app => ({
-        to: `/apps/${app.id}`,
-        label: app.name,
-        icon: Package
-      }))
+      children: [
+        { to: '/apps', label: 'Dashboard', icon: LayoutDashboard, end: true },
+        { separator: true },
+        ...sidebarApps.map(app => ({
+          to: `/apps/${app.id}`,
+          label: app.name,
+          icon: Package
+        }))
+      ]
     };
   }), [sidebarApps]);
 
@@ -281,7 +286,7 @@ export default function Layout() {
           title={collapsed ? item.label : undefined}
         >
           <div className="flex items-center gap-3">
-            <Icon size={20} className="flex-shrink-0" />
+            <Icon size={20} className="shrink-0" />
             <span className={`whitespace-nowrap ${collapsed ? 'lg:hidden' : ''}`}>
               {item.label}
             </span>
@@ -309,7 +314,7 @@ export default function Layout() {
         >
           <div className="flex items-center gap-3">
             <div className="relative">
-              <Icon size={20} className="flex-shrink-0" />
+              <Icon size={20} className="shrink-0" />
               {/* Badge for collapsed state */}
               {item.showBadge && unreadCount > 0 && collapsed && (
                 <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center text-[9px] font-bold rounded-full bg-yellow-500 text-black px-0.5">
@@ -356,7 +361,7 @@ export default function Layout() {
         >
           <div className="flex items-center gap-3">
             <div className="relative">
-              <Icon size={20} className="flex-shrink-0" />
+              <Icon size={20} className="shrink-0" />
               {/* Badge for collapsed state on collapsible sections */}
               {item.showBadge && unreadCount > 0 && collapsed && (
                 <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center text-[9px] font-bold rounded-full bg-yellow-500 text-black px-0.5">
@@ -387,7 +392,10 @@ export default function Layout() {
         {/* Children items */}
         {expandedSections[item.label] && !collapsed && (
           <div className="ml-4 mt-1">
-            {item.children.map((child) => {
+            {item.children.map((child, childIndex) => {
+              if (child.separator) {
+                return <div key={`child-sep-${childIndex}`} className="mx-3 my-1 border-t border-port-border" />;
+              }
               const ChildIcon = child.icon;
               if (child.external) {
                 const childHref = child.dynamicHost
@@ -409,13 +417,17 @@ export default function Layout() {
                   </a>
                 );
               }
+              const childActive = child.end
+                ? location.pathname === child.to
+                : isActive(child.to);
               return (
                 <NavLink
                   key={child.to}
                   to={child.to}
+                  end={child.end}
                   onClick={() => setMobileOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    isActive(child.to)
+                    childActive
                       ? 'bg-port-accent/10 text-port-accent'
                       : 'text-gray-500 hover:text-white hover:bg-port-border/50'
                   }`}
@@ -436,7 +448,7 @@ export default function Layout() {
       {/* Skip to main content link for keyboard users */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-port-accent focus:text-white focus:rounded-lg focus:outline-none"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-port-accent focus:text-white focus:rounded-lg focus:outline-hidden"
       >
         Skip to main content
       </a>

@@ -311,7 +311,7 @@ export default function AccountsTab() {
                 value={form.username}
                 onChange={e => setForm(prev => ({ ...prev, username: e.target.value }))}
                 placeholder={selectedPlatformDef ? `Your ${selectedPlatformDef.label} username` : 'username'}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-none focus:border-port-accent min-h-[40px]"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-hidden focus:border-port-accent min-h-[40px]"
               />
             </div>
             <div>
@@ -321,7 +321,7 @@ export default function AccountsTab() {
                 value={form.displayName}
                 onChange={e => setForm(prev => ({ ...prev, displayName: e.target.value }))}
                 placeholder="Optional display name"
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-none focus:border-port-accent min-h-[40px]"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-hidden focus:border-port-accent min-h-[40px]"
               />
             </div>
           </div>
@@ -334,7 +334,7 @@ export default function AccountsTab() {
               value={form.url}
               onChange={e => setForm(prev => ({ ...prev, url: e.target.value }))}
               placeholder={selectedPlatformDef?.urlTemplate?.replace('{username}', form.username || 'username') || 'https://...'}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-none focus:border-port-accent min-h-[40px]"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-hidden focus:border-port-accent min-h-[40px]"
             />
           </div>
 
@@ -346,7 +346,7 @@ export default function AccountsTab() {
               onChange={e => setForm(prev => ({ ...prev, bio: e.target.value }))}
               placeholder="What you use this account for, your profile bio, etc."
               rows={2}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-none focus:border-port-accent resize-y"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-hidden focus:border-port-accent resize-y"
             />
           </div>
 
@@ -358,7 +358,7 @@ export default function AccountsTab() {
               onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
               placeholder="Private notes about this account"
               rows={2}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-none focus:border-port-accent resize-y"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-hidden focus:border-port-accent resize-y"
             />
           </div>
 
@@ -438,7 +438,7 @@ export default function AccountsTab() {
                   className="bg-port-card border border-port-border rounded-lg p-3 flex items-start gap-3 group hover:border-gray-600 transition-colors"
                 >
                   {/* Platform icon */}
-                  <div className={`flex-shrink-0 w-10 h-10 rounded-lg border flex items-center justify-center ${colorClass}`}>
+                  <div className={`shrink-0 w-10 h-10 rounded-lg border flex items-center justify-center ${colorClass}`}>
                     <Icon className="w-5 h-5" />
                   </div>
 

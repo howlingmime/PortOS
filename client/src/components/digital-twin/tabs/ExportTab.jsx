@@ -148,7 +148,7 @@ export default function ExportTab({ onRefresh }) {
                       : 'border-port-border hover:border-gray-500'
                   }`}
                 >
-                  <Icon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+                  <Icon className={`w-5 h-5 mt-0.5 shrink-0 ${
                     selectedFormat === format.id ? 'text-port-accent' : 'text-gray-400'
                   }`} />
                   <div className="min-w-0">

@@ -410,7 +410,7 @@ export default function ImportTab() {
                     <ul className="space-y-2">
                       {analysisResult.insights.patterns.map((pattern, i) => (
                         <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
-                          <ChevronRight className="w-4 h-4 text-port-accent flex-shrink-0 mt-0.5" />
+                          <ChevronRight className="w-4 h-4 text-port-accent shrink-0 mt-0.5" />
                           {pattern}
                         </li>
                       ))}
@@ -423,7 +423,7 @@ export default function ImportTab() {
                     <ul className="space-y-2">
                       {analysisResult.insights.preferences.map((pref, i) => (
                         <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
-                          <ChevronRight className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+                          <ChevronRight className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
                           {pref}
                         </li>
                       ))}

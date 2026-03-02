@@ -231,7 +231,7 @@ export default function TaskItem({ task, isSystem, awaitingApproval, onRefresh, 
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-sm font-mono text-gray-500">{task.id}</span>
             {task.metadata?.app && apps?.find(a => a.id === task.metadata.app)?.name && (
-              <span className="px-1.5 py-0.5 text-xs bg-cyan-500/20 text-cyan-400 rounded flex-shrink-0" title={task.metadata.app}>
+              <span className="px-1.5 py-0.5 text-xs bg-cyan-500/20 text-cyan-400 rounded shrink-0" title={task.metadata.app}>
                 {apps.find(a => a.id === task.metadata.app).name}
               </span>
             )}
@@ -370,7 +370,7 @@ export default function TaskItem({ task, isSystem, awaitingApproval, onRefresh, 
               {/* Blocker reason display */}
               {task.status === 'blocked' && task.metadata?.blocker && (
                 <div className="flex items-start gap-2 mt-2 px-2 py-1.5 bg-port-error/10 border border-port-error/20 rounded text-sm">
-                  <AlertCircle size={14} className="text-port-error flex-shrink-0 mt-0.5" aria-hidden="true" />
+                  <AlertCircle size={14} className="text-port-error shrink-0 mt-0.5" aria-hidden="true" />
                   <span className="text-port-error/90">{task.metadata.blocker}</span>
                 </div>
               )}

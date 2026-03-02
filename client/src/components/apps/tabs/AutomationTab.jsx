@@ -135,7 +135,7 @@ export default function AutomationTab({ appId, appName }) {
                         <select
                           value={overrideInterval ?? 'null'}
                           onChange={e => handleIntervalChange(taskType, e.target.value)}
-                          className="px-2 py-1 bg-port-bg border border-port-border rounded text-xs text-white focus:border-port-accent focus:outline-none"
+                          className="px-2 py-1 bg-port-bg border border-port-border rounded text-xs text-white focus:border-port-accent focus:outline-hidden"
                         >
                           {INTERVAL_OPTIONS.map(opt => (
                             <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>

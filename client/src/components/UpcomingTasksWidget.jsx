@@ -98,7 +98,7 @@ const UpcomingTasksWidget = memo(function UpcomingTasksWidget() {
             key={`${task.taskType}-ready-${index}`}
             className="flex items-center gap-3 p-2 rounded-lg bg-port-success/10 border border-port-success/20"
           >
-            <span className="text-lg flex-shrink-0" aria-hidden="true">
+            <span className="text-lg shrink-0" aria-hidden="true">
               {getTaskIcon(task.taskType)}
             </span>
             <div className="flex-1 min-w-0">
@@ -145,7 +145,7 @@ const UpcomingTasksWidget = memo(function UpcomingTasksWidget() {
             key={`${task.taskType}-scheduled-${index}`}
             className="flex items-center gap-3 p-2 rounded-lg bg-port-bg/50"
           >
-            <span className="text-lg flex-shrink-0 opacity-60" aria-hidden="true">
+            <span className="text-lg shrink-0 opacity-60" aria-hidden="true">
               {getTaskIcon(task.taskType)}
             </span>
             <div className="flex-1 min-w-0">

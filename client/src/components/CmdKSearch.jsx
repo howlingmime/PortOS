@@ -135,17 +135,17 @@ export default function CmdKSearch() {
 
         {/* Search input row */}
         <div className="flex items-center gap-3 px-4 py-4 border-b border-port-border">
-          <Search size={18} className="text-gray-400 flex-shrink-0" />
+          <Search size={18} className="text-gray-400 shrink-0" />
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search Brain, Memory, Health..."
-            className="flex-1 bg-transparent text-white placeholder-gray-500 outline-none text-sm"
+            className="flex-1 bg-transparent text-white placeholder-gray-500 outline-hidden text-sm"
             aria-label="Search PortOS"
           />
-          <span className="text-xs text-gray-500 border border-port-border rounded px-1.5 py-0.5 flex-shrink-0">
+          <span className="text-xs text-gray-500 border border-port-border rounded px-1.5 py-0.5 shrink-0">
             {navigator.platform?.includes('Mac') ? '⌘K' : 'Ctrl+K'}
           </span>
         </div>

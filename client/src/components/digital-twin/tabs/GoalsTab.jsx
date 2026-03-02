@@ -350,7 +350,7 @@ export default function GoalsTab({ onRefresh }) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-white truncate">{goal.title}</span>
-                        <span className="text-xs text-gray-500 flex-shrink-0">
+                        <span className="text-xs text-gray-500 shrink-0">
                           {HORIZON_OPTIONS.find(h => h.value === goal.horizon)?.label}
                         </span>
                       </div>
@@ -366,7 +366,7 @@ export default function GoalsTab({ onRefresh }) {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                       {goal.urgency != null && (
                         <div className={`flex items-center gap-1 ${urgencyColor(goal.urgency)}`}>
                           {goal.urgency >= 0.7 && <AlertTriangle className="w-3.5 h-3.5" />}
@@ -407,7 +407,7 @@ export default function GoalsTab({ onRefresh }) {
                               <div key={ms.id} className="flex items-center gap-2 text-sm">
                                 <button
                                   onClick={() => !ms.completedAt && handleCompleteMilestone(goal.id, ms.id)}
-                                  className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                                  className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                                     ms.completedAt
                                       ? 'bg-green-500/20 border-green-500 text-green-400'
                                       : 'border-gray-600 hover:border-port-accent'

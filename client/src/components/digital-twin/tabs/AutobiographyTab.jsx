@@ -252,7 +252,7 @@ export default function AutobiographyTab({ onRefresh }) {
             value={storyContent}
             onChange={(e) => setStoryContent(e.target.value)}
             placeholder="Start writing your story... Take about 5 minutes."
-            className="w-full h-64 bg-port-bg border border-port-border rounded-lg p-4 text-white text-sm resize-y focus:outline-none focus:border-port-accent/50 placeholder-gray-600"
+            className="w-full h-64 bg-port-bg border border-port-border rounded-lg p-4 text-white text-sm resize-y focus:outline-hidden focus:border-port-accent/50 placeholder-gray-600"
             autoFocus
           />
 
@@ -346,7 +346,7 @@ export default function AutobiographyTab({ onRefresh }) {
                 </div>
                 <p className="text-sm text-gray-300 truncate">{story.promptText}</p>
               </div>
-              {isExpanded ? <ChevronUp size={16} className="text-gray-500 flex-shrink-0" /> : <ChevronDown size={16} className="text-gray-500 flex-shrink-0" />}
+              {isExpanded ? <ChevronUp size={16} className="text-gray-500 shrink-0" /> : <ChevronDown size={16} className="text-gray-500 shrink-0" />}
             </button>
 
             {isExpanded && (
@@ -356,7 +356,7 @@ export default function AutobiographyTab({ onRefresh }) {
                     <textarea
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
-                      className="w-full h-48 bg-port-bg border border-port-border rounded p-3 text-white text-sm resize-y focus:outline-none focus:border-port-accent/50"
+                      className="w-full h-48 bg-port-bg border border-port-border rounded p-3 text-white text-sm resize-y focus:outline-hidden focus:border-port-accent/50"
                     />
                     <div className="flex items-center gap-2 justify-end">
                       <button

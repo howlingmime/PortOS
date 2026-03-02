@@ -207,7 +207,7 @@ export default function LinksTab({ onRefresh }) {
             value={inputUrl}
             onChange={(e) => setInputUrl(e.target.value)}
             placeholder="Paste a URL (GitHub repos auto-clone)..."
-            className="flex-1 px-4 py-3 bg-port-card border border-port-border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-port-accent"
+            className="flex-1 px-4 py-3 bg-port-card border border-port-border rounded-lg text-white placeholder-gray-500 focus:outline-hidden focus:border-port-accent"
             disabled={sending}
           />
           <button
@@ -326,9 +326,9 @@ export default function LinksTab({ onRefresh }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       {link.isGitHubRepo ? (
-                        <GitBranch size={16} className="text-purple-400 flex-shrink-0" />
+                        <GitBranch size={16} className="text-purple-400 shrink-0" />
                       ) : (
-                        <Link2 size={16} className="text-gray-400 flex-shrink-0" />
+                        <Link2 size={16} className="text-gray-400 shrink-0" />
                       )}
                       <h3 className="font-medium text-white truncate">{link.title}</h3>
                     </div>
@@ -345,7 +345,7 @@ export default function LinksTab({ onRefresh }) {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => handleEdit(link)}
                       className="p-1.5 text-gray-400 hover:text-white transition-colors"

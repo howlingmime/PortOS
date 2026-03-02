@@ -83,7 +83,7 @@ export default function NotificationDropdown({
       {/* Bell button with badge */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg hover:bg-port-card transition-colors focus:outline-none focus:ring-2 focus:ring-port-accent focus:ring-offset-2 focus:ring-offset-port-bg"
+        className="relative p-2 rounded-lg hover:bg-port-card transition-colors focus:outline-hidden focus:ring-2 focus:ring-port-accent focus:ring-offset-2 focus:ring-offset-port-bg"
         title="Notifications"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
         aria-expanded={isOpen}
@@ -115,7 +115,7 @@ export default function NotificationDropdown({
               {unreadCount > 0 && (
                 <button
                   onClick={onMarkAllAsRead}
-                  className="p-1.5 rounded hover:bg-port-border transition-colors focus:outline-none focus:ring-2 focus:ring-port-accent"
+                  className="p-1.5 rounded hover:bg-port-border transition-colors focus:outline-hidden focus:ring-2 focus:ring-port-accent"
                   title="Mark all as read"
                   aria-label="Mark all notifications as read"
                 >
@@ -125,7 +125,7 @@ export default function NotificationDropdown({
               {notifications.length > 0 && (
                 <button
                   onClick={onClearAll}
-                  className="p-1.5 rounded hover:bg-port-border transition-colors focus:outline-none focus:ring-2 focus:ring-port-accent"
+                  className="p-1.5 rounded hover:bg-port-border transition-colors focus:outline-hidden focus:ring-2 focus:ring-port-accent"
                   title="Clear all"
                   aria-label="Clear all notifications"
                 >
@@ -153,7 +153,7 @@ export default function NotificationDropdown({
                     tabIndex={0}
                     className={`
                       px-4 py-3 border-b border-port-border last:border-b-0 cursor-pointer
-                      hover:bg-port-border/50 transition-colors focus:outline-none focus:bg-port-border/50
+                      hover:bg-port-border/50 transition-colors focus:outline-hidden focus:bg-port-border/50
                       ${!notification.read ? 'bg-port-border/30' : ''}
                       border-l-2 ${PRIORITY_COLORS[notification.priority] || PRIORITY_COLORS.medium}
                     `}
@@ -174,7 +174,7 @@ export default function NotificationDropdown({
                               e.stopPropagation();
                               onRemove(notification.id);
                             }}
-                            className="p-1 rounded hover:bg-port-border transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-port-accent"
+                            className="p-1 rounded hover:bg-port-border transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-port-accent"
                             aria-label={`Remove notification: ${notification.title}`}
                           >
                             <X className="w-3 h-3 text-gray-500" aria-hidden="true" />

@@ -239,7 +239,7 @@ export default function CreateApp() {
                 }
               }}
               placeholder="/Users/you/projects/my-app"
-              className="flex-1 px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none font-mono"
+              className="flex-1 px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden font-mono"
             />
             <FolderPicker
               value={repoPath}
@@ -365,7 +365,7 @@ export default function CreateApp() {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="My Awesome App"
                   required
-                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                 />
               </div>
               <div className="w-32">
@@ -380,7 +380,7 @@ export default function CreateApp() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="A brief description of the app"
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
               />
             </div>
 
@@ -392,7 +392,7 @@ export default function CreateApp() {
                   value={uiPort}
                   onChange={(e) => setUiPort(e.target.value)}
                   placeholder="3000"
-                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                 />
               </div>
               <div>
@@ -402,7 +402,7 @@ export default function CreateApp() {
                   value={devUiPort}
                   onChange={(e) => setDevUiPort(e.target.value)}
                   placeholder="3001"
-                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                 />
               </div>
               <div>
@@ -412,7 +412,7 @@ export default function CreateApp() {
                   value={apiPort}
                   onChange={(e) => setApiPort(e.target.value)}
                   placeholder="3002"
-                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                 />
               </div>
             </div>
@@ -424,7 +424,7 @@ export default function CreateApp() {
                 onChange={(e) => setStartCommands(e.target.value)}
                 placeholder="npm run dev"
                 rows={2}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none font-mono text-sm"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden font-mono text-sm"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Commands to start your app. Multiple lines = multiple PM2 processes.
@@ -438,7 +438,7 @@ export default function CreateApp() {
                 value={buildCommand}
                 onChange={(e) => setBuildCommand(e.target.value)}
                 placeholder="npm run build"
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none font-mono text-sm"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden font-mono text-sm"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Command to build the production UI. Enables the Build button.
@@ -452,7 +452,7 @@ export default function CreateApp() {
                 value={pm2Names}
                 onChange={(e) => setPm2Names(e.target.value)}
                 placeholder="my-app-ui, my-app-api"
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Names for PM2 processes. Leave blank to auto-generate from app name.

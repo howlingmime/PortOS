@@ -29,6 +29,8 @@ export const classificationSchema = z.object({
   destination: destinationEnum,
   confidence: z.number().min(0).max(1),
   title: z.string().min(1).max(200),
+  cleanedUp: z.string().max(10000).optional(),
+  thoughts: z.string().max(2000).optional(),
   extracted: z.record(z.unknown()),
   reasons: z.array(z.string()).max(5).optional()
 });
@@ -269,6 +271,8 @@ export const classifierOutputSchema = z.object({
   destination: destinationEnum,
   confidence: z.number().min(0).max(1),
   title: z.string().min(1).max(200),
+  cleanedUp: z.string().max(10000).optional().default(''),
+  thoughts: z.string().max(2000).optional().default(''),
   extracted: z.record(z.unknown()),
   reasons: z.array(z.string()).max(5).optional().default([])
 });

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Clock, RefreshCw, Activity, Image, X, XCircle, Cpu, MemoryStick, Terminal, Trash2, MessageSquarePlus, Info, Save, Maximize2, RotateCcw } from 'lucide-react';
+import { Clock, RefreshCw, Activity, Image, X, XCircle, Cpu, MemoryStick, Terminal, Trash2, MessageSquarePlus, Info, Save, RotateCcw } from 'lucide-react';
+import ProcessesTab from '../components/apps/tabs/ProcessesTab';
 import toast from 'react-hot-toast';
 import * as api from '../services/api';
 import socket from '../services/socket';
@@ -102,7 +103,7 @@ export function HistoryPage() {
           <select
             value={filter.action}
             onChange={(e) => setFilter(prev => ({ ...prev, action: e.target.value }))}
-            className="px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-port-accent"
+            className="px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-port-accent"
             aria-label="Filter by action type"
           >
             <option value="">All Actions</option>
@@ -114,7 +115,7 @@ export function HistoryPage() {
           <select
             value={filter.success}
             onChange={(e) => setFilter(prev => ({ ...prev, success: e.target.value }))}
-            className="px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-port-accent"
+            className="px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-port-accent"
             aria-label="Filter by result status"
           >
             <option value="">All Results</option>
@@ -166,13 +167,13 @@ export function HistoryPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <button
-                        className="text-gray-400 hover:text-white flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-port-accent rounded"
+                        className="text-gray-400 hover:text-white shrink-0 focus:outline-hidden focus:ring-2 focus:ring-port-accent rounded"
                         aria-expanded={expandedId === entry.id}
                         aria-label={`${expandedId === entry.id ? 'Collapse' : 'Expand'} ${entry.action} details`}
                       >
                         <span className={`inline-block transition-transform ${expandedId === entry.id ? 'rotate-90' : ''}`} aria-hidden="true">▶</span>
                       </button>
-                      <span className="text-xl flex-shrink-0">{getActionIcon(entry.action)}</span>
+                      <span className="text-xl shrink-0">{getActionIcon(entry.action)}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span className="font-medium text-white">{entry.action}</span>
@@ -190,14 +191,14 @@ export function HistoryPage() {
                     </div>
                     <div className="flex items-center gap-3 pl-8 sm:pl-0">
                       <span
-                        className={`w-2 h-2 rounded-full flex-shrink-0 ${entry.success ? 'bg-port-success' : 'bg-port-error'}`}
+                        className={`w-2 h-2 rounded-full shrink-0 ${entry.success ? 'bg-port-success' : 'bg-port-error'}`}
                         role="img"
                         aria-label={entry.success ? 'Success' : 'Failed'}
                       />
-                      <span className="text-sm text-gray-500 flex-shrink-0">{formatTime(entry.timestamp)}</span>
+                      <span className="text-sm text-gray-500 shrink-0">{formatTime(entry.timestamp)}</span>
                       <button
                         onClick={(e) => handleDelete(entry.id, e)}
-                        className="p-1 text-gray-500 hover:text-port-error transition-colors sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-port-accent rounded"
+                        className="p-1 text-gray-500 hover:text-port-error transition-colors sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-port-accent rounded"
                         title="Delete entry"
                         aria-label={`Delete ${entry.action} entry from ${formatTime(entry.timestamp)}`}
                       >
@@ -516,10 +517,10 @@ export function RunsHistoryPage() {
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <button className="text-gray-400 hover:text-white flex-shrink-0">
+                      <button className="text-gray-400 hover:text-white shrink-0">
                         <span className={`inline-block transition-transform ${expandedId === run.id ? 'rotate-90' : ''}`}>▶</span>
                       </button>
-                      <span className="text-xl flex-shrink-0">🤖</span>
+                      <span className="text-xl shrink-0">🤖</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span className="font-medium text-white">{run.providerName}</span>
@@ -557,8 +558,8 @@ export function RunsHistoryPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3 pl-8 sm:pl-0">
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${run.success ? 'bg-port-success' : run.success === false ? 'bg-port-error' : 'bg-port-warning'}`} />
-                      <span className="text-sm text-gray-500 flex-shrink-0">{formatTime(run.startTime)}</span>
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${run.success ? 'bg-port-success' : run.success === false ? 'bg-port-error' : 'bg-port-warning'}`} />
+                      <span className="text-sm text-gray-500 shrink-0">{formatTime(run.startTime)}</span>
                       {run.success !== null && (
                         <button
                           onClick={(e) => handleResume(run, e)}
@@ -1167,7 +1168,7 @@ ${prompt.trim()}`;
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Describe what you want the AI to do..."
             rows={3}
-            className="flex-1 px-3 sm:px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none resize-none text-sm sm:text-base"
+            className="flex-1 px-3 sm:px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden resize-none text-sm sm:text-base"
           />
           {running ? (
             <button
@@ -1195,7 +1196,7 @@ ${prompt.trim()}`;
               onChange={(e) => setCommand(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !running && handleRunCommand()}
               placeholder="Enter command (e.g., npm run build)"
-              className="flex-1 px-3 sm:px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white font-mono focus:border-port-accent focus:outline-none text-sm sm:text-base"
+              className="flex-1 px-3 sm:px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white font-mono focus:border-port-accent focus:outline-hidden text-sm sm:text-base"
             />
             {running ? (
               <button
@@ -1239,140 +1240,24 @@ ${prompt.trim()}`;
 }
 
 export function ProcessesPage() {
-  const [processes, setProcesses] = useState([]);
   const [managedProcessNames, setManagedProcessNames] = useState(new Set());
-  const [loading, setLoading] = useState(true);
-  const [expandedProcess, setExpandedProcess] = useState(null);
-  const [logs, setLogs] = useState([]);
-  const [restarting, setRestarting] = useState({});
-  const [tailLines, setTailLines] = useState(500);
-  const [subscribed, setSubscribed] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
-  const logsRef = useRef(null);
-  const fullscreenLogsRef = useRef(null);
 
   useEffect(() => {
-    loadProcesses();
+    const loadManagedProcessNames = async () => {
+      const apps = await api.getApps().catch(() => []);
+      const names = new Set();
+      apps.forEach(app => {
+        (app.pm2ProcessNames || []).forEach(name => names.add(name));
+      });
+      setManagedProcessNames(names);
+    };
     loadManagedProcessNames();
-    const interval = setInterval(loadProcesses, 5000);
-    return () => clearInterval(interval);
   }, []);
-
-  const loadManagedProcessNames = async () => {
-    const apps = await api.getApps().catch(() => []);
-    const names = new Set();
-    apps.forEach(app => {
-      (app.pm2ProcessNames || []).forEach(name => names.add(name));
-    });
-    setManagedProcessNames(names);
-  };
 
   const isPortOSManaged = (procName) => {
     if (procName.startsWith('portos-')) return true;
     return managedProcessNames.has(procName);
-  };
-
-  useEffect(() => {
-    if (!expandedProcess) {
-      setLogs([]);
-      setSubscribed(false);
-      return;
-    }
-
-    // Subscribe to logs via socket
-    socket.emit('logs:subscribe', { processName: expandedProcess, lines: tailLines });
-
-    const handleLog = (data) => {
-      if (data.processName === expandedProcess) {
-        setLogs(prev => [...prev.slice(-1000), {
-          line: data.line,
-          type: data.type,
-          timestamp: data.timestamp
-        }]);
-        setTimeout(() => {
-          if (logsRef.current) {
-            logsRef.current.scrollTop = logsRef.current.scrollHeight;
-          }
-          if (fullscreenLogsRef.current) {
-            fullscreenLogsRef.current.scrollTop = fullscreenLogsRef.current.scrollHeight;
-          }
-        }, 10);
-      }
-    };
-
-    const handleSubscribed = (data) => {
-      if (data.processName === expandedProcess) {
-        setSubscribed(true);
-      }
-    };
-
-    const handleError = (data) => {
-      if (data.processName === expandedProcess) {
-        setLogs(prev => [...prev, { line: `Error: ${data.error}`, type: 'stderr', timestamp: Date.now() }]);
-      }
-    };
-
-    socket.on('logs:line', handleLog);
-    socket.on('logs:subscribed', handleSubscribed);
-    socket.on('logs:error', handleError);
-
-    return () => {
-      socket.emit('logs:unsubscribe', { processName: expandedProcess });
-      socket.off('logs:line', handleLog);
-      socket.off('logs:subscribed', handleSubscribed);
-      socket.off('logs:error', handleError);
-    };
-  }, [expandedProcess, tailLines]);
-
-  const loadProcesses = async () => {
-    const data = await api.getProcessesList().catch(() => []);
-    setProcesses(data);
-    setLoading(false);
-  };
-
-  const handleRestart = async (name) => {
-    setRestarting(prev => ({ ...prev, [name]: true }));
-    await fetch('/api/commands/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command: `pm2 restart ${name}` })
-    }).catch(() => null);
-    setTimeout(() => {
-      setRestarting(prev => ({ ...prev, [name]: false }));
-      loadProcesses();
-    }, 2000);
-  };
-
-  const handleStop = async (name) => {
-    setRestarting(prev => ({ ...prev, [name]: true }));
-    await fetch('/api/commands/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command: `pm2 stop ${name}` })
-    }).catch(() => null);
-    setTimeout(() => {
-      setRestarting(prev => ({ ...prev, [name]: false }));
-      loadProcesses();
-    }, 2000);
-  };
-
-  const handleStart = async (name) => {
-    setRestarting(prev => ({ ...prev, [name]: true }));
-    await fetch('/api/commands/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command: `pm2 start ${name}` })
-    }).catch(() => null);
-    setTimeout(() => {
-      setRestarting(prev => ({ ...prev, [name]: false }));
-      loadProcesses();
-    }, 2000);
-  };
-
-  const toggleExpand = (name) => {
-    setExpandedProcess(prev => prev === name ? null : name);
-    setLogs([]);
   };
 
   const handlePm2Save = async () => {
@@ -1390,288 +1275,22 @@ export function ProcessesPage() {
     }
   };
 
-  // Filter to only show PortOS-managed processes
-  const managedProcesses = processes.filter(proc => isPortOSManaged(proc.name));
-
-  const formatMemory = (bytes) => {
-    if (!bytes) return '0 MB';
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  };
-
-  const formatUptime = (ms) => {
-    if (!ms) return '-';
-    const hours = Math.floor(ms / 3600000);
-    const mins = Math.floor((ms % 3600000) / 60000);
-    if (hours > 24) {
-      return `${Math.floor(hours / 24)}d ${hours % 24}h`;
-    }
-    return `${hours}h ${mins}m`;
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'online': return 'bg-port-success';
-      case 'stopped': return 'bg-gray-500';
-      case 'errored': return 'bg-port-error';
-      default: return 'bg-port-warning';
-    }
-  };
-
-  if (loading) {
-    return <div className="text-center py-8"><BrailleSpinner text="Loading processes" /></div>;
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">PM2 Processes</h1>
-          <p className="text-gray-500 text-sm sm:text-base">PortOS-managed processes ({managedProcesses.length} of {processes.length} total)</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handlePm2Save}
-            disabled={saving}
-            className="px-3 sm:px-4 py-2 bg-port-accent hover:bg-port-accent/80 text-white rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 text-sm sm:text-base"
-          >
-            <Save size={16} className={saving ? 'animate-pulse' : ''} />
-            <span className="hidden sm:inline">{saving ? 'Saving...' : 'PM2 Save'}</span>
-            <span className="sm:hidden">{saving ? '...' : 'Save'}</span>
-          </button>
-          <button
-            onClick={loadProcesses}
-            className="px-3 sm:px-4 py-2 bg-port-border hover:bg-port-border/80 text-white rounded-lg transition-colors text-sm sm:text-base"
-          >
-            Refresh
-          </button>
-        </div>
+        <h1 className="text-2xl font-bold text-white">PM2 Processes</h1>
+        <button
+          onClick={handlePm2Save}
+          disabled={saving}
+          className="px-3 sm:px-4 py-2 bg-port-accent hover:bg-port-accent/80 text-white rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 text-sm sm:text-base"
+        >
+          <Save size={16} className={saving ? 'animate-pulse' : ''} />
+          <span className="hidden sm:inline">{saving ? 'Saving...' : 'PM2 Save'}</span>
+          <span className="sm:hidden">{saving ? '...' : 'Save'}</span>
+        </button>
       </div>
 
-      <div className="bg-port-card border border-port-border rounded-xl overflow-hidden overflow-x-auto">
-        <table className="w-full min-w-[700px]">
-          <thead className="bg-port-border/50">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-400 w-8"></th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Name</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Status</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">PID</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">CPU</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Memory</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Uptime</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Restarts</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-400">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-port-border">
-            {managedProcesses.map(proc => (
-              <Fragment key={proc.pm_id}>
-                <tr className="hover:bg-port-border/20">
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => toggleExpand(proc.name)}
-                      className="text-gray-400 hover:text-white transition-transform"
-                    >
-                      <span className={`inline-block transition-transform ${expandedProcess === proc.name ? 'rotate-90' : ''}`}>▶</span>
-                    </button>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="font-medium text-white">{proc.name}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-2 px-2 py-1 rounded text-xs ${getStatusColor(proc.status)} bg-opacity-20`}>
-                      <span className={`w-2 h-2 rounded-full ${getStatusColor(proc.status)}`} />
-                      {proc.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-400 font-mono text-sm">{proc.pid || '-'}</td>
-                  <td className="px-4 py-3 text-gray-400">{proc.cpu ? `${proc.cpu}%` : '-'}</td>
-                  <td className="px-4 py-3 text-gray-400">{formatMemory(proc.memory)}</td>
-                  <td className="px-4 py-3 text-gray-400">{formatUptime(proc.uptime)}</td>
-                  <td className="px-4 py-3 text-gray-400">{proc.restarts}</td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-1">
-                      {proc.status === 'online' ? (
-                        <>
-                          <button
-                            onClick={() => handleRestart(proc.name)}
-                            disabled={restarting[proc.name]}
-                            className="px-2 py-1 text-xs bg-port-warning/20 text-port-warning hover:bg-port-warning/30 rounded disabled:opacity-50"
-                          >
-                            {restarting[proc.name] ? '...' : 'Restart'}
-                          </button>
-                          <button
-                            onClick={() => handleStop(proc.name)}
-                            disabled={restarting[proc.name]}
-                            className="px-2 py-1 text-xs bg-port-error/20 text-port-error hover:bg-port-error/30 rounded disabled:opacity-50"
-                          >
-                            Stop
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => handleStart(proc.name)}
-                          disabled={restarting[proc.name]}
-                          className="px-2 py-1 text-xs bg-port-success/20 text-port-success hover:bg-port-success/30 rounded disabled:opacity-50"
-                        >
-                          {restarting[proc.name] ? '...' : 'Start'}
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-                {expandedProcess === proc.name && (
-                  <tr>
-                    <td colSpan={9} className="p-0">
-                      <div className="bg-port-bg border-t border-port-border">
-                        <div className="flex items-center justify-between px-4 py-2 border-b border-port-border">
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs text-gray-400">Live logs for {proc.name}</span>
-                            {subscribed && (
-                              <span className="text-xs text-port-success">● streaming</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2">
-                              <label className="text-xs text-gray-500">Tail lines:</label>
-                              <select
-                                value={tailLines}
-                                onChange={(e) => {
-                                  setTailLines(Number(e.target.value));
-                                  setLogs([]);
-                                }}
-                                className="px-2 py-1 text-xs bg-port-card border border-port-border rounded text-white"
-                              >
-                                <option value={100}>100</option>
-                                <option value={250}>250</option>
-                                <option value={500}>500</option>
-                                <option value={1000}>1000</option>
-                                <option value={2000}>2000</option>
-                              </select>
-                            </div>
-                            <span className="text-xs text-gray-600">{logs.length} lines</span>
-                            <button
-                              onClick={() => setLogs([])}
-                              className="text-xs text-gray-500 hover:text-white"
-                            >
-                              Clear
-                            </button>
-                            <button
-                              onClick={() => setFullscreen(true)}
-                              className="text-xs text-gray-500 hover:text-white flex items-center gap-1"
-                              title="Fullscreen"
-                            >
-                              <Maximize2 size={12} />
-                              Fullscreen
-                            </button>
-                          </div>
-                        </div>
-                        <div
-                          ref={logsRef}
-                          className="h-[32rem] overflow-auto p-3 font-mono text-xs"
-                        >
-                          {logs.length === 0 ? (
-                            <div className="text-gray-500">
-                              {subscribed ? 'No logs yet...' : 'Connecting to log stream...'}
-                            </div>
-                          ) : (
-                            logs.map((log, i) => (
-                              <div
-                                key={i}
-                                className={`py-0.5 ${log.type === 'stderr' ? 'text-port-error' : 'text-gray-300'}`}
-                              >
-                                <span className="text-gray-600 mr-2">
-                                  {new Date(log.timestamp).toLocaleTimeString()}
-                                </span>
-                                {log.line}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
-            {processes.length === 0 && (
-              <tr>
-                <td colSpan={9} className="px-4 py-12 text-center text-gray-500">
-                  No PM2 processes running
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Fullscreen Log Modal */}
-      {fullscreen && expandedProcess && (
-        <div className="fixed inset-0 bg-port-bg z-50 flex flex-col">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-port-border bg-port-card">
-            <div className="flex items-center gap-4">
-              <span className="text-lg font-medium text-white">Logs: {expandedProcess}</span>
-              {subscribed && (
-                <span className="text-sm text-port-success">● streaming</span>
-              )}
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-500">Tail lines:</label>
-                <select
-                  value={tailLines}
-                  onChange={(e) => {
-                    setTailLines(Number(e.target.value));
-                    setLogs([]);
-                  }}
-                  className="px-2 py-1 text-sm bg-port-bg border border-port-border rounded text-white"
-                >
-                  <option value={100}>100</option>
-                  <option value={250}>250</option>
-                  <option value={500}>500</option>
-                  <option value={1000}>1000</option>
-                  <option value={2000}>2000</option>
-                </select>
-              </div>
-              <span className="text-sm text-gray-600">{logs.length} lines</span>
-              <button
-                onClick={() => setLogs([])}
-                className="text-sm text-gray-500 hover:text-white"
-              >
-                Clear
-              </button>
-              <button
-                onClick={() => setFullscreen(false)}
-                className="p-2 text-gray-400 hover:text-white"
-                title="Exit fullscreen"
-              >
-                <X size={20} />
-              </button>
-            </div>
-          </div>
-          <div
-            ref={fullscreenLogsRef}
-            className="flex-1 overflow-auto p-4 font-mono text-sm"
-          >
-            {logs.length === 0 ? (
-              <div className="text-gray-500">
-                {subscribed ? 'No logs yet...' : 'Connecting to log stream...'}
-              </div>
-            ) : (
-              logs.map((log, i) => (
-                <div
-                  key={i}
-                  className={`py-0.5 ${log.type === 'stderr' ? 'text-port-error' : 'text-gray-300'}`}
-                >
-                  <span className="text-gray-600 mr-3">
-                    {new Date(log.timestamp).toLocaleTimeString()}
-                  </span>
-                  {log.line}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+      <ProcessesTab filterFn={isPortOSManaged} />
     </div>
   );
 }
@@ -1936,15 +1555,15 @@ export function AgentsPage() {
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className="font-mono text-white text-sm truncate">{agent.agentName.toLowerCase()}</span>
                   {agent.source === 'cos' && (
-                    <span className="px-1.5 py-0.5 text-[10px] bg-purple-500/20 text-purple-400 rounded flex-shrink-0">CoS</span>
+                    <span className="px-1.5 py-0.5 text-[10px] bg-purple-500/20 text-purple-400 rounded shrink-0">CoS</span>
                   )}
-                  <span className="text-gray-500 text-xs flex-shrink-0">#{agent.pid}</span>
-                  <span className="font-mono text-cyan-400 text-xs flex-shrink-0 whitespace-nowrap">{agent.runtimeFormatted}</span>
+                  <span className="text-gray-500 text-xs shrink-0">#{agent.pid}</span>
+                  <span className="font-mono text-cyan-400 text-xs shrink-0 whitespace-nowrap">{agent.runtimeFormatted}</span>
                 </div>
                 <button
                   onClick={() => handleKill(agent.pid)}
                   disabled={killing[agent.pid]}
-                  className="flex-shrink-0 px-2 py-1 bg-red-500/20 text-red-400 hover:bg-red-500/30 hover:text-red-300 disabled:opacity-50 rounded text-xs font-medium flex items-center gap-1"
+                  className="shrink-0 px-2 py-1 bg-red-500/20 text-red-400 hover:bg-red-500/30 hover:text-red-300 disabled:opacity-50 rounded text-xs font-medium flex items-center gap-1"
                 >
                   <XCircle size={14} className={killing[agent.pid] ? 'animate-pulse' : ''} />
                   Kill

@@ -91,7 +91,7 @@ export default function DigitalTwin() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 gap-3 border-b border-port-border">
         <div className="flex items-center gap-3">
-          <Heart className="w-8 h-8 text-pink-500 flex-shrink-0" />
+          <Heart className="w-8 h-8 text-pink-500 shrink-0" />
           <div>
             <h1 className="text-xl font-bold text-white">Digital Twin</h1>
             <p className="text-sm text-gray-500">Identity scaffold for AI interactions</p>

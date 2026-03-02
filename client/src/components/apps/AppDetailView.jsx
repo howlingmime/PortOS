@@ -13,6 +13,7 @@ import AutomationTab from './tabs/AutomationTab';
 import DocumentsTab from './tabs/DocumentsTab';
 import GitTab from './tabs/GitTab';
 import GsdTab from './tabs/GsdTab';
+import ProcessesTab from './tabs/ProcessesTab';
 
 export default function AppDetailView() {
   const { appId, tab } = useParams();
@@ -111,6 +112,8 @@ export default function AppDetailView() {
         return <GitTab appId={appId} appName={app.name} repoPath={app.repoPath} />;
       case 'gsd':
         return <GsdTab appId={appId} repoPath={app.repoPath} />;
+      case 'processes':
+        return <ProcessesTab pm2ProcessNames={app.pm2ProcessNames} />;
       default:
         return <OverviewTab app={app} onRefresh={fetchApp} />;
     }

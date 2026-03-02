@@ -93,7 +93,7 @@ function JobCard({ job, onToggle, onTrigger, onDelete, onUpdate }) {
         {/* Toggle */}
         <button
           onClick={() => onToggle(job.id)}
-          className={`flex-shrink-0 transition-colors ${
+          className={`shrink-0 transition-colors ${
             job.enabled ? 'text-port-success' : 'text-gray-600'
           }`}
           title={job.enabled ? 'Disable job' : 'Enable job'}

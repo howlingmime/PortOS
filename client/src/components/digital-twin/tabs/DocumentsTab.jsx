@@ -122,7 +122,7 @@ export default function DocumentsTab({ onRefresh }) {
   return (
     <div className="flex flex-col lg:flex-row h-full gap-4">
       {/* Document List Sidebar */}
-      <div className={`${selectedDoc ? 'hidden lg:flex' : 'flex'} w-full lg:w-72 flex-shrink-0 bg-port-card rounded-lg border border-port-border overflow-hidden flex-col`}>
+      <div className={`${selectedDoc ? 'hidden lg:flex' : 'flex'} w-full lg:w-72 shrink-0 bg-port-card rounded-lg border border-port-border overflow-hidden flex-col`}>
         <div className="p-3 border-b border-port-border flex items-center justify-between">
           <h3 className="font-medium text-white">Documents</h3>
           <button
@@ -193,14 +193,14 @@ export default function DocumentsTab({ onRefresh }) {
                     <ArrowLeft size={18} />
                   </button>
                   <h3 className="font-medium text-white truncate">{selectedDoc.title}</h3>
-                  <span className={`hidden sm:inline text-xs px-2 py-0.5 rounded flex-shrink-0 ${DOCUMENT_CATEGORIES[selectedDoc.category]?.color}`}>
+                  <span className={`hidden sm:inline text-xs px-2 py-0.5 rounded shrink-0 ${DOCUMENT_CATEGORIES[selectedDoc.category]?.color}`}>
                     {DOCUMENT_CATEGORIES[selectedDoc.category]?.label}
                   </span>
                   {selectedDoc.version && (
-                    <span className="hidden sm:inline text-xs text-gray-500 flex-shrink-0">v{selectedDoc.version}</span>
+                    <span className="hidden sm:inline text-xs text-gray-500 shrink-0">v{selectedDoc.version}</span>
                   )}
                 </div>
-                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                   {/* Weight Control - hidden on mobile */}
                   <div className="hidden md:flex items-center gap-2 px-2 py-1 bg-port-bg rounded border border-port-border" title="Document weight (1-10): Higher weight = included first when truncating">
                     <Scale size={14} className="text-gray-500" />
@@ -286,7 +286,7 @@ export default function DocumentsTab({ onRefresh }) {
                 <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  className="w-full h-full p-4 bg-port-bg text-white font-mono text-sm resize-none focus:outline-none"
+                  className="w-full h-full p-4 bg-port-bg text-white font-mono text-sm resize-none focus:outline-hidden"
                   placeholder="Write your soul document here..."
                 />
               ) : (

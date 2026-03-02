@@ -327,7 +327,7 @@ export default function PromptManager() {
                     <div className="flex items-center gap-1">
                       <span className="font-medium truncate">{config.name || name}</span>
                       {systemStages.includes(name) && (
-                        <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 bg-port-accent/20 text-port-accent rounded uppercase font-semibold">
+                        <span className="shrink-0 text-[10px] px-1.5 py-0.5 bg-port-accent/20 text-port-accent rounded uppercase font-semibold">
                           System
                         </span>
                       )}
@@ -336,7 +336,7 @@ export default function PromptManager() {
                   </button>
                   <button
                     onClick={() => deleteStage(name)}
-                    className="flex-shrink-0 p-1 text-gray-500 hover:text-port-error"
+                    className="shrink-0 p-1 text-gray-500 hover:text-port-error"
                     title="Delete stage"
                   >
                     <Trash2 size={14} />
@@ -398,7 +398,7 @@ export default function PromptManager() {
                         <select
                           value={stageConfig.model || 'default'}
                           onChange={(e) => setStageConfig({ ...stageConfig, model: e.target.value })}
-                          className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                          className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                         >
                           <option value="default">Default</option>
                           <option value="quick">Quick</option>
@@ -432,7 +432,7 @@ export default function PromptManager() {
                     <textarea
                       value={stageTemplate}
                       onChange={(e) => setStageTemplate(e.target.value)}
-                      className="w-full h-96 px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white font-mono text-sm focus:border-port-accent focus:outline-none"
+                      className="w-full h-96 px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white font-mono text-sm focus:border-port-accent focus:outline-hidden"
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       Use {'{{variable}}'} for substitution, {'{{#array}}...{{/array}}'} for iteration
@@ -528,7 +528,7 @@ export default function PromptManager() {
                       onChange={(e) => setVarForm({ ...varForm, key: e.target.value })}
                       disabled={!!selectedVar}
                       placeholder="variableKey"
-                      className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none disabled:opacity-50"
+                      className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden disabled:opacity-50"
                     />
                   </div>
                   <div>
@@ -538,7 +538,7 @@ export default function PromptManager() {
                       value={varForm.name}
                       onChange={(e) => setVarForm({ ...varForm, name: e.target.value })}
                       placeholder="Human Readable Name"
-                      className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                      className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                     />
                   </div>
                 </div>
@@ -548,7 +548,7 @@ export default function PromptManager() {
                   <select
                     value={varForm.category}
                     onChange={(e) => setVarForm({ ...varForm, category: e.target.value })}
-                    className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                    className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                   >
                     <option value="">Select category</option>
                     <option value="response">Response Format</option>
@@ -563,7 +563,7 @@ export default function PromptManager() {
                   <textarea
                     value={varForm.content}
                     onChange={(e) => setVarForm({ ...varForm, content: e.target.value })}
-                    className="w-full h-48 px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white font-mono text-sm focus:border-port-accent focus:outline-none"
+                    className="w-full h-48 px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white font-mono text-sm focus:border-port-accent focus:outline-hidden"
                     placeholder="Variable content..."
                   />
                 </div>
@@ -596,7 +596,7 @@ export default function PromptManager() {
                   <div className="flex items-center gap-1">
                     <span className="font-medium">{skill.name}</span>
                     {skill.hasTemplate && (
-                      <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 bg-port-success/20 text-port-success rounded uppercase font-semibold">
+                      <span className="shrink-0 text-[10px] px-1.5 py-0.5 bg-port-success/20 text-port-success rounded uppercase font-semibold">
                         Active
                       </span>
                     )}
@@ -646,7 +646,7 @@ export default function PromptManager() {
                     <textarea
                       value={jobSkillContent}
                       onChange={(e) => setJobSkillContent(e.target.value)}
-                      className="w-full h-96 px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white font-mono text-sm focus:border-port-accent focus:outline-none"
+                      className="w-full h-96 px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white font-mono text-sm focus:border-port-accent focus:outline-hidden"
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       Sections: ## Prompt Template, ## Steps, ## Expected Outputs, ## Success Criteria
@@ -697,7 +697,7 @@ export default function PromptManager() {
                     value={newStageForm.stageName}
                     onChange={(e) => setNewStageForm({ ...newStageForm, stageName: e.target.value })}
                     placeholder="my-stage"
-                    className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                    className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                   />
                   <p className="text-xs text-gray-500 mt-1">Lowercase, hyphens only</p>
                 </div>
@@ -708,7 +708,7 @@ export default function PromptManager() {
                     value={newStageForm.name}
                     onChange={(e) => setNewStageForm({ ...newStageForm, name: e.target.value })}
                     placeholder="My Stage"
-                    className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                    className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                   />
                 </div>
               </div>
@@ -720,7 +720,7 @@ export default function PromptManager() {
                   value={newStageForm.description}
                   onChange={(e) => setNewStageForm({ ...newStageForm, description: e.target.value })}
                   placeholder="What this stage does"
-                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                 />
               </div>
 
@@ -754,7 +754,7 @@ export default function PromptManager() {
                     <select
                       value={newStageForm.model}
                       onChange={(e) => setNewStageForm({ ...newStageForm, model: e.target.value })}
-                      className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                      className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                     >
                       <option value="default">Default</option>
                       <option value="quick">Quick</option>
@@ -793,7 +793,7 @@ export default function PromptManager() {
                 <textarea
                   value={newStageForm.template}
                   onChange={(e) => setNewStageForm({ ...newStageForm, template: e.target.value })}
-                  className="w-full h-64 px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white font-mono text-sm focus:border-port-accent focus:outline-none"
+                  className="w-full h-64 px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white font-mono text-sm focus:border-port-accent focus:outline-hidden"
                   placeholder="Enter your prompt template here..."
                 />
               </div>

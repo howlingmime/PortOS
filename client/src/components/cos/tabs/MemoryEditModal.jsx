@@ -136,7 +136,7 @@ export default function MemoryEditModal({ memory, apps, onSave, onClose }) {
               onChange={e => setFormData({ ...formData, content: e.target.value })}
               placeholder="Memory content..."
               rows={5}
-              className="w-full px-3 py-3 min-h-[120px] bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none resize-none"
+              className="w-full px-3 py-3 min-h-[120px] bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden resize-none"
               autoFocus
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -152,7 +152,7 @@ export default function MemoryEditModal({ memory, apps, onSave, onClose }) {
               value={formData.summary}
               onChange={e => setFormData({ ...formData, summary: e.target.value })}
               placeholder="Brief summary..."
-              className="w-full px-3 py-3 min-h-[44px] bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none"
+              className="w-full px-3 py-3 min-h-[44px] bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden"
             />
           </div>
 
@@ -163,7 +163,7 @@ export default function MemoryEditModal({ memory, apps, onSave, onClose }) {
               <select
                 value={formData.category}
                 onChange={e => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-3 py-3 min-h-[44px] bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none"
+                className="w-full px-3 py-3 min-h-[44px] bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden"
               >
                 <option value="other">Other</option>
                 <option value="codebase">Codebase</option>
@@ -182,7 +182,7 @@ export default function MemoryEditModal({ memory, apps, onSave, onClose }) {
               <select
                 value={formData.sourceAppId}
                 onChange={e => setFormData({ ...formData, sourceAppId: e.target.value })}
-                className="w-full px-3 py-3 min-h-[44px] bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none"
+                className="w-full px-3 py-3 min-h-[44px] bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden"
               >
                 <option value="">None (General)</option>
                 {apps?.map(app => (
@@ -219,7 +219,7 @@ export default function MemoryEditModal({ memory, apps, onSave, onClose }) {
                 onChange={e => setNewTag(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Add tag..."
-                className="flex-1 px-3 py-3 min-h-[44px] bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none"
+                className="flex-1 px-3 py-3 min-h-[44px] bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden"
               />
               <button
                 type="button"

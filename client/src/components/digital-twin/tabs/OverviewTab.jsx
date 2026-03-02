@@ -200,7 +200,7 @@ export default function OverviewTab({ status, settings, onRefresh }) {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-6">
-          <div className="relative w-28 h-28 sm:w-32 sm:h-32 flex-shrink-0">
+          <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0">
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 128 128">
               <circle
                 cx="64"
@@ -503,7 +503,7 @@ export default function OverviewTab({ status, settings, onRefresh }) {
           onClick={() => navigate('/digital-twin/test')}
           className="flex items-center gap-3 sm:gap-4 p-4 min-h-[72px] bg-port-card rounded-lg border border-port-border hover:border-port-accent transition-colors"
         >
-          <div className="p-2.5 sm:p-3 rounded-lg bg-green-500/20 flex-shrink-0">
+          <div className="p-2.5 sm:p-3 rounded-lg bg-green-500/20 shrink-0">
             <Play className="w-5 h-5 sm:w-6 sm:h-6 text-green-400" />
           </div>
           <div className="text-left min-w-0">
@@ -520,7 +520,7 @@ export default function OverviewTab({ status, settings, onRefresh }) {
           onClick={() => navigate(gaps[0]?.suggestedCategory ? `/digital-twin/enrich?category=${gaps[0].suggestedCategory}` : '/digital-twin/enrich')}
           className="flex items-center gap-3 sm:gap-4 p-4 min-h-[72px] bg-port-card rounded-lg border border-port-border hover:border-port-accent transition-colors"
         >
-          <div className="p-2.5 sm:p-3 rounded-lg bg-yellow-500/20 flex-shrink-0">
+          <div className="p-2.5 sm:p-3 rounded-lg bg-yellow-500/20 shrink-0">
             <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-400" />
           </div>
           <div className="text-left min-w-0">
@@ -535,7 +535,7 @@ export default function OverviewTab({ status, settings, onRefresh }) {
           onClick={() => navigate('/digital-twin/export')}
           className="flex items-center gap-3 sm:gap-4 p-4 min-h-[72px] bg-port-card rounded-lg border border-port-border hover:border-port-accent transition-colors"
         >
-          <div className="p-2.5 sm:p-3 rounded-lg bg-blue-500/20 flex-shrink-0">
+          <div className="p-2.5 sm:p-3 rounded-lg bg-blue-500/20 shrink-0">
             <Download className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
           </div>
           <div className="text-left min-w-0">

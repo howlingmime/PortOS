@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -16,12 +17,27 @@ const getThemeHex = (varName) => {
 };
 
 export default function Shell() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const terminalRef = useRef(null);
   const termInstanceRef = useRef(null);
   const fitAddonRef = useRef(null);
   const sessionIdRef = useRef(null);
+  const initialOptsRef = useRef(null);
   const socket = useSocket();
   const [connected, setConnected] = useState(false);
+
+  // Read query params once on mount for initial session options
+  if (!initialOptsRef.current) {
+    const cwd = searchParams.get('cwd');
+    const cmd = searchParams.get('cmd');
+    if (cwd || cmd) {
+      initialOptsRef.current = { cwd, cmd };
+      // Clear query params from URL so restart/refresh starts a plain shell
+      setSearchParams({}, { replace: true });
+    } else {
+      initialOptsRef.current = {};
+    }
+  }
 
   // Initialize terminal once
   useEffect(() => {
@@ -129,7 +145,13 @@ export default function Shell() {
       termInstanceRef.current.clear();
       termInstanceRef.current.writeln('\x1b[36mStarting shell session...\x1b[0m');
     }
-    socket.emit('shell:start');
+    const opts = initialOptsRef.current || {};
+    const startOpts = {};
+    if (opts.cwd) startOpts.cwd = opts.cwd;
+    if (opts.cmd) startOpts.initialCommand = opts.cmd;
+    // Only use initial opts once
+    initialOptsRef.current = {};
+    socket.emit('shell:start', Object.keys(startOpts).length > 0 ? startOpts : undefined);
   }, [socket]);
 
   const stopSession = useCallback(() => {

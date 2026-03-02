@@ -219,7 +219,7 @@ export default function InboxTab({ onRefresh, settings }) {
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder="One thought at a time..."
-            className="flex-1 px-4 py-3 bg-port-card border border-port-border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-port-accent"
+            className="flex-1 px-4 py-3 bg-port-card border border-port-border rounded-lg text-white placeholder-gray-500 focus:outline-hidden focus:border-port-accent"
             disabled={sending}
           />
           <button
@@ -343,6 +343,18 @@ export default function InboxTab({ onRefresh, settings }) {
                       {formatRelativeTime(entry.capturedAt)}
                     </span>
                   </div>
+
+                  {entry.classification?.cleanedUp && entry.classification.cleanedUp !== entry.capturedText && (
+                    <p className="text-sm text-gray-300 mb-2 pl-3 border-l-2 border-port-accent/30">
+                      {entry.classification.cleanedUp}
+                    </p>
+                  )}
+
+                  {entry.classification?.thoughts && (
+                    <p className="text-xs text-port-accent/70 italic mb-2">
+                      {entry.classification.thoughts}
+                    </p>
+                  )}
 
                   {entry.classification?.reasons && (
                     <p className="text-xs text-gray-500 mb-2">
@@ -539,9 +551,19 @@ export default function InboxTab({ onRefresh, settings }) {
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex-1">
                       <p className="text-white">{entry.capturedText}</p>
+                      {entry.classification?.cleanedUp && entry.classification.cleanedUp !== entry.capturedText && (
+                        <p className="text-sm text-gray-300 mt-1 pl-3 border-l-2 border-port-accent/30">
+                          {entry.classification.cleanedUp}
+                        </p>
+                      )}
                       {entry.classification?.title && (
                         <p className="text-sm text-gray-400 mt-1">
                           → {entry.classification.title}
+                        </p>
+                      )}
+                      {entry.classification?.thoughts && (
+                        <p className="text-xs text-port-accent/70 italic mt-1">
+                          {entry.classification.thoughts}
                         </p>
                       )}
                     </div>

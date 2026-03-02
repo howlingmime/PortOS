@@ -54,10 +54,10 @@ export default function DirectoryPicker({ value, onChange, label = 'Select Direc
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none font-mono text-left flex items-center justify-between"
+        className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden font-mono text-left flex items-center justify-between"
       >
         <span className="truncate">{value || currentPath || 'Select a directory...'}</span>
-        <ChevronRight size={16} className={`flex-shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+        <ChevronRight size={16} className={`shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
       </button>
 
       {/* Directory Browser Dropdown */}
@@ -65,7 +65,7 @@ export default function DirectoryPicker({ value, onChange, label = 'Select Direc
         <div className="absolute z-50 mt-1 w-full bg-port-card border border-port-border rounded-lg shadow-xl max-h-96 overflow-hidden flex flex-col">
           {/* Current Path Header */}
           <div className="sticky top-0 bg-port-card border-b border-port-border p-3 flex items-center gap-2">
-            <Folder size={16} className="text-port-accent flex-shrink-0" />
+            <Folder size={16} className="text-port-accent shrink-0" />
             <span className="text-sm text-gray-400 truncate font-mono">{currentPath}</span>
           </div>
 
@@ -121,9 +121,9 @@ export default function DirectoryPicker({ value, onChange, label = 'Select Direc
                     onDoubleClick={() => handleSelectDirectory(dir.path)}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-port-border rounded transition-colors group"
                   >
-                    <Folder size={14} className="text-gray-500 group-hover:text-port-accent flex-shrink-0" />
+                    <Folder size={14} className="text-gray-500 group-hover:text-port-accent shrink-0" />
                     <span className="truncate">{dir.name}</span>
-                    <ChevronRight size={14} className="ml-auto flex-shrink-0 text-gray-600 group-hover:text-gray-400" />
+                    <ChevronRight size={14} className="ml-auto shrink-0 text-gray-600 group-hover:text-gray-400" />
                   </button>
                 ))}
               </div>

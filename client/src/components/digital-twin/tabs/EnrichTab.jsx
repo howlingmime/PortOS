@@ -309,7 +309,7 @@ export default function EnrichTab({ onRefresh }) {
           </button>
 
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className={`p-2.5 sm:p-3 rounded-lg bg-${categoryConfig?.color || 'blue'}-500/20 flex-shrink-0`}>
+            <div className={`p-2.5 sm:p-3 rounded-lg bg-${categoryConfig?.color || 'blue'}-500/20 shrink-0`}>
               <Icon className={`w-5 h-5 sm:w-6 sm:h-6 text-${categoryConfig?.color || 'blue'}-400`} />
             </div>
             <div className="min-w-0">
@@ -365,7 +365,7 @@ export default function EnrichTab({ onRefresh }) {
                     onChange={(e) => setAnswer(e.target.value)}
                     placeholder="Type your answer here..."
                     rows={6}
-                    className="w-full px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white resize-none focus:outline-none focus:border-port-accent"
+                    className="w-full px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white resize-none focus:outline-hidden focus:border-port-accent"
                     autoFocus
                   />
                   <div className="text-xs text-gray-500 mt-2">
@@ -499,7 +499,7 @@ export default function EnrichTab({ onRefresh }) {
       {/* Info */}
       <div className="bg-port-card rounded-lg border border-port-border p-4">
         <div className="flex items-start gap-4">
-          <Sparkles className="w-6 h-6 text-yellow-400 flex-shrink-0" />
+          <Sparkles className="w-6 h-6 text-yellow-400 shrink-0" />
           <div>
             <h3 className="font-medium text-white mb-1">How Enrichment Works</h3>
             <p className="text-sm text-gray-400">
@@ -564,7 +564,7 @@ export default function EnrichTab({ onRefresh }) {
                     onChange={(e) => updateWritingSample(index, e.target.value)}
                     placeholder={`Paste writing sample ${index + 1} here (emails, messages, docs)...`}
                     rows={4}
-                    className="w-full px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white resize-none focus:outline-none focus:border-port-accent"
+                    className="w-full px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white resize-none focus:outline-hidden focus:border-port-accent"
                   />
                   {writingSamples.length > 1 && (
                     <button

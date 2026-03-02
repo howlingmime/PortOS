@@ -92,7 +92,7 @@ export default function ConfidenceGauge({ confidence, onRecalculate }) {
 
       {/* Overall Score */}
       <div className="flex items-center gap-6 mb-6">
-        <div className="relative w-24 h-24 flex-shrink-0">
+        <div className="relative w-24 h-24 shrink-0">
           <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
             <circle
               cx="50"
@@ -182,10 +182,10 @@ export default function ConfidenceGauge({ confidence, onRecalculate }) {
                 </div>
               </div>
               {isLow && (
-                <TrendingDown className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <TrendingDown className="w-4 h-4 text-red-400 shrink-0" />
               )}
               {score >= 0.8 && (
-                <TrendingUp className="w-4 h-4 text-green-400 flex-shrink-0" />
+                <TrendingUp className="w-4 h-4 text-green-400 shrink-0" />
               )}
             </div>
           );

@@ -311,7 +311,7 @@ export default function Security() {
               <select
                 value={selectedVideo}
                 onChange={(e) => handleDeviceChange('video', e.target.value)}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-none focus:border-port-accent"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-hidden focus:border-port-accent"
               >
                 {devices.video.length === 0 ? (
                   <option value="">No cameras found</option>
@@ -334,7 +334,7 @@ export default function Security() {
               <select
                 value={selectedAudio}
                 onChange={(e) => handleDeviceChange('audio', e.target.value)}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-none focus:border-port-accent"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-hidden focus:border-port-accent"
               >
                 {devices.audio.length === 0 ? (
                   <option value="">No microphones found</option>

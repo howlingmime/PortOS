@@ -115,7 +115,7 @@ export default function InterviewTab({ onRefresh }) {
             onChange={(e) => setContent(e.target.value)}
             placeholder="Paste your personality assessment here (from ChatGPT, Claude, etc.)..."
             rows={8}
-            className="w-full px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white resize-y focus:outline-none focus:border-port-accent placeholder-gray-600"
+            className="w-full px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white resize-y focus:outline-hidden focus:border-port-accent placeholder-gray-600"
             disabled={analyzing}
           />
 
@@ -250,7 +250,7 @@ export default function InterviewTab({ onRefresh }) {
                       />
                     </div>
                   </div>
-                  <ArrowRight size={14} className="text-gray-600 flex-shrink-0" />
+                  <ArrowRight size={14} className="text-gray-600 shrink-0" />
                 </button>
               );
             })}

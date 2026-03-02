@@ -48,10 +48,19 @@ async function callAI(promptStageName, variables, providerOverride, modelOverrid
   const prompt = await buildPrompt(promptStageName, variables);
   const model = modelOverride || provider.defaultModel;
 
+  console.log(`🧠 Calling AI: ${provider.id} / ${model} / ${promptStageName}`);
+
   if (provider.type === 'cli') {
 
     return new Promise((resolve, reject) => {
-      const args = [...(provider.args || []), prompt];
+      const args = [...(provider.args || [])];
+      if (provider.headlessArgs?.length) {
+        args.push(...provider.headlessArgs);
+      }
+      if (model) {
+        args.push('--model', model);
+      }
+      args.push(prompt);
       let output = '';
 
       const child = spawn(provider.command, args, {
@@ -207,6 +216,7 @@ async function classifyInBackground(entryId, text, meta, providerOverride, model
   let classification = null;
   let aiError = null;
 
+  const startTime = Date.now();
   const aiResponse = await callAI(
     'brain-classifier',
     { capturedText: text, now: new Date().toISOString() },
@@ -217,7 +227,10 @@ async function classifyInBackground(entryId, text, meta, providerOverride, model
     return null;
   });
 
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
   if (aiResponse) {
+    console.log(`🧠 AI responded in ${elapsed}s for ${entryId}`);
     const parsed = safeParseJsonResponse(aiResponse);
     if (parsed) {
       const validationResult = classifierOutputSchema.safeParse(parsed);
@@ -230,6 +243,8 @@ async function classifyInBackground(entryId, text, meta, providerOverride, model
     } else {
       aiError = new Error('Could not parse AI response as JSON');
     }
+  } else {
+    console.log(`🧠 AI failed after ${elapsed}s for ${entryId}`);
   }
 
   // If AI failed, mark as needs_review
@@ -560,7 +575,9 @@ export async function runWeeklyReview(providerOverride, modelOverride) {
 }
 
 /**
- * Retry classification for a needs_review item
+ * Retry classification for a needs_review item.
+ * Returns immediately after setting status to 'classifying'.
+ * AI classification runs in the background and emits a socket event on completion.
  */
 export async function retryClassification(inboxLogId, providerOverride, modelOverride) {
   const inboxLog = await storage.getInboxLogById(inboxLogId);
@@ -572,96 +589,26 @@ export async function retryClassification(inboxLogId, providerOverride, modelOve
   const provider = providerOverride || meta.defaultProvider;
   const model = modelOverride || meta.defaultModel;
 
-  // Update AI config for this retry
+  // Set status to classifying so UI shows spinner
   await storage.updateInboxLog(inboxLogId, {
     ai: {
       providerId: provider,
       modelId: model,
       promptTemplateId: 'brain-classifier'
     },
-    status: 'needs_review',
+    status: 'classifying',
     error: null
   });
 
-  // Attempt AI classification
-  let classification = null;
-  let aiError = null;
+  console.log(`🧠 Retrying classification in background: ${inboxLogId}`);
 
-  const aiResponse = await callAI(
-    'brain-classifier',
-    { capturedText: inboxLog.capturedText, now: new Date().toISOString() },
-    provider,
-    model
-  ).catch(err => {
-    aiError = err;
-    return null;
-  });
+  // Run AI classification in background (don't await)
+  classifyInBackground(inboxLogId, inboxLog.capturedText, meta, provider, model)
+    .catch(err => console.error(`❌ Background retry failed for ${inboxLogId}: ${err.message}`));
 
-  if (aiResponse) {
-    const parsed = parseJsonResponse(aiResponse);
-    const validationResult = classifierOutputSchema.safeParse(parsed);
-
-    if (validationResult.success) {
-      classification = validationResult.data;
-    } else {
-      console.error(`🧠 Classification validation failed: ${JSON.stringify(validationResult.error.errors)}`);
-      aiError = new Error('Invalid classification output from AI');
-    }
-  }
-
-  // If AI failed, update entry with error
-  if (!classification) {
-    const errorMessage = aiError?.message || 'AI classification failed';
-    await storage.updateInboxLog(inboxLogId, {
-      classification: {
-        destination: 'unknown',
-        confidence: 0,
-        title: 'Classification failed',
-        extracted: {},
-        reasons: [errorMessage]
-      },
-      status: 'needs_review',
-      error: { message: errorMessage }
-    });
-
-    console.log(`🧠 Retry failed for ${inboxLogId}: ${errorMessage}`);
-    return {
-      inboxLog: await storage.getInboxLogById(inboxLogId),
-      message: 'Classification failed, needs manual review'
-    };
-  }
-
-  // If confidence too low, update but keep as needs_review
-  if (classification.confidence < meta.confidenceThreshold) {
-    await storage.updateInboxLog(inboxLogId, {
-      classification,
-      status: 'needs_review'
-    });
-
-    console.log(`🧠 Retry low confidence for ${inboxLogId}: ${classification.confidence}`);
-    return {
-      inboxLog: await storage.getInboxLogById(inboxLogId),
-      message: `Low confidence (${(classification.confidence * 100).toFixed(0)}%), needs manual review`
-    };
-  }
-
-  // Classification succeeded with high confidence - auto-file
-  const filedRecord = await fileToDestination(classification.destination, classification.extracted, classification.title);
-
-  await storage.updateInboxLog(inboxLogId, {
-    classification,
-    status: 'filed',
-    filed: {
-      destination: classification.destination,
-      recordId: filedRecord.id,
-      filedAt: new Date().toISOString()
-    }
-  });
-
-  console.log(`🧠 Retry successful for ${inboxLogId} -> ${classification.destination}`);
   return {
     inboxLog: await storage.getInboxLogById(inboxLogId),
-    message: `Successfully classified as ${classification.destination}`
+    message: 'Retrying classification...'
   };
 }
 
@@ -707,6 +654,21 @@ export async function deleteInboxEntry(inboxLogId) {
 
   console.log(`🧠 Deleted inbox entry: ${inboxLogId}`);
   return true;
+}
+
+/**
+ * Recover inbox entries stuck in 'classifying' status from a previous server restart.
+ * Resets them to 'needs_review' so the user can retry.
+ */
+export async function recoverStuckClassifications() {
+  const entries = await storage.getInboxLog({ status: 'classifying', limit: 100 });
+  for (const entry of entries) {
+    await storage.updateInboxLog(entry.id, { status: 'needs_review' });
+    console.log(`🧠 Recovered stuck classification: ${entry.id}`);
+  }
+  if (entries.length > 0) {
+    console.log(`🧠 Recovered ${entries.length} stuck classification(s)`);
+  }
 }
 
 // Re-export storage functions for convenience

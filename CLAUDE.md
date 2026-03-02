@@ -99,60 +99,11 @@ port-error: #ef4444
 
 ## Git Workflow
 
-- **dev**: Active development
-- **main**: Production releases only
-- PR `dev → main` creates tagged release and archives changelog
-- **Version bumps are manual** — include `npm version <major|minor|patch> --no-git-tag-version` in your commit (CI does not auto-bump)
-- **Use `/gitup` to push** — always use `git pull --rebase --autostash && git push` (or `/gitup`) instead of plain `git push`
-- Update `.changelog/v{major}.{minor}.x.md` when making changes (see Release Changelog Process below)
+- **main**: Active development
+- **release**: Push `main` to `release` to trigger GitHub Release workflow
+- **Push pattern**: `git pull --rebase --autostash && git push`
+- **Changelog**: `/cam` appends to `.changelog/NEXT.md`; `/release` finalizes it into a versioned file
+- **Versioning**: Version in `package.json` reflects the last release. Do not bump during development — `/release` handles version bumps
 - Commit code after each feature or bug fix
-
-See `docs/VERSIONING.md` for details.
-
-## Release Changelog Process
-
-All release notes are maintained in `.changelog/v{major}.{minor}.x.md` files (e.g., `.changelog/v0.10.x.md`). Each minor version series has a single changelog file that accumulates changes throughout development.
-
-### Starting a New Minor Version
-
-When `dev` is bumped to a new minor version (e.g., 0.10.0), create a new changelog file:
-
-```bash
-# Copy previous version as template
-cp .changelog/v0.9.x.md .changelog/v0.10.x.md
-# Edit to clear content but keep structure
-# Keep version as "v0.10.x" (literal x, not a placeholder)
-```
-
-### During Development
-
-**Always update `.changelog/v0.10.x.md`** when you make changes:
-- Add entries under appropriate emoji sections (🎉 Features, 🐛 Fixes, 🔧 Improvements, 🗑️ Removed)
-- Keep the version as `v0.10.x` throughout development (don't change it to 0.10.1, 0.10.2, etc.)
-- Group related changes together for clarity
-- Explain the "why" not just the "what"
-
-### Before Releasing to Main
-
-Final review before merging `dev → main`:
-- Ensure all changes are documented in `.changelog/v0.10.x.md`
-- Add the release date (update "YYYY-MM-DD" to actual date)
-- Polish descriptions for clarity
-- Commit the changelog
-
-### On Release (Automated)
-
-When you push to `release`, the GitHub Actions workflow automatically:
-1. Reads `.changelog/v0.10.x.md`
-2. Replaces all instances of `0.10.x` with actual version (e.g., `0.10.5`)
-3. Creates the GitHub release with substituted changelog
-4. Archives the changelog on `main`: checks out `main`, renames `v0.10.x.md` → `v0.10.5.md` using `git mv`, pushes to `main`
-5. Fast-forwards `release` to match `main` so the branches never diverge
-
-**Result:**
-- `main` has `.changelog/v0.10.5.md` with the archive commit
-- `release` is fast-forwarded to match `main` (no divergence)
-- Git history shows: `v0.10.x.md` → `v0.10.5.md` (rename)
-- You create a new `.changelog/v{next}.x.md` to start the next development cycle
 
 See `.changelog/README.md` for detailed format and best practices.

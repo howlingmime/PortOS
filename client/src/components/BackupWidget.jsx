@@ -135,7 +135,7 @@ function RestorePanel({ snapshot, onClose }) {
           value={filter}
           onChange={e => setFilter(e.target.value)}
           placeholder="e.g., brain"
-          className="w-full bg-port-card border border-port-border rounded px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-port-accent"
+          className="w-full bg-port-card border border-port-border rounded px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-hidden focus:border-port-accent"
         />
         <p className="mt-1 text-xs text-gray-600">
           Leave blank to restore all data from this snapshot.

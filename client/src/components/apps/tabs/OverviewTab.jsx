@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { FolderOpen, Terminal, Code, RefreshCw, Wrench, Archive, ArchiveRestore, Ticket, ExternalLink, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import BrailleSpinner from '../../BrailleSpinner';
 import EditAppModal from '../EditAppModal';
+import ActivityLog from '../ActivityLog';
+import { useAppOperation } from '../../../hooks/useAppOperation';
 import * as api from '../../../services/api';
 
 function KanbanBoard({ tickets }) {
@@ -55,7 +57,7 @@ function KanbanBoard({ tickets }) {
                       <div className="text-xs text-white line-clamp-2">{ticket.summary}</div>
                       <div className="text-xs text-gray-500 mt-1">{ticket.issueType}</div>
                     </div>
-                    <ExternalLink size={12} className="text-gray-500 flex-shrink-0" />
+                    <ExternalLink size={12} className="text-gray-500 shrink-0" />
                   </div>
                 </a>
               ))}
@@ -72,12 +74,15 @@ function KanbanBoard({ tickets }) {
 
 export default function OverviewTab({ app, onRefresh }) {
   const [editingApp, setEditingApp] = useState(null);
-  const [updating, setUpdating] = useState(false);
   const [refreshingConfig, setRefreshingConfig] = useState(false);
-  const [standardizing, setStandardizing] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [jiraTickets, setJiraTickets] = useState(null);
   const [loadingTickets, setLoadingTickets] = useState(false);
+
+  const onComplete = useMemo(() => () => onRefresh(), [onRefresh]);
+  const { steps, isOperating, operationType, error, completed, startUpdate, startStandardize } = useAppOperation({ onComplete });
+  const updating = isOperating && operationType === 'update';
+  const standardizing = isOperating && operationType === 'standardize';
 
   useEffect(() => {
     if (app?.jira?.enabled && app.jira.instanceId && app.jira.projectKey) {
@@ -89,14 +94,7 @@ export default function OverviewTab({ app, onRefresh }) {
     }
   }, [app?.jira?.enabled, app?.jira?.instanceId, app?.jira?.projectKey]);
 
-  const handleUpdate = async () => {
-    setUpdating(true);
-    const result = await api.pullAndUpdateApp(app.id).catch(() => null);
-    setUpdating(false);
-    if (result?.success) {
-      toast.success(`Updated ${app.name} (${result.steps?.length || 0} steps)`);
-    }
-  };
+  const handleUpdate = () => startUpdate(app.id);
 
   const handleRefreshConfig = async () => {
     setRefreshingConfig(true);
@@ -105,29 +103,7 @@ export default function OverviewTab({ app, onRefresh }) {
     onRefresh();
   };
 
-  const handleStandardize = async () => {
-    setStandardizing(true);
-    const analysis = await api.analyzeStandardizationByApp(app.id).catch(err => {
-      toast.error(`Analysis failed: ${err.message}`);
-      return null;
-    });
-    if (!analysis?.success) {
-      setStandardizing(false);
-      return;
-    }
-    const result = await api.applyStandardizationByApp(app.id, analysis).catch(err => {
-      toast.error(`Apply failed: ${err.message}`);
-      return null;
-    });
-    setStandardizing(false);
-    if (result?.success) {
-      const msg = result.backupBranch
-        ? `Standardized! Backup: ${result.backupBranch}`
-        : `Standardized ${result.filesModified?.length || 0} files`;
-      toast.success(msg);
-      onRefresh();
-    }
-  };
+  const handleStandardize = () => startStandardize(app.id);
 
   const handleArchive = async () => {
     setArchiving(true);
@@ -152,14 +128,14 @@ export default function OverviewTab({ app, onRefresh }) {
         <div>
           <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">Repository Path</div>
           <div className="flex items-start gap-2">
-            <FolderOpen size={16} className="text-yellow-400 flex-shrink-0 mt-0.5" />
+            <FolderOpen size={16} className="text-yellow-400 shrink-0 mt-0.5" />
             <code className="text-sm text-gray-300 font-mono break-all">{app.repoPath}</code>
           </div>
         </div>
         <div>
           <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">Editor Command</div>
           <div className="flex items-center gap-2">
-            <Code size={16} className="text-blue-400 flex-shrink-0" />
+            <Code size={16} className="text-blue-400 shrink-0" />
             <code className="text-sm text-gray-300 font-mono">{app.editorCommand || 'code .'}</code>
           </div>
         </div>
@@ -172,7 +148,7 @@ export default function OverviewTab({ app, onRefresh }) {
           <div className="bg-port-card border border-port-border rounded-lg p-3">
             {app.startCommands.map((cmd, i) => (
               <div key={i} className="flex items-start gap-2 py-1">
-                <Terminal size={14} className="text-green-400 flex-shrink-0 mt-0.5" />
+                <Terminal size={14} className="text-green-400 shrink-0 mt-0.5" />
                 <code className="text-sm text-cyan-300 font-mono break-all">{cmd}</code>
               </div>
             ))}
@@ -192,7 +168,7 @@ export default function OverviewTab({ app, onRefresh }) {
                   key={i}
                   className="flex flex-wrap items-center gap-2 px-3 py-1.5 bg-port-card border border-port-border rounded-lg"
                 >
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${
                     proc.status === 'online' ? 'bg-port-success' :
                     proc.status === 'stopped' ? 'bg-gray-500' : 'bg-port-error'
                   }`} />
@@ -223,7 +199,7 @@ export default function OverviewTab({ app, onRefresh }) {
         <div>
           <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">JIRA Integration</div>
           <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-port-card border border-port-border rounded-lg">
-            <Ticket size={16} className="text-blue-400 flex-shrink-0" />
+            <Ticket size={16} className="text-blue-400 shrink-0" />
             <span className="text-sm text-white font-mono">{app.jira.projectKey || '-'}</span>
             {app.jira.issueType && <span className="text-xs text-gray-400">{app.jira.issueType}</span>}
             {app.jira.createPR !== false && <span className="text-xs text-green-400">+ PR</span>}
@@ -268,7 +244,7 @@ export default function OverviewTab({ app, onRefresh }) {
         </button>
         <button
           onClick={handleUpdate}
-          disabled={updating}
+          disabled={isOperating}
           className="px-3 py-1.5 bg-port-success/20 text-port-success hover:bg-port-success/30 rounded-lg text-xs flex items-center gap-1 disabled:opacity-50"
         >
           <Download size={14} className={updating ? 'animate-bounce' : ''} />
@@ -284,7 +260,7 @@ export default function OverviewTab({ app, onRefresh }) {
         </button>
         <button
           onClick={handleStandardize}
-          disabled={standardizing}
+          disabled={isOperating}
           className="px-3 py-1.5 bg-port-accent/20 text-port-accent hover:bg-port-accent/30 rounded-lg text-xs flex items-center gap-1 disabled:opacity-50"
         >
           <Wrench size={14} className={standardizing ? 'animate-spin' : ''} />
@@ -311,6 +287,9 @@ export default function OverviewTab({ app, onRefresh }) {
           </button>
         )}
       </div>
+
+      {/* Activity Log */}
+      <ActivityLog steps={steps} error={error} completed={completed} />
 
       {/* Edit Modal */}
       {editingApp && (

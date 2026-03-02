@@ -170,7 +170,7 @@ export default function ConfigTab({ onRefresh }) {
                   setSelectedModel('');
                 }
               }}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-port-accent"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-port-accent"
             >
               <option value="">Select a provider...</option>
               {providers.map(provider => (
@@ -194,7 +194,7 @@ export default function ConfigTab({ onRefresh }) {
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
               disabled={!selectedProvider || getAvailableModels().length === 0}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-port-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-port-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {getAvailableModels().length === 0 ? (
                 <option value="">No models available</option>
@@ -266,7 +266,7 @@ export default function ConfigTab({ onRefresh }) {
               type="time"
               value={dailyDigestTime}
               onChange={(e) => setDailyDigestTime(e.target.value)}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-port-accent"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-port-accent"
             />
             <p className="mt-1 text-xs text-gray-500">
               Time when daily digest will be generated automatically
@@ -282,7 +282,7 @@ export default function ConfigTab({ onRefresh }) {
               id="reviewDay"
               value={weeklyReviewDay}
               onChange={(e) => setWeeklyReviewDay(e.target.value)}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-port-accent"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-port-accent"
             >
               {DAYS_OF_WEEK.map(day => (
                 <option key={day} value={day}>
@@ -305,7 +305,7 @@ export default function ConfigTab({ onRefresh }) {
               type="time"
               value={weeklyReviewTime}
               onChange={(e) => setWeeklyReviewTime(e.target.value)}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-port-accent"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-port-accent"
             />
             <p className="mt-1 text-xs text-gray-500">
               Time when weekly review will be generated automatically

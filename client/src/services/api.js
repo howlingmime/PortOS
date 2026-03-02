@@ -155,6 +155,11 @@ export const getAppLogs = (id, lines = 100, processName) => {
 
 export const getAppDocuments = (id) => request(`/apps/${id}/documents`);
 export const getAppDocument = (id, filename) => request(`/apps/${id}/documents/${filename}`);
+export const saveAppDocument = (id, filename, content, commitMessage) =>
+  request(`/apps/${id}/documents/${filename}`, {
+    method: 'PUT',
+    body: JSON.stringify({ content, ...(commitMessage && { commitMessage }) })
+  });
 export const getAppAgents = (id, limit = 50) => request(`/apps/${id}/agents?limit=${limit}`);
 
 // Ports
@@ -245,7 +250,7 @@ export const getRunOutput = (id) => request(`/runs/${id}/output`);
 export const getRunPrompt = (id) => request(`/runs/${id}/prompt`);
 export const stopRun = (id) => request(`/runs/${id}/stop`, { method: 'POST' });
 export const deleteRun = (id) => request(`/runs/${id}`, { method: 'DELETE' });
-export const deleteFailedRuns = () => request('/runs?confirm=true', { method: 'DELETE' });
+export const deleteFailedRuns = () => request('/runs?filter=failed', { method: 'DELETE' });
 
 // History
 export const getHistory = (options = {}) => {
@@ -1460,6 +1465,15 @@ export const getGsdPhase = (appId, phaseId) => request(`/cos/gsd/projects/${appI
 export const createGsdConcernTasks = (appId, data) => request(`/cos/gsd/projects/${appId}/concerns/tasks`, {
   method: 'POST',
   body: JSON.stringify(data)
+});
+export const triggerGsdPhaseAction = (appId, phaseId, action) => request(`/cos/gsd/projects/${appId}/phases/${phaseId}/action`, {
+  method: 'POST',
+  body: JSON.stringify({ action })
+});
+export const getGsdDocument = (appId, docName) => request(`/cos/gsd/projects/${appId}/documents/${docName}`);
+export const saveGsdDocument = (appId, docName, content, commitMessage) => request(`/cos/gsd/projects/${appId}/documents/${docName}`, {
+  method: 'PUT',
+  body: JSON.stringify({ content, ...(commitMessage && { commitMessage }) })
 });
 
 // Default export for simplified imports

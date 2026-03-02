@@ -139,7 +139,7 @@ export default function MemoryTab({ apps = [] }) {
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           placeholder="Search memories semantically..."
-          className="flex-1 bg-port-card border border-port-border rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:border-port-accent outline-none"
+          className="flex-1 bg-port-card border border-port-border rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:border-port-accent outline-hidden"
         />
         <button
           onClick={handleSearch}

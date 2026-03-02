@@ -280,7 +280,7 @@ function HourlyActivityHeatmap({ hourlyActivity }) {
         {hourlyActivity.map((count, hour) => (
           <div
             key={hour}
-            className={`aspect-square rounded-sm ${getIntensityClass(count)} transition-colors cursor-default min-w-[20px] min-h-[20px]`}
+            className={`aspect-square rounded-xs ${getIntensityClass(count)} transition-colors cursor-default min-w-[20px] min-h-[20px]`}
             title={`${formatHour(hour)}: ${count} session${count !== 1 ? 's' : ''}`}
             aria-label={`${formatHour(hour)}: ${count} sessions`}
           />
@@ -299,11 +299,11 @@ function HourlyActivityHeatmap({ hourlyActivity }) {
       <div className="mt-4 flex items-center justify-end gap-2 text-xs text-gray-500">
         <span>Less</span>
         <div className="flex gap-1">
-          <div className="w-4 h-4 sm:w-3 sm:h-3 rounded-sm bg-port-border/30" />
-          <div className="w-4 h-4 sm:w-3 sm:h-3 rounded-sm bg-port-success/20" />
-          <div className="w-4 h-4 sm:w-3 sm:h-3 rounded-sm bg-port-success/40" />
-          <div className="w-4 h-4 sm:w-3 sm:h-3 rounded-sm bg-port-success/70" />
-          <div className="w-4 h-4 sm:w-3 sm:h-3 rounded-sm bg-port-success" />
+          <div className="w-4 h-4 sm:w-3 sm:h-3 rounded-xs bg-port-border/30" />
+          <div className="w-4 h-4 sm:w-3 sm:h-3 rounded-xs bg-port-success/20" />
+          <div className="w-4 h-4 sm:w-3 sm:h-3 rounded-xs bg-port-success/40" />
+          <div className="w-4 h-4 sm:w-3 sm:h-3 rounded-xs bg-port-success/70" />
+          <div className="w-4 h-4 sm:w-3 sm:h-3 rounded-xs bg-port-success" />
         </div>
         <span>More</span>
       </div>

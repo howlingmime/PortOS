@@ -325,7 +325,7 @@ function ActivityCalendar({ data }) {
                   key={day.date}
                   className={`
                     w-[9px] h-[9px] sm:w-[10px] sm:h-[10px]
-                    rounded-sm transition-colors cursor-default
+                    rounded-xs transition-colors cursor-default
                     ${getColorClass(day)}
                     ${day.isToday ? 'ring-1 ring-port-accent' : ''}
                     ${day.isFuture ? 'opacity-30' : ''}
@@ -350,10 +350,10 @@ function ActivityCalendar({ data }) {
         {/* Mini Legend */}
         <div className="flex items-center gap-0.5">
           <span className="mr-1 hidden sm:inline">Less</span>
-          <div className="w-2 h-2 rounded-sm bg-port-border/20" />
-          <div className="w-2 h-2 rounded-sm bg-emerald-900/50" />
-          <div className="w-2 h-2 rounded-sm bg-emerald-500/70" />
-          <div className="w-2 h-2 rounded-sm bg-emerald-400" />
+          <div className="w-2 h-2 rounded-xs bg-port-border/20" />
+          <div className="w-2 h-2 rounded-xs bg-emerald-900/50" />
+          <div className="w-2 h-2 rounded-xs bg-emerald-500/70" />
+          <div className="w-2 h-2 rounded-xs bg-emerald-400" />
           <span className="ml-1 hidden sm:inline">More</span>
         </div>
       </div>

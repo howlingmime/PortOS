@@ -112,7 +112,7 @@ export default function TerminalCoSPanel({ state, speaking, statusMessage, event
       {/* ASCII Art + Info + Controls in row on mobile */}
       <div className="flex items-center lg:items-start gap-3 lg:gap-4 mb-1 lg:mb-4">
         {/* ASCII Art - smaller on mobile */}
-        <div className="flex-shrink-0 scale-75 lg:scale-100 origin-top-left -mr-3 lg:mr-0">
+        <div className="shrink-0 scale-75 lg:scale-100 origin-top-left -mr-3 lg:mr-0">
           {ascii.map((line, i) => (
             <div
               key={i}

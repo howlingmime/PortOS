@@ -10,7 +10,7 @@ export default function IconPicker({ value, onChange }) {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-3 w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white hover:border-port-accent/50 focus:border-port-accent focus:outline-none transition-colors"
+        className="flex items-center gap-3 w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white hover:border-port-accent/50 focus:border-port-accent focus:outline-hidden transition-colors"
       >
         <div className="w-8 h-8 rounded bg-port-border flex items-center justify-center text-port-accent">
           <AppIcon icon={value || 'package'} size={20} />

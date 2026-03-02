@@ -108,7 +108,7 @@ export default function Templates() {
                 onChange={(e) => setAppName(e.target.value)}
                 placeholder="my-new-app"
                 required
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
               />
             </div>
 

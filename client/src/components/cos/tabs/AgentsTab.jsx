@@ -210,7 +210,7 @@ export default function AgentsTab({ agents, onRefresh, liveOutputs, providers, a
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search loaded agents..."
-                className="w-full bg-port-card border border-port-border rounded-lg pl-9 pr-4 py-2 min-h-[40px] text-white text-sm placeholder-gray-500 focus:border-port-accent outline-none"
+                className="w-full bg-port-card border border-port-border rounded-lg pl-9 pr-4 py-2 min-h-[40px] text-white text-sm placeholder-gray-500 focus:border-port-accent outline-hidden"
               />
             </div>
             {searchQuery && (

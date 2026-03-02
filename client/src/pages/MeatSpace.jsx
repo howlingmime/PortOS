@@ -53,7 +53,7 @@ export default function MeatSpace() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-port-border">
+      <div className="shrink-0 px-6 pt-6 pb-4 border-b border-port-border">
         <div className="flex items-center gap-3 mb-4">
           <Skull size={24} className="text-port-error" />
           <h1 className="text-2xl font-bold text-white">MeatSpace</h1>

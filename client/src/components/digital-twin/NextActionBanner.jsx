@@ -177,7 +177,7 @@ export default function NextActionBanner({ gaps, status, traits, onRefresh }) {
     return (
       <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-lg p-5">
         <div className="flex items-start gap-3">
-          <MessageSquare className="w-5 h-5 text-purple-400 mt-0.5 flex-shrink-0" />
+          <MessageSquare className="w-5 h-5 text-purple-400 mt-0.5 shrink-0" />
           <div className="flex-1">
             <h3 className="text-white font-medium mb-1">Get started with a personality assessment</h3>
             <p className="text-sm text-gray-400 mb-3">
@@ -201,7 +201,7 @@ export default function NextActionBanner({ gaps, status, traits, onRefresh }) {
     return (
       <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-5">
         <div className="flex items-start gap-3">
-          <CheckCircle className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
+          <CheckCircle className="w-5 h-5 text-green-400 mt-0.5 shrink-0" />
           <div className="flex-1">
             <h3 className="text-white font-medium mb-1">Your twin is well-defined</h3>
             <p className="text-sm text-gray-400 mb-3">
@@ -230,7 +230,7 @@ export default function NextActionBanner({ gaps, status, traits, onRefresh }) {
     return (
       <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-lg p-5">
         <div className="flex items-start gap-3">
-          <MessageSquare className="w-5 h-5 text-purple-400 mt-0.5 flex-shrink-0" />
+          <MessageSquare className="w-5 h-5 text-purple-400 mt-0.5 shrink-0" />
           <div className="flex-1">
             <h3 className="text-white font-medium mb-1">Deepen: {weakestLabel}</h3>
             <p className="text-sm text-gray-400 mb-3">
@@ -285,7 +285,7 @@ export default function NextActionBanner({ gaps, status, traits, onRefresh }) {
     return (
       <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-lg p-5">
         <div className="flex items-start gap-3">
-          <Sparkles className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
+          <Sparkles className="w-5 h-5 text-yellow-400 mt-0.5 shrink-0" />
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="text-white font-medium">Enrich: {dimensionLabel}</h3>
@@ -311,7 +311,7 @@ export default function NextActionBanner({ gaps, status, traits, onRefresh }) {
   return (
     <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-lg p-5">
       <div className="flex items-start gap-3">
-        <Sparkles className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
+        <Sparkles className="w-5 h-5 text-yellow-400 mt-0.5 shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-white font-medium">Quick Enrich: {dimensionLabel}</h3>
@@ -342,7 +342,7 @@ export default function NextActionBanner({ gaps, status, traits, onRefresh }) {
                   onKeyDown={handleKeyDown}
                   placeholder="Type your answer..."
                   rows={3}
-                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm resize-none focus:outline-none focus:border-port-accent mb-2"
+                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm resize-none focus:outline-hidden focus:border-port-accent mb-2"
                 />
               )}
               <div className="flex items-center justify-between">

@@ -195,7 +195,7 @@ export default function BrowserPage() {
                 type="number"
                 value={configDraft.cdpPort}
                 onChange={e => setConfigDraft(d => ({ ...d, cdpPort: parseInt(e.target.value, 10) || 5556 }))}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-none focus:border-port-accent"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-hidden focus:border-port-accent"
               />
             </div>
             <div>
@@ -204,7 +204,7 @@ export default function BrowserPage() {
                 type="text"
                 value={configDraft.cdpHost}
                 onChange={e => setConfigDraft(d => ({ ...d, cdpHost: e.target.value }))}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-none focus:border-port-accent"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-hidden focus:border-port-accent"
               />
             </div>
             <div>
@@ -213,7 +213,7 @@ export default function BrowserPage() {
                 type="number"
                 value={configDraft.healthPort}
                 onChange={e => setConfigDraft(d => ({ ...d, healthPort: parseInt(e.target.value, 10) || 5557 }))}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-none focus:border-port-accent"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-hidden focus:border-port-accent"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -413,7 +413,7 @@ export default function BrowserPage() {
                   value={navUrl}
                   onChange={e => setNavUrl(e.target.value)}
                   placeholder="https://example.com"
-                  className="flex-1 px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-none focus:border-port-accent placeholder-gray-600"
+                  className="flex-1 px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:outline-hidden focus:border-port-accent placeholder-gray-600"
                 />
                 <button
                   type="submit"
@@ -466,7 +466,7 @@ export default function BrowserPage() {
                               {page.url}
                             </div>
                           </div>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-port-border text-gray-400 flex-shrink-0">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-port-border text-gray-400 shrink-0">
                             {page.type}
                           </span>
                         </div>

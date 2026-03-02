@@ -149,12 +149,12 @@ export default function EpigeneticTracker({ markerCategories = [] }) {
               value={customForm.name}
               onChange={(e) => setCustomForm(prev => ({ ...prev, name: e.target.value }))}
               placeholder="Intervention name"
-              className="col-span-2 px-3 py-2 bg-port-bg border border-port-border rounded text-sm text-white placeholder-gray-600 focus:outline-none focus:border-port-accent"
+              className="col-span-2 px-3 py-2 bg-port-bg border border-port-border rounded text-sm text-white placeholder-gray-600 focus:outline-hidden focus:border-port-accent"
             />
             <select
               value={customForm.category}
               onChange={(e) => setCustomForm(prev => ({ ...prev, category: e.target.value }))}
-              className="px-3 py-2 bg-port-bg border border-port-border rounded text-sm text-white focus:outline-none"
+              className="px-3 py-2 bg-port-bg border border-port-border rounded text-sm text-white focus:outline-hidden"
             >
               <option value="supplement">Supplement</option>
               <option value="lifestyle">Lifestyle</option>
@@ -163,7 +163,7 @@ export default function EpigeneticTracker({ markerCategories = [] }) {
             <select
               value={customForm.frequency}
               onChange={(e) => setCustomForm(prev => ({ ...prev, frequency: e.target.value }))}
-              className="px-3 py-2 bg-port-bg border border-port-border rounded text-sm text-white focus:outline-none"
+              className="px-3 py-2 bg-port-bg border border-port-border rounded text-sm text-white focus:outline-hidden"
             >
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
@@ -174,14 +174,14 @@ export default function EpigeneticTracker({ markerCategories = [] }) {
               value={customForm.dosage}
               onChange={(e) => setCustomForm(prev => ({ ...prev, dosage: e.target.value }))}
               placeholder="Target dosage (e.g. 5g/day)"
-              className="px-3 py-2 bg-port-bg border border-port-border rounded text-sm text-white placeholder-gray-600 focus:outline-none"
+              className="px-3 py-2 bg-port-bg border border-port-border rounded text-sm text-white placeholder-gray-600 focus:outline-hidden"
             />
             <input
               type="text"
               value={customForm.trackingUnit}
               onChange={(e) => setCustomForm(prev => ({ ...prev, trackingUnit: e.target.value }))}
               placeholder="Unit (g, mg, min, etc.)"
-              className="px-3 py-2 bg-port-bg border border-port-border rounded text-sm text-white placeholder-gray-600 focus:outline-none"
+              className="px-3 py-2 bg-port-bg border border-port-border rounded text-sm text-white placeholder-gray-600 focus:outline-hidden"
             />
           </div>
           <div className="flex gap-2">
@@ -266,7 +266,7 @@ export default function EpigeneticTracker({ markerCategories = [] }) {
                         onChange={(e) => setLogAmounts(prev => ({ ...prev, [key]: e.target.value }))}
                         onKeyDown={(e) => e.key === 'Enter' && handleLog(key)}
                         placeholder={`Amount (${intervention.trackingUnit})`}
-                        className="flex-1 max-w-[160px] px-3 py-1.5 bg-port-bg border border-port-border rounded text-sm text-white placeholder-gray-600 focus:outline-none focus:border-port-accent font-mono"
+                        className="flex-1 max-w-[160px] px-3 py-1.5 bg-port-bg border border-port-border rounded text-sm text-white placeholder-gray-600 focus:outline-hidden focus:border-port-accent font-mono"
                         min="0"
                         step="any"
                       />

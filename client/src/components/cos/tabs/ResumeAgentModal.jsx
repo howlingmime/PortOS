@@ -85,7 +85,7 @@ export default function ResumeAgentModal({ agent, taskType = 'user', providers, 
               onChange={e => setFormData({ ...formData, refinedInstructions: e.target.value })}
               placeholder="Provide refined or additional instructions for the resumed task..."
               rows={4}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none resize-none"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden resize-none"
               autoFocus
             />
           </div>
@@ -96,7 +96,7 @@ export default function ResumeAgentModal({ agent, taskType = 'user', providers, 
             <select
               value={formData.app}
               onChange={e => setFormData({ ...formData, app: e.target.value })}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden"
             >
               <option value="">PortOS (default)</option>
               {apps?.map(app => (
@@ -112,7 +112,7 @@ export default function ResumeAgentModal({ agent, taskType = 'user', providers, 
               <select
                 value={formData.provider}
                 onChange={e => setFormData({ ...formData, provider: e.target.value, model: '' })}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden"
               >
                 <option value="">Auto (default)</option>
                 {providers?.filter(p => p.enabled).map(p => (
@@ -125,7 +125,7 @@ export default function ResumeAgentModal({ agent, taskType = 'user', providers, 
               <select
                 value={formData.model}
                 onChange={e => setFormData({ ...formData, model: e.target.value })}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden"
                 disabled={!formData.provider}
               >
                 <option value="">{formData.provider ? 'Select model...' : 'Select provider first'}</option>

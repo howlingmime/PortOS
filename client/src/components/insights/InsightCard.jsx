@@ -8,7 +8,7 @@ export default function InsightCard({ title, subtitle, badge, children, sources,
             <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
           )}
         </div>
-        {badge && <div className="flex-shrink-0">{badge}</div>}
+        {badge && <div className="shrink-0">{badge}</div>}
       </div>
 
       {sources && sources.length > 0 && (

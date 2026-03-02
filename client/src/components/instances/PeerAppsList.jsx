@@ -10,7 +10,7 @@ export default function PeerAppsList({ apps, peerAddress }) {
       <div className="space-y-1">
         {apps.map(app => (
           <div key={app.id} className="flex items-center gap-2 text-xs">
-            <AppIcon icon={app.icon || 'package'} size={14} className="text-gray-400 flex-shrink-0" />
+            <AppIcon icon={app.icon || 'package'} size={14} className="text-gray-400 shrink-0" />
             {app.uiPort && app.overallStatus === 'online' ? (
               <a
                 href={`http://${peerAddress}:${app.uiPort}`}
@@ -25,7 +25,7 @@ export default function PeerAppsList({ apps, peerAddress }) {
               <span className="text-gray-300 truncate">{app.name}</span>
             )}
             {app.apiPort && (
-              <span className="text-gray-600 font-mono flex-shrink-0">:{app.apiPort}</span>
+              <span className="text-gray-600 font-mono shrink-0">:{app.apiPort}</span>
             )}
             <StatusBadge status={app.overallStatus || 'unknown'} size="sm" />
           </div>

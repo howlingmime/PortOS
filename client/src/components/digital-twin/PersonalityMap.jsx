@@ -148,7 +148,7 @@ export default function PersonalityMap({ traits, confidence, providers, onAnalyz
       ) : (
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Radar Chart */}
-          <div className="flex-shrink-0 mx-auto lg:mx-0">
+          <div className="shrink-0 mx-auto lg:mx-0">
             <svg width="200" height="200" viewBox="0 0 200 200" className="overflow-visible">
               {/* Background levels */}
               {Array.from({ length: levels }).map((_, i) => {

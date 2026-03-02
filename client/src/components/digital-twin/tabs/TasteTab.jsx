@@ -438,7 +438,7 @@ export default function TasteTab({ onRefresh }) {
           </button>
 
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className={`p-2.5 sm:p-3 rounded-lg bg-${color}-500/20 flex-shrink-0`}>
+            <div className={`p-2.5 sm:p-3 rounded-lg bg-${color}-500/20 shrink-0`}>
               <Icon className={`w-5 h-5 sm:w-6 sm:h-6 text-${color}-400`} />
             </div>
             <div className="min-w-0">
@@ -492,7 +492,7 @@ export default function TasteTab({ onRefresh }) {
                 onChange={(e) => setAnswer(e.target.value)}
                 placeholder="Share your thoughts... be as specific as possible."
                 rows={6}
-                className="w-full px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white resize-none focus:outline-none focus:border-port-accent"
+                className="w-full px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white resize-none focus:outline-hidden focus:border-port-accent"
                 autoFocus
               />
               <div className="text-xs text-gray-500 mt-2">
@@ -730,7 +730,7 @@ export default function TasteTab({ onRefresh }) {
       {/* Info */}
       <div className="bg-port-card rounded-lg border border-port-border p-4">
         <div className="flex items-start gap-4">
-          <Palette className="w-6 h-6 text-violet-400 flex-shrink-0" />
+          <Palette className="w-6 h-6 text-violet-400 shrink-0" />
           <div>
             <h3 className="font-medium text-white mb-1">How the Taste Questionnaire Works</h3>
             <p className="text-sm text-gray-400">

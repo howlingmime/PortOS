@@ -221,23 +221,23 @@ export default function AgentCard({ agent, onKill, onDelete, onResume, completed
         {/* Top row: Agent ID, badges, and actions */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
-            <Cpu size={16} aria-hidden="true" className={`flex-shrink-0 ${completed ? 'text-gray-500' : 'text-port-accent animate-pulse'}`} />
+            <Cpu size={16} aria-hidden="true" className={`shrink-0 ${completed ? 'text-gray-500' : 'text-port-accent animate-pulse'}`} />
             <span className="font-mono text-sm text-gray-400 truncate">{agent.id}</span>
             {remote && peerName && (
-              <span className="px-1.5 py-0.5 text-xs bg-port-accent/20 text-port-accent rounded flex-shrink-0" title={`Remote agent on ${peerName}`}>
+              <span className="px-1.5 py-0.5 text-xs bg-port-accent/20 text-port-accent rounded shrink-0" title={`Remote agent on ${peerName}`}>
                 {peerName}
               </span>
             )}
             {agent.metadata?.taskApp && (agent.metadata.taskAppName || agent.metadata.workspaceName) && !/^[0-9a-f]{8}-[0-9a-f]{4}-/.test(agent.metadata.taskAppName || agent.metadata.workspaceName) && (
-              <span className="px-1.5 py-0.5 text-xs bg-cyan-500/20 text-cyan-400 rounded flex-shrink-0" title={agent.metadata.workspacePath || agent.metadata.taskApp}>
+              <span className="px-1.5 py-0.5 text-xs bg-cyan-500/20 text-cyan-400 rounded shrink-0" title={agent.metadata.workspacePath || agent.metadata.taskApp}>
                 {agent.metadata.taskAppName || agent.metadata.workspaceName}
               </span>
             )}
             {isSystemAgent && (
-              <span className="px-1.5 py-0.5 text-xs bg-gray-500/20 text-gray-400 rounded flex-shrink-0">SYS</span>
+              <span className="px-1.5 py-0.5 text-xs bg-gray-500/20 text-gray-400 rounded shrink-0">SYS</span>
             )}
             {agent.metadata?.model && (
-              <span className={`px-2 py-0.5 text-xs rounded flex-shrink-0 ${
+              <span className={`px-2 py-0.5 text-xs rounded shrink-0 ${
                 agent.metadata.modelTier === 'heavy' ? 'bg-purple-500/20 text-purple-400' :
                 agent.metadata.modelTier === 'light' ? 'bg-green-500/20 text-green-400' :
                 'bg-blue-500/20 text-blue-400'
@@ -246,7 +246,7 @@ export default function AgentCard({ agent, onKill, onDelete, onResume, completed
               </span>
             )}
             {!completed && (
-              <span className={`px-2 py-0.5 text-xs rounded animate-pulse flex-shrink-0 ${
+              <span className={`px-2 py-0.5 text-xs rounded animate-pulse shrink-0 ${
                 agent.metadata?.phase === 'initializing' ? 'bg-yellow-500/20 text-yellow-400' :
                 'bg-port-accent/20 text-port-accent'
               }`}>
@@ -255,7 +255,7 @@ export default function AgentCard({ agent, onKill, onDelete, onResume, completed
             )}
           </div>
           {/* Actions - right side */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {(output.length > 0 || completed) && (
               <button
                 onClick={() => setExpanded(!expanded)}
@@ -307,7 +307,7 @@ export default function AgentCard({ agent, onKill, onDelete, onResume, completed
               className="flex items-center gap-1.5 text-gray-500 whitespace-nowrap"
               title={`Based on ${durationEstimate.basedOn} completed ${durationEstimate.taskType} tasks (avg: ${formatDuration(durationEstimate.avgMs)}, est: ${formatDuration(durationEstimate.estimatedMs)})`}
             >
-              <Clock size={12} aria-hidden="true" className="flex-shrink-0" />
+              <Clock size={12} aria-hidden="true" className="shrink-0" />
               <span className="font-mono">{formatDuration(duration)}</span>
               {remainingTime && !remainingTime.isOvertime && (
                 <>
@@ -324,7 +324,7 @@ export default function AgentCard({ agent, onKill, onDelete, onResume, completed
             </span>
           ) : (
             <span className="flex items-center gap-1 text-gray-500 whitespace-nowrap">
-              <Clock size={12} aria-hidden="true" className="flex-shrink-0" />
+              <Clock size={12} aria-hidden="true" className="shrink-0" />
               <span className="font-mono">{formatDuration(duration)}</span>
             </span>
           )}
@@ -342,7 +342,7 @@ export default function AgentCard({ agent, onKill, onDelete, onResume, completed
           {!completed && processStats?.active && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-port-success/20 text-port-success whitespace-nowrap"
                   title={`PID: ${processStats.pid} | State: ${processStats.state}`}>
-              <Activity size={10} aria-hidden="true" className="flex-shrink-0" />
+              <Activity size={10} aria-hidden="true" className="shrink-0" />
               <span className="font-mono">PID {processStats.pid}</span>
               <span className="text-port-success/70">|</span>
               <span className="font-mono">{processStats.cpu?.toFixed(1)}%</span>
@@ -354,7 +354,7 @@ export default function AgentCard({ agent, onKill, onDelete, onResume, completed
           {!completed && agent.pid && processStats && !processStats.active && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-port-error/20 text-port-error whitespace-nowrap"
                   title="Process is not running - zombie agent">
-              <Skull size={10} aria-hidden="true" className="flex-shrink-0" />
+              <Skull size={10} aria-hidden="true" className="shrink-0" />
               <span className="font-mono">PID {agent.pid}</span>
               <span>ZOMBIE</span>
             </span>
@@ -524,7 +524,7 @@ export default function AgentCard({ agent, onKill, onDelete, onResume, completed
                   value={feedbackComment}
                   onChange={(e) => setFeedbackComment(e.target.value)}
                   placeholder="Optional: add a comment..."
-                  className="flex-1 px-2 py-1 text-sm bg-port-bg border border-port-border rounded text-white placeholder-gray-500 focus:outline-none focus:border-port-accent min-h-[32px]"
+                  className="flex-1 px-2 py-1 text-sm bg-port-bg border border-port-border rounded text-white placeholder-gray-500 focus:outline-hidden focus:border-port-accent min-h-[32px]"
                   maxLength={200}
                 />
                 <button

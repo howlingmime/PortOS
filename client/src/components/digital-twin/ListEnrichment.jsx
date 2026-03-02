@@ -159,7 +159,7 @@ export default function ListEnrichment({
         </button>
 
         <div className="flex items-center gap-3 sm:gap-4">
-          <div className={`p-2.5 sm:p-3 rounded-lg bg-${config?.color || 'blue'}-500/20 flex-shrink-0`}>
+          <div className={`p-2.5 sm:p-3 rounded-lg bg-${config?.color || 'blue'}-500/20 shrink-0`}>
             <Icon className={`w-5 h-5 sm:w-6 sm:h-6 text-${config?.color || 'blue'}-400`} />
           </div>
           <div className="min-w-0">
@@ -202,7 +202,7 @@ export default function ListEnrichment({
                     value={item.title}
                     onChange={(e) => updateItem(index, 'title', e.target.value)}
                     placeholder={config?.itemPlaceholder}
-                    className="w-full px-3 py-2.5 bg-port-card border border-port-border rounded-lg text-white focus:outline-none focus:border-port-accent"
+                    className="w-full px-3 py-2.5 bg-port-card border border-port-border rounded-lg text-white focus:outline-hidden focus:border-port-accent"
                   />
                 </div>
 
@@ -215,7 +215,7 @@ export default function ListEnrichment({
                     onChange={(e) => updateItem(index, 'note', e.target.value)}
                     placeholder={config?.notePlaceholder}
                     rows={2}
-                    className="w-full px-3 py-2.5 bg-port-card border border-port-border rounded-lg text-white resize-none focus:outline-none focus:border-port-accent"
+                    className="w-full px-3 py-2.5 bg-port-card border border-port-border rounded-lg text-white resize-none focus:outline-hidden focus:border-port-accent"
                   />
                 </div>
               </div>
@@ -330,7 +330,7 @@ export default function ListEnrichment({
                   <ul className="space-y-2">
                     {analysis.patterns.map((pattern, i) => (
                       <li key={i} className="flex items-start gap-2 text-gray-300">
-                        <Check size={16} className="text-green-400 mt-0.5 flex-shrink-0" />
+                        <Check size={16} className="text-green-400 mt-0.5 shrink-0" />
                         {pattern}
                       </li>
                     ))}
@@ -389,7 +389,7 @@ export default function ListEnrichment({
                 value={documentContent}
                 onChange={(e) => setDocumentContent(e.target.value)}
                 rows={15}
-                className="w-full px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white font-mono text-sm resize-y focus:outline-none focus:border-port-accent"
+                className="w-full px-4 py-3 bg-port-bg border border-port-border rounded-lg text-white font-mono text-sm resize-y focus:outline-hidden focus:border-port-accent"
               />
             ) : (
               <pre className="p-4 bg-port-bg rounded-lg text-sm text-gray-300 whitespace-pre-wrap overflow-auto max-h-96">

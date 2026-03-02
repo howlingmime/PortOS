@@ -128,7 +128,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
                 type="text"
                 value={formData.name}
                 onChange={e => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                 required
               />
             </div>
@@ -143,7 +143,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
               type="text"
               value={formData.repoPath}
               onChange={e => setFormData({ ...formData, repoPath: e.target.value })}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
               required
             />
           </div>
@@ -155,7 +155,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
                 type="number"
                 value={formData.uiPort}
                 onChange={e => setFormData({ ...formData, uiPort: e.target.value })}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                 placeholder="3000"
               />
             </div>
@@ -165,7 +165,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
                 type="number"
                 value={formData.devUiPort}
                 onChange={e => setFormData({ ...formData, devUiPort: e.target.value })}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                 placeholder="3001"
               />
             </div>
@@ -175,7 +175,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
                 type="number"
                 value={formData.apiPort}
                 onChange={e => setFormData({ ...formData, apiPort: e.target.value })}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                 placeholder="3002"
               />
             </div>
@@ -186,7 +186,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
             <textarea
               value={formData.startCommands}
               onChange={e => setFormData({ ...formData, startCommands: e.target.value })}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none font-mono text-sm"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden font-mono text-sm"
               rows={2}
             />
           </div>
@@ -197,7 +197,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
               type="text"
               value={formData.buildCommand}
               onChange={e => setFormData({ ...formData, buildCommand: e.target.value })}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none font-mono text-sm"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden font-mono text-sm"
               placeholder="npm run build"
             />
           </div>
@@ -208,7 +208,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
               type="text"
               value={formData.pm2ProcessNames}
               onChange={e => setFormData({ ...formData, pm2ProcessNames: e.target.value })}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
             />
           </div>
 
@@ -218,7 +218,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
               type="text"
               value={formData.editorCommand}
               onChange={e => setFormData({ ...formData, editorCommand: e.target.value })}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
             />
           </div>
 
@@ -274,7 +274,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
                           <select
                             value={formData.jiraInstanceId}
                             onChange={e => setFormData({ ...formData, jiraInstanceId: e.target.value, jiraProjectKey: '' })}
-                            className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                            className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                           >
                             <option value="">Select instance...</option>
                             {jiraInstances.map(inst => (
@@ -305,7 +305,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
                                   setProjectSearch('');
                                 }}
                                 onBlur={() => setTimeout(() => setProjectDropdownOpen(false), 150)}
-                                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                                 placeholder="Search projects..."
                               />
                               {formData.jiraProjectKey && !projectDropdownOpen && (
@@ -361,7 +361,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
                               type="text"
                               value={formData.jiraProjectKey}
                               onChange={e => setFormData({ ...formData, jiraProjectKey: e.target.value })}
-                              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                               placeholder="e.g. CONTECH"
                             />
                           )}
@@ -373,7 +373,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
                             type="text"
                             value={formData.jiraBoardId}
                             onChange={e => setFormData({ ...formData, jiraBoardId: e.target.value })}
-                            className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                            className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                             placeholder="e.g. 11810 (from JIRA board URL rapidView param)"
                           />
                         </div>
@@ -385,7 +385,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
                               type="text"
                               value={formData.jiraIssueType}
                               onChange={e => setFormData({ ...formData, jiraIssueType: e.target.value })}
-                              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                               placeholder="Task"
                             />
                           </div>
@@ -395,7 +395,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
                               type="text"
                               value={formData.jiraAssignee}
                               onChange={e => setFormData({ ...formData, jiraAssignee: e.target.value })}
-                              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                               placeholder="Optional"
                             />
                           </div>
@@ -407,7 +407,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
                             type="text"
                             value={formData.jiraLabels}
                             onChange={e => setFormData({ ...formData, jiraLabels: e.target.value })}
-                            className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                            className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                             placeholder="e.g. cos-auto, feature"
                           />
                         </div>
@@ -418,7 +418,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
                             type="text"
                             value={formData.jiraEpicKey}
                             onChange={e => setFormData({ ...formData, jiraEpicKey: e.target.value })}
-                            className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                            className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                             placeholder="e.g. CONTECH-100"
                           />
                         </div>

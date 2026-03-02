@@ -325,7 +325,7 @@ function GlobalConfigControls({ taskType, config, onUpdate, onTrigger, onReset, 
                       onClick={() => { onTrigger(taskType, app.id); setShowAppSelector(false); }}
                       className="w-full px-3 py-2 text-left text-sm hover:bg-port-border/50 flex items-center gap-2 min-h-[40px]"
                     >
-                      <Package size={14} className="text-gray-400 flex-shrink-0" />
+                      <Package size={14} className="text-gray-400 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <div className="text-white truncate">{app.name}</div>
                         {app.repoPath && <div className="text-xs text-gray-500 truncate">{app.repoPath}</div>}
@@ -446,7 +446,7 @@ function AppOverrideRow({ app, taskType, globalIntervalType, override, onUpdate 
   return (
     <div className="flex items-center gap-3 py-2 px-3 rounded hover:bg-port-card/30">
       <div className="flex items-center gap-2 min-w-0 flex-1">
-        <AppIcon icon={app.icon || 'package'} size={16} className="text-gray-400 flex-shrink-0" />
+        <AppIcon icon={app.icon || 'package'} size={16} className="text-gray-400 shrink-0" />
         <span className="text-sm text-white truncate">{app.name}</span>
       </div>
 
@@ -467,7 +467,7 @@ function AppOverrideRow({ app, taskType, globalIntervalType, override, onUpdate 
       <button
         onClick={handleToggle}
         disabled={updating}
-        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0 ${
+        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${
           isEnabled ? 'bg-port-accent' : 'bg-gray-600'
         } ${updating ? 'opacity-50' : ''}`}
         aria-label={`${isEnabled ? 'Disable' : 'Enable'} ${taskType} for ${app.name}`}

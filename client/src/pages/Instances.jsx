@@ -110,7 +110,7 @@ function SelfCard({ self, onUpdate }) {
                 value={name}
                 onChange={e => setName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && saveName()}
-                className="flex-1 bg-port-bg border border-port-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-port-accent"
+                className="flex-1 bg-port-bg border border-port-border rounded px-2 py-1 text-sm text-white focus:outline-hidden focus:border-port-accent"
                 autoFocus
               />
               <button onClick={saveName} className="text-port-success hover:text-port-success/80">
@@ -169,7 +169,7 @@ function AddPeerForm({ onAdd }) {
           placeholder="100.64.x.x"
           pattern="^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$"
           required
-          className="bg-port-bg border border-port-border rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-port-accent flex-1 min-w-[140px]"
+          className="bg-port-bg border border-port-border rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-hidden focus:border-port-accent flex-1 min-w-[140px]"
         />
         <input
           value={port}
@@ -178,13 +178,13 @@ function AddPeerForm({ onAdd }) {
           type="number"
           min="1"
           max="65535"
-          className="bg-port-bg border border-port-border rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-port-accent w-20"
+          className="bg-port-bg border border-port-border rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-hidden focus:border-port-accent w-20"
         />
         <input
           value={name}
           onChange={e => setName(e.target.value)}
           placeholder="Name (optional)"
-          className="bg-port-bg border border-port-border rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-port-accent flex-1 min-w-[120px]"
+          className="bg-port-bg border border-port-border rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-hidden focus:border-port-accent flex-1 min-w-[120px]"
         />
         <button
           type="submit"
@@ -283,7 +283,7 @@ function PeerCard({ peer, onRefresh }) {
                 value={name}
                 onChange={e => setName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && saveName()}
-                className="bg-port-bg border border-port-border rounded px-2 py-0.5 text-sm text-white focus:outline-none focus:border-port-accent w-32"
+                className="bg-port-bg border border-port-border rounded px-2 py-0.5 text-sm text-white focus:outline-hidden focus:border-port-accent w-32"
                 autoFocus
               />
               <button onClick={saveName} className="text-port-success hover:text-port-success/80"><Check size={14} /></button>

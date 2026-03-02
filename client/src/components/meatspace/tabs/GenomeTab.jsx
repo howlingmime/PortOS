@@ -322,7 +322,7 @@ export default function GenomeTab() {
 
         <div className="p-3 rounded bg-port-card border border-port-border text-sm text-gray-400">
           <p className="flex items-start gap-2">
-            <AlertTriangle size={16} className="text-yellow-500 mt-0.5 flex-shrink-0" />
+            <AlertTriangle size={16} className="text-yellow-500 mt-0.5 shrink-0" />
             <span>
               Your genome data is stored locally on this server only. It is never sent to external services.
               All analysis is performed locally using a curated list of known health markers.
@@ -494,7 +494,7 @@ export default function GenomeTab() {
         {/* Sync progress */}
         {clinvarProgress && (
           <div className="flex items-center gap-2 p-3 rounded bg-purple-500/10 border border-purple-500/20 text-sm text-purple-300">
-            <RefreshCw size={14} className="animate-spin flex-shrink-0" />
+            <RefreshCw size={14} className="animate-spin shrink-0" />
             {clinvarProgress}
           </div>
         )}
@@ -549,7 +549,7 @@ export default function GenomeTab() {
               <select
                 value={clinvarStarFilter}
                 onChange={(e) => setClinvarStarFilter(Number(e.target.value))}
-                className="px-2 py-1 rounded bg-port-card border border-port-border text-xs text-gray-400 focus:outline-none"
+                className="px-2 py-1 rounded bg-port-card border border-port-border text-xs text-gray-400 focus:outline-hidden"
               >
                 <option value={0}>Any evidence</option>
                 <option value={1}>1+ star</option>
@@ -575,13 +575,13 @@ export default function GenomeTab() {
                           className="w-full flex items-center justify-between p-2.5 text-left hover:bg-white/5 transition-colors text-sm"
                         >
                           <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className="font-mono text-xs text-gray-500 w-24 flex-shrink-0">{finding.rsid}</span>
+                            <span className="font-mono text-xs text-gray-500 w-24 shrink-0">{finding.rsid}</span>
                             <span className="text-white font-medium truncate">{finding.gene}</span>
-                            <span className={`px-1.5 py-0.5 rounded text-xs ${sev.bg} ${sev.text} border ${sev.border} flex-shrink-0`}>
+                            <span className={`px-1.5 py-0.5 rounded text-xs ${sev.bg} ${sev.text} border ${sev.border} shrink-0`}>
                               {sev.label}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
                             <span className="text-xs text-yellow-500" title={STAR_LABELS[finding.reviewStars] || ''}>
                               {'★'.repeat(finding.reviewStars)}{'☆'.repeat(4 - finding.reviewStars)}
                             </span>
@@ -644,7 +644,7 @@ export default function GenomeTab() {
             onChange={(e) => setSearchRsid(e.target.value.toLowerCase().trim())}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             placeholder="rs1801133"
-            className="flex-1 max-w-xs px-3 py-2 bg-port-card border border-port-border rounded text-sm text-white placeholder-gray-600 focus:outline-none focus:border-port-accent font-mono"
+            className="flex-1 max-w-xs px-3 py-2 bg-port-card border border-port-border rounded text-sm text-white placeholder-gray-600 focus:outline-hidden focus:border-port-accent font-mono"
           />
           <button
             onClick={handleSearch}

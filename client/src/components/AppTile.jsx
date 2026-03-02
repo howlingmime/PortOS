@@ -49,7 +49,7 @@ const AppTile = memo(function AppTile({ app, onUpdate }) {
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2 min-w-0">
-          <div className={`w-8 h-8 rounded flex-shrink-0 flex items-center justify-center ${
+          <div className={`w-8 h-8 rounded shrink-0 flex items-center justify-center ${
             app.archived ? 'bg-port-border/50 text-gray-500' : 'bg-port-border text-port-accent'
           }`} aria-hidden="true">
             <AppIcon icon={app.icon || 'package'} size={18} />
@@ -58,7 +58,7 @@ const AppTile = memo(function AppTile({ app, onUpdate }) {
             <div className="flex items-center gap-1.5">
               <h3 id={`app-title-${app.id}`} className={`text-sm font-semibold truncate ${app.archived ? 'text-gray-500' : 'text-white'}`}>{app.name}</h3>
               {app.archived && (
-                <span className="px-1 py-0.5 bg-gray-600/30 text-gray-500 text-[10px] rounded flex-shrink-0">Arc</span>
+                <span className="px-1 py-0.5 bg-gray-600/30 text-gray-500 text-[10px] rounded shrink-0">Arc</span>
               )}
             </div>
             <p className="text-xs text-gray-500">{app.type}</p>

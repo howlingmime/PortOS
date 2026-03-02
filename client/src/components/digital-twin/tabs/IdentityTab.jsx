@@ -451,7 +451,7 @@ export default function IdentityTab({ onRefresh }) {
                     const CatIcon = GOAL_CATEGORY_ICONS[goal.category] || Target;
                     return (
                       <div key={goal.id} className="flex items-center gap-3 bg-port-bg rounded-lg px-3 py-2">
-                        <CatIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <CatIcon className="w-4 h-4 text-gray-400 shrink-0" />
                         <span className="text-sm text-white truncate flex-1">{goal.title}</span>
                         {goal.urgency != null && (
                           <span className={`text-xs font-medium ${urgencyColor(goal.urgency)}`}>

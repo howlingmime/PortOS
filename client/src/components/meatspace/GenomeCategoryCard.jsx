@@ -107,7 +107,7 @@ export default function GenomeCategoryCard({ category, label, emoji, color, mark
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
                           <span className="text-xs font-medium text-gray-200 truncate">{marker.name}</span>
                         </div>
                         <div className="flex items-center gap-2 mt-1 ml-3.5">
@@ -116,7 +116,7 @@ export default function GenomeCategoryCard({ category, label, emoji, color, mark
                         </div>
                       </div>
                       {marker.genotype && (
-                        <span className="px-1.5 py-0.5 rounded bg-port-bg border border-port-border text-[10px] font-mono text-gray-300 flex-shrink-0">
+                        <span className="px-1.5 py-0.5 rounded bg-port-bg border border-port-border text-[10px] font-mono text-gray-300 shrink-0">
                           {marker.genotype}
                         </span>
                       )}
@@ -164,7 +164,7 @@ export default function GenomeCategoryCard({ category, label, emoji, color, mark
                           onChange={(e) => onEditNotes(marker.id, e.target.value)}
                           placeholder="Add personal notes..."
                           rows={2}
-                          className="w-full mt-1 p-2 bg-port-card border border-port-border rounded text-sm text-gray-300 placeholder-gray-600 resize-none focus:outline-none focus:border-port-accent"
+                          className="w-full mt-1 p-2 bg-port-card border border-port-border rounded text-sm text-gray-300 placeholder-gray-600 resize-none focus:outline-hidden focus:border-port-accent"
                         />
                       </div>
 

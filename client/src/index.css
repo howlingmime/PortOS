@@ -1,6 +1,16 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-port-bg: rgb(var(--port-bg));
+  --color-port-card: rgb(var(--port-card));
+  --color-port-border: rgb(var(--port-border));
+  --color-port-accent: rgb(var(--port-accent));
+  --color-port-success: rgb(var(--port-success));
+  --color-port-warning: rgb(var(--port-warning));
+  --color-port-error: rgb(var(--port-error));
+
+  --animate-scanline: scanline 5s linear infinite;
+}
 
 /* Default theme CSS vars (Midnight) — overridden by JS on load */
 :root {

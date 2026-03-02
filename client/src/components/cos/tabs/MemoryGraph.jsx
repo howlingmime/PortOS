@@ -376,7 +376,7 @@ export default function MemoryGraph() {
             </div>
             <button
               onClick={() => setSelectedNode(null)}
-              className="text-gray-500 hover:text-white transition-colors p-1 flex-shrink-0"
+              className="text-gray-500 hover:text-white transition-colors p-1 shrink-0"
             >
               &times;
             </button>
@@ -394,9 +394,9 @@ export default function MemoryGraph() {
                     }}
                     className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded hover:bg-port-border/50 transition-colors"
                   >
-                    <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: TYPE_HEX[cn.type] }} />
+                    <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: TYPE_HEX[cn.type] }} />
                     <span className="text-xs text-gray-300 truncate flex-1">{cn.summary}</span>
-                    <span className="text-[10px] text-gray-600 flex-shrink-0">
+                    <span className="text-[10px] text-gray-600 shrink-0">
                       {cn.edgeType === 'linked' ? 'linked' : `${(cn.weight * 100).toFixed(0)}%`}
                     </span>
                   </button>

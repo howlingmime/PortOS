@@ -280,7 +280,7 @@ export default function AIProviders() {
                   <button
                     onClick={() => handleAddSample(provider)}
                     disabled={addingSample[provider.id]}
-                    className="px-4 py-1.5 text-sm bg-port-success/20 text-port-success hover:bg-port-success/30 rounded transition-colors disabled:opacity-50 flex-shrink-0"
+                    className="px-4 py-1.5 text-sm bg-port-success/20 text-port-success hover:bg-port-success/30 rounded transition-colors disabled:opacity-50 shrink-0"
                   >
                     {addingSample[provider.id] ? 'Adding...' : 'Add'}
                   </button>
@@ -323,7 +323,7 @@ export default function AIProviders() {
             onChange={(e) => setRunPrompt(e.target.value)}
             placeholder="Enter your prompt..."
             rows={3}
-            className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white resize-none focus:border-port-accent focus:outline-none"
+            className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white resize-none focus:border-port-accent focus:outline-hidden"
           />
 
           <div className="flex justify-between items-center">
@@ -402,6 +402,11 @@ export default function AIProviders() {
                       {provider.lightModel && <span className="ml-1 text-green-400">{provider.lightModel}</span>}
                       {provider.mediumModel && <span className="ml-1 text-yellow-400">{provider.mediumModel}</span>}
                       {provider.heavyModel && <span className="ml-1 text-red-400">{provider.heavyModel}</span>}
+                    </p>
+                  )}
+                  {provider.headlessArgs?.length > 0 && (
+                    <p className="text-xs break-words">
+                      Headless: <code className="text-gray-300 break-all">{provider.headlessArgs.join(' ')}</code>
                     </p>
                   )}
                   {provider.fallbackProvider && (
@@ -509,7 +514,7 @@ export default function AIProviders() {
                 className="bg-port-card border border-port-border rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
               >
                 <div className="flex items-start sm:items-center gap-3 min-w-0">
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 sm:mt-0 ${
+                  <span className={`w-2 h-2 rounded-full shrink-0 mt-1.5 sm:mt-0 ${
                     run.success === true ? 'bg-port-success' :
                     run.success === false ? 'bg-port-error' :
                     'bg-port-warning animate-pulse'
@@ -521,7 +526,7 @@ export default function AIProviders() {
                     </p>
                   </div>
                 </div>
-                <div className="text-sm text-gray-400 flex-shrink-0 pl-5 sm:pl-0">
+                <div className="text-sm text-gray-400 shrink-0 pl-5 sm:pl-0">
                   {run.duration ? `${(run.duration / 1000).toFixed(1)}s` : 'Running...'}
                 </div>
               </div>
@@ -560,7 +565,8 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
     timeout: provider?.timeout || 300000,
     enabled: provider?.enabled !== false,
     envVars: provider?.envVars || {},
-    secretEnvVars: provider?.secretEnvVars || []
+    secretEnvVars: provider?.secretEnvVars || [],
+    headlessArgs: provider?.headlessArgs?.join(' ') || ''
   });
 
   const [newEnvKey, setNewEnvKey] = useState('');
@@ -578,6 +584,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
     const data = {
       ...formData,
       args: formData.args ? formData.args.split(' ').filter(Boolean) : [],
+      headlessArgs: formData.headlessArgs ? formData.headlessArgs.split(' ').filter(Boolean) : [],
       timeout: parseInt(formData.timeout, 10)
     };
 
@@ -610,7 +617,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
               value={formData.name}
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
               required
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
             />
           </div>
 
@@ -619,7 +626,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
             <select
               value={formData.type}
               onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
             >
               <option value="cli">CLI</option>
               <option value="api">API</option>
@@ -636,7 +643,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                   onChange={(e) => setFormData(prev => ({ ...prev, command: e.target.value }))}
                   placeholder="claude"
                   required={formData.type === 'cli'}
-                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                 />
               </div>
 
@@ -647,8 +654,22 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                   value={formData.args}
                   onChange={(e) => setFormData(prev => ({ ...prev, args: e.target.value }))}
                   placeholder="--print -p"
-                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Headless Args (for simple prompt tasks)</label>
+                <input
+                  type="text"
+                  value={formData.headlessArgs}
+                  onChange={(e) => setFormData(prev => ({ ...prev, headlessArgs: e.target.value }))}
+                  placeholder='--no-session-persistence --disable-slash-commands --tools ""'
+                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Extra CLI flags for lightweight prompt-in/text-out mode (brain classifier, etc.)
+                </p>
               </div>
             </>
           )}
@@ -663,7 +684,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                   onChange={(e) => setFormData(prev => ({ ...prev, endpoint: e.target.value }))}
                   placeholder="http://localhost:1234/v1"
                   required={formData.type === 'api'}
-                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                 />
               </div>
 
@@ -674,7 +695,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                   value={formData.apiKey}
                   onChange={(e) => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
                   placeholder={provider?.hasApiKey ? 'Key set — leave blank to keep' : 'Optional'}
-                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
                 />
               </div>
             </>
@@ -696,7 +717,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
               }}
               placeholder="model-1, model-2, model-3"
               rows={2}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white resize-none focus:border-port-accent focus:outline-none"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white resize-none focus:border-port-accent focus:outline-hidden"
             />
             <p className="text-xs text-gray-500 mt-1">
               Comma-separated list of available models. For API providers, use Refresh to auto-populate.
@@ -709,7 +730,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
               <select
                 value={formData.defaultModel}
                 onChange={(e) => setFormData(prev => ({ ...prev, defaultModel: e.target.value }))}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
               >
                 <option value="">None</option>
                 {availableModels.map(model => (
@@ -722,7 +743,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                 value={formData.defaultModel}
                 onChange={(e) => setFormData(prev => ({ ...prev, defaultModel: e.target.value }))}
                 placeholder="claude-sonnet-4-20250514"
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
               />
             )}
             <p className="text-xs text-gray-500 mt-1">
@@ -745,7 +766,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                   <select
                     value={formData.lightModel}
                     onChange={(e) => setFormData(prev => ({ ...prev, lightModel: e.target.value }))}
-                    className="w-full px-2 py-1.5 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none"
+                    className="w-full px-2 py-1.5 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden"
                   >
                     <option value="">None</option>
                     {availableModels.map(model => (
@@ -758,7 +779,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                     value={formData.lightModel}
                     onChange={(e) => setFormData(prev => ({ ...prev, lightModel: e.target.value }))}
                     placeholder="haiku"
-                    className="w-full px-2 py-1.5 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none"
+                    className="w-full px-2 py-1.5 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden"
                   />
                 )}
               </div>
@@ -771,7 +792,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                   <select
                     value={formData.mediumModel}
                     onChange={(e) => setFormData(prev => ({ ...prev, mediumModel: e.target.value }))}
-                    className="w-full px-2 py-1.5 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none"
+                    className="w-full px-2 py-1.5 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden"
                   >
                     <option value="">None</option>
                     {availableModels.map(model => (
@@ -784,7 +805,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                     value={formData.mediumModel}
                     onChange={(e) => setFormData(prev => ({ ...prev, mediumModel: e.target.value }))}
                     placeholder="sonnet"
-                    className="w-full px-2 py-1.5 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none"
+                    className="w-full px-2 py-1.5 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden"
                   />
                 )}
               </div>
@@ -797,7 +818,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                   <select
                     value={formData.heavyModel}
                     onChange={(e) => setFormData(prev => ({ ...prev, heavyModel: e.target.value }))}
-                    className="w-full px-2 py-1.5 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none"
+                    className="w-full px-2 py-1.5 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden"
                   >
                     <option value="">None</option>
                     {availableModels.map(model => (
@@ -810,7 +831,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                     value={formData.heavyModel}
                     onChange={(e) => setFormData(prev => ({ ...prev, heavyModel: e.target.value }))}
                     placeholder="opus"
-                    className="w-full px-2 py-1.5 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-none"
+                    className="w-full px-2 py-1.5 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden"
                   />
                 )}
               </div>
@@ -828,7 +849,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
               type="number"
               value={formData.timeout}
               onChange={(e) => setFormData(prev => ({ ...prev, timeout: e.target.value }))}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
             />
           </div>
 
@@ -838,7 +859,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
             <select
               value={formData.fallbackProvider}
               onChange={(e) => setFormData(prev => ({ ...prev, fallbackProvider: e.target.value }))}
-              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-none"
+              className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
             >
               <option value="">None (use system default)</option>
               {fallbackOptions.map(p => (
@@ -859,7 +880,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                   const isSecret = formData.secretEnvVars.includes(key);
                   return (
                     <div key={key} className="flex items-center gap-2">
-                      <code className="text-xs text-gray-300 bg-port-bg px-2 py-1.5 rounded border border-port-border flex-shrink-0">{key}</code>
+                      <code className="text-xs text-gray-300 bg-port-bg px-2 py-1.5 rounded border border-port-border shrink-0">{key}</code>
                       <input
                         type={isSecret ? 'password' : 'text'}
                         value={value}
@@ -867,7 +888,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                           ...prev,
                           envVars: { ...prev.envVars, [key]: e.target.value }
                         }))}
-                        className="flex-1 min-w-0 px-2 py-1.5 bg-port-bg border border-port-border rounded text-white text-sm focus:border-port-accent focus:outline-none"
+                        className="flex-1 min-w-0 px-2 py-1.5 bg-port-bg border border-port-border rounded text-white text-sm focus:border-port-accent focus:outline-hidden"
                       />
                       <button
                         type="button"
@@ -877,7 +898,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                             ? prev.secretEnvVars.filter(k => k !== key)
                             : [...prev.secretEnvVars, key]
                         }))}
-                        className={`px-2 py-1.5 text-xs rounded transition-colors flex-shrink-0 ${
+                        className={`px-2 py-1.5 text-xs rounded transition-colors shrink-0 ${
                           isSecret
                             ? 'text-port-warning bg-port-warning/20 hover:bg-port-warning/30'
                             : 'text-gray-400 hover:bg-port-border/50'
@@ -896,7 +917,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                             secretEnvVars: prev.secretEnvVars.filter(k => k !== key)
                           };
                         })}
-                        className="px-2 py-1.5 text-xs text-port-error hover:bg-port-error/20 rounded transition-colors flex-shrink-0"
+                        className="px-2 py-1.5 text-xs text-port-error hover:bg-port-error/20 rounded transition-colors shrink-0"
                       >
                         Remove
                       </button>
@@ -911,16 +932,16 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                 value={newEnvKey}
                 onChange={(e) => setNewEnvKey(e.target.value.toUpperCase())}
                 placeholder="KEY"
-                className="w-1/3 px-2 py-1.5 bg-port-bg border border-port-border rounded text-white text-sm focus:border-port-accent focus:outline-none font-mono"
+                className="w-1/3 px-2 py-1.5 bg-port-bg border border-port-border rounded text-white text-sm focus:border-port-accent focus:outline-hidden font-mono"
               />
               <input
                 type={newEnvSecret ? 'password' : 'text'}
                 value={newEnvValue}
                 onChange={(e) => setNewEnvValue(e.target.value)}
                 placeholder="value"
-                className="flex-1 px-2 py-1.5 bg-port-bg border border-port-border rounded text-white text-sm focus:border-port-accent focus:outline-none"
+                className="flex-1 px-2 py-1.5 bg-port-bg border border-port-border rounded text-white text-sm focus:border-port-accent focus:outline-hidden"
               />
-              <label className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0 cursor-pointer" title="Mark as secret (value will be masked on provider list)">
+              <label className="flex items-center gap-1 text-xs text-gray-400 shrink-0 cursor-pointer" title="Mark as secret (value will be masked on provider list)">
                 <input
                   type="checkbox"
                   checked={newEnvSecret}
@@ -946,7 +967,7 @@ function ProviderForm({ provider, onClose, onSave, allProviders = [] }) {
                   }
                 }}
                 disabled={!newEnvKey.trim()}
-                className="px-3 py-1.5 text-sm bg-port-border hover:bg-port-border/80 text-white rounded transition-colors disabled:opacity-50 flex-shrink-0"
+                className="px-3 py-1.5 text-sm bg-port-border hover:bg-port-border/80 text-white rounded transition-colors disabled:opacity-50 shrink-0"
               >
                 Add
               </button>
