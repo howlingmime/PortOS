@@ -351,6 +351,17 @@ export default function GitHub() {
                     {repo.isPrivate && (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-400 border border-purple-800">private</span>
                     )}
+                    {repo.isFork && (
+                      <a
+                        href={`https://github.com/${repo.forkSource}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs px-1.5 py-0.5 rounded bg-cyan-900/50 text-cyan-400 border border-cyan-800 hover:bg-cyan-900/70"
+                        title={`Forked from ${repo.forkSource}`}
+                      >
+                        fork: {repo.forkSource}
+                      </a>
+                    )}
                     {repo.isArchived && (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-gray-700 text-gray-400">archived</span>
                     )}

@@ -80,7 +80,7 @@ async function runWithConcurrency(tasks, limit) {
 export async function syncRepos() {
   const raw = await execGh([
     'repo', 'list', 'atomantic', '--limit', '200',
-    '--json', 'name,nameWithOwner,description,pushedAt,isArchived,isPrivate,licenseInfo'
+    '--json', 'name,nameWithOwner,description,pushedAt,isArchived,isPrivate,isFork,parent,licenseInfo'
   ]);
   const remoteRepos = JSON.parse(raw);
   const data = await load();
@@ -94,6 +94,8 @@ export async function syncRepos() {
       description: repo.description || '',
       isArchived: repo.isArchived,
       isPrivate: repo.isPrivate,
+      isFork: repo.isFork,
+      forkSource: repo.parent ? `${repo.parent.owner.login}/${repo.parent.name}` : null,
       pushedAt: repo.pushedAt,
       license: repo.licenseInfo?.name || null,
       flags: existing.flags || {},
