@@ -39,3 +39,8 @@ Thumbs.db
 
 # Browser service node_modules (code is committed)
 browser/node_modules/
+
+# Workspace sub-package lock files (root package-lock.json is canonical)
+browser/package-lock.json
+client/package-lock.json
+server/package-lock.json

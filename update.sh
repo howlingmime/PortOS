@@ -14,8 +14,8 @@ echo ""
 # Update dependencies
 echo "Updating dependencies..."
 npm install
-cd client && npm install && cd ..
-cd server && npm install && cd ..
+(cd client && npm install)
+(cd server && npm install)
 echo ""
 
 # Run setup (data dirs + browser deps)
