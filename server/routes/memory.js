@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import * as memory from '../services/memoryBackend.js';
-import { getBackendName } from '../services/memoryBackend.js';
+import { ensureBackend } from '../services/memoryBackend.js';
 import * as embeddings from '../services/memoryEmbeddings.js';
 import * as memorySync from '../services/memorySync.js';
 import { checkHealth } from '../lib/db.js';
@@ -78,13 +78,15 @@ router.get('/graph', asyncHandler(async (req, res) => {
 
 // GET /api/memory/backend/status - Check memory backend status
 router.get('/backend/status', asyncHandler(async (req, res) => {
+  const name = await ensureBackend();
   const dbHealth = await checkHealth();
-  res.json({ backend: getBackendName(), db: dbHealth });
+  res.json({ backend: name, db: dbHealth });
 }));
 
 // GET /api/memory/sync - Federation sync: get changes since sequence
 router.get('/sync', asyncHandler(async (req, res) => {
-  if (getBackendName() !== 'postgres') {
+  const name = await ensureBackend();
+  if (name !== 'postgres') {
     throw new ServerError('Sync requires PostgreSQL backend', { status: 400 });
   }
   const since = parseInt(req.query.since, 10) || 0;
@@ -95,7 +97,8 @@ router.get('/sync', asyncHandler(async (req, res) => {
 
 // POST /api/memory/sync - Federation sync: apply remote changes
 router.post('/sync', asyncHandler(async (req, res) => {
-  if (getBackendName() !== 'postgres') {
+  const name = await ensureBackend();
+  if (name !== 'postgres') {
     throw new ServerError('Sync requires PostgreSQL backend', { status: 400 });
   }
   const { memories } = req.body;

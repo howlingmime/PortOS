@@ -60,10 +60,15 @@ CREATE TABLE IF NOT EXISTS memory_links (
 );
 
 -- Auto-update updated_at and sync_sequence on modification
+-- Respects explicitly provided updated_at (e.g., from sync service)
+-- Always bumps sync_sequence so federation peers detect changes
 CREATE OR REPLACE FUNCTION update_memory_timestamp()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.updated_at = NOW();
+  IF NEW.updated_at IS NULL OR NEW.updated_at = OLD.updated_at THEN
+    NEW.updated_at = NOW();
+  END IF;
+  NEW.sync_sequence = nextval('memories_sync_sequence_seq');
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

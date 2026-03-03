@@ -10,7 +10,7 @@
  * Called by: npm run setup, npm run update, npm start, npm run dev
  */
 
-import { execFileSync, execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -71,7 +71,7 @@ function waitForHealth(maxAttempts = 30) {
       return true;
     } catch {
       if (i < maxAttempts - 1) {
-        execSync('sleep 1', { stdio: 'pipe' });
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000);
       }
     }
   }

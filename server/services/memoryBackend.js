@@ -53,7 +53,16 @@ async function getBackend() {
 }
 
 /**
- * Get the name of the active backend
+ * Ensure the backend is initialized and return its name.
+ * Safe to call from routes that need the backend name before any other function.
+ */
+export async function ensureBackend() {
+  await getBackend();
+  return backendName;
+}
+
+/**
+ * Get the name of the active backend (null if not yet initialized)
  */
 export function getBackendName() {
   return backendName;
@@ -181,5 +190,17 @@ export async function flushBM25Index() {
   return b.flushBM25Index();
 }
 
-// Re-export the config constant (same in both backends)
-export { DEFAULT_MEMORY_CONFIG } from './memory.js';
+// Default memory configuration (shared across backends)
+export const DEFAULT_MEMORY_CONFIG = {
+  enabled: true,
+  embeddingProvider: 'lmstudio',
+  embeddingEndpoint: 'http://localhost:1234/v1/embeddings',
+  embeddingModel: 'text-embedding-nomic-embed-text-v2-moe',
+  embeddingDimension: 768,
+  maxMemories: 10000,
+  maxContextTokens: 2000,
+  minRelevanceThreshold: 0.7,
+  autoExtractEnabled: true,
+  consolidationIntervalMs: 86400000,
+  decayIntervalMs: 86400000
+};

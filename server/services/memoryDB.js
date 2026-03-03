@@ -533,7 +533,7 @@ export async function hybridSearchMemories(queryText, queryEmbedding, options = 
   // Get vector similarity results
   let vectorResults = [];
   if (queryEmbedding) {
-    const vecParamStart = paramIdx + 2;
+    const vecParamStart = filterParams.length + 1;
     const vectorResult = await query(
       `SELECT id, type, category, tags, summary, importance, created_at, status, source_app_id,
               1 - (embedding <=> $${vecParamStart}) AS similarity

@@ -16,6 +16,17 @@
 import { query, withTransaction } from '../lib/db.js';
 
 /**
+ * Convert embedding to pgvector string format.
+ * Handles both JS arrays and existing pgvector strings.
+ */
+function toPgvector(embedding) {
+  if (!embedding) return null;
+  if (typeof embedding === 'string') return embedding;
+  if (Array.isArray(embedding)) return `[${embedding.join(',')}]`;
+  return null;
+}
+
+/**
  * Get memories changed since a given sync sequence.
  * Used by peers to pull incremental updates.
  *
@@ -112,7 +123,7 @@ export async function applyRemoteChanges(incomingMemories) {
           )`,
           [
             mem.id, mem.type, mem.content, mem.summary, mem.category, mem.tags || [],
-            mem.embedding, mem.embeddingModel, mem.confidence, mem.importance,
+            toPgvector(mem.embedding), mem.embeddingModel, mem.confidence, mem.importance,
             mem.accessCount || 0, mem.lastAccessed,
             mem.status, mem.sourceTaskId, mem.sourceAgentId, mem.sourceAppId,
             mem.expiresAt, mem.createdAt, mem.updatedAt
@@ -133,7 +144,7 @@ export async function applyRemoteChanges(incomingMemories) {
             WHERE id = $1`,
             [
               mem.id, mem.type, mem.content, mem.summary, mem.category, mem.tags || [],
-              mem.embedding, mem.embeddingModel, mem.confidence, mem.importance,
+              toPgvector(mem.embedding), mem.embeddingModel, mem.confidence, mem.importance,
               mem.status, mem.expiresAt, mem.updatedAt
             ]
           );
