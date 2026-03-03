@@ -257,38 +257,43 @@ export async function updateMemory(id, updates) {
 
   let memory;
 
-  if (fields.length > 0) {
-    params.push(id);
-    const result = await query(
-      `UPDATE memories SET ${fields.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
-      params
-    );
-    memory = rowToMemory(result.rows[0]);
+  // Wrap memory UPDATE + link operations in a single transaction for atomicity
+  if (fields.length > 0 || updates.relatedMemories) {
+    await withTransaction(async (client) => {
+      if (fields.length > 0) {
+        params.push(id);
+        const result = await client.query(
+          `UPDATE memories SET ${fields.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
+          params
+        );
+        memory = rowToMemory(result.rows[0]);
+      } else {
+        memory = rowToMemory(existing.rows[0]);
+      }
+
+      if (updates.relatedMemories) {
+        await client.query('DELETE FROM memory_links WHERE source_id = $1', [id]);
+        for (const relId of updates.relatedMemories) {
+          await client.query(
+            'INSERT INTO memory_links (source_id, target_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [id, relId]
+          );
+        }
+        // Bump updated_at so link changes appear in sync and timeline
+        if (fields.length === 0) {
+          await client.query(
+            'UPDATE memories SET updated_at = NOW() WHERE id = $1',
+            [id]
+          );
+        }
+        memory.relatedMemories = updates.relatedMemories;
+      }
+    });
   } else {
     memory = rowToMemory(existing.rows[0]);
   }
 
-  // Update related memories if provided (transactional delete+insert)
-  if (updates.relatedMemories) {
-    await withTransaction(async (client) => {
-      await client.query('DELETE FROM memory_links WHERE source_id = $1', [id]);
-      for (const relId of updates.relatedMemories) {
-        await client.query(
-          'INSERT INTO memory_links (source_id, target_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-          [id, relId]
-        );
-      }
-      // Bump updated_at so link changes appear in sync and timeline
-      if (fields.length === 0) {
-        await client.query(
-          'UPDATE memories SET updated_at = NOW() WHERE id = $1',
-          [id]
-        );
-      }
-    });
-    memory.relatedMemories = updates.relatedMemories;
-  } else {
-    // Load existing related memories
+  if (!memory.relatedMemories) {
     const links = await query('SELECT target_id FROM memory_links WHERE source_id = $1', [id]);
     memory.relatedMemories = links.rows.map(r => r.target_id);
   }
