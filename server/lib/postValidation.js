@@ -8,21 +8,23 @@ import { z } from 'zod';
 export const postTagsSchema = z.record(z.string().max(200));
 
 // Individual question result
+// correct is optional — the server recomputes it via scoreDrill
 const questionResultSchema = z.object({
   prompt: z.string(),
   expected: z.number(),
   answered: z.number().nullable(),
-  correct: z.boolean(),
+  correct: z.boolean().optional(),
   responseMs: z.number().min(0)
 });
 
 // Task result within a session
+// score is optional — the server recomputes it via scoreDrill
 const taskResultSchema = z.object({
   module: z.string(),
   type: z.string(),
   config: z.record(z.unknown()).optional().default({}),
   questions: z.array(questionResultSchema),
-  score: z.number().min(0).max(100),
+  score: z.number().min(0).max(100).optional(),
   totalMs: z.number().min(0)
 });
 

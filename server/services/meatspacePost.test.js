@@ -1,80 +1,12 @@
 import { describe, it, expect } from 'vitest';
-
-// Inline pure functions to avoid mocking file I/O
-
-function generateDoublingChain(startValue, steps = 8) {
-  const start = startValue ?? (Math.floor(Math.random() * 7) + 3);
-  const questions = [];
-  let current = start;
-  for (let i = 0; i < steps; i++) {
-    const next = current * 2;
-    questions.push({ prompt: `${current} x 2`, expected: next });
-    current = next;
-  }
-  return { type: 'doubling-chain', config: { startValue: start, steps }, questions };
-}
-
-function generateSerialSubtraction(start, subtrahend = 7, steps = 10) {
-  const startVal = start ?? (Math.floor(Math.random() * 101) + 100);
-  const questions = [];
-  let current = startVal;
-  for (let i = 0; i < steps; i++) {
-    const next = current - subtrahend;
-    questions.push({ prompt: `${current} - ${subtrahend}`, expected: next });
-    current = next;
-  }
-  return { type: 'serial-subtraction', config: { startValue: startVal, subtrahend, steps }, questions };
-}
-
-function generateMultiplication(count = 10, maxDigits = 2) {
-  const maxVal = Math.pow(10, maxDigits) - 1;
-  const minVal = maxDigits > 1 ? Math.pow(10, maxDigits - 1) : 1;
-  const questions = [];
-  for (let i = 0; i < count; i++) {
-    const a = Math.floor(Math.random() * (maxVal - minVal + 1)) + minVal;
-    const b = Math.floor(Math.random() * (maxVal - minVal + 1)) + minVal;
-    questions.push({ prompt: `${a} x ${b}`, expected: a * b });
-  }
-  return { type: 'multiplication', config: { count, maxDigits }, questions };
-}
-
-function generatePowers(bases = [2, 3, 5], maxExponent = 10, count = 8) {
-  const questions = [];
-  for (let i = 0; i < count; i++) {
-    const base = bases[Math.floor(Math.random() * bases.length)];
-    const exp = Math.floor(Math.random() * (maxExponent - 1)) + 2;
-    questions.push({ prompt: `${base}^${exp}`, expected: Math.pow(base, exp) });
-  }
-  return { type: 'powers', config: { bases, maxExponent, count }, questions };
-}
-
-function generateEstimation(count = 5) {
-  const ops = ['+', '-', 'x'];
-  const questions = [];
-  for (let i = 0; i < count; i++) {
-    const a = Math.floor(Math.random() * 900) + 100;
-    const b = Math.floor(Math.random() * 900) + 100;
-    const op = ops[Math.floor(Math.random() * ops.length)];
-    let expected, prompt;
-    if (op === '+') { expected = a + b; prompt = `${a} + ${b}`; }
-    else if (op === '-') { expected = a - b; prompt = `${a} - ${b}`; }
-    else { expected = a * b; prompt = `${a} x ${b}`; }
-    questions.push({ prompt, expected });
-  }
-  return { type: 'estimation', config: { count }, questions };
-}
-
-function scoreDrill(type, questions, timeLimitMs) {
-  if (!questions?.length) return 0;
-  const answered = questions.filter(q => q.answered !== null && q.answered !== undefined);
-  const correct = questions.filter(q => q.correct);
-  const correctRatio = correct.length / questions.length;
-  const totalResponseMs = answered.reduce((sum, q) => sum + (q.responseMs || 0), 0);
-  const avgResponseMs = answered.length > 0 ? totalResponseMs / answered.length : timeLimitMs;
-  const speedBonus = Math.max(0, 1 - avgResponseMs / timeLimitMs);
-  const score = Math.round((correctRatio * 0.8 + speedBonus * 0.2) * 100);
-  return Math.min(100, Math.max(0, score));
-}
+import {
+  generateDoublingChain,
+  generateSerialSubtraction,
+  generateMultiplication,
+  generatePowers,
+  generateEstimation,
+  scoreDrill,
+} from './meatspacePost.js';
 
 // =============================================================================
 // DOUBLING CHAIN TESTS
@@ -132,6 +64,18 @@ describe('generateSerialSubtraction', () => {
     const start = result.config.startValue;
     expect(start).toBeGreaterThanOrEqual(100);
     expect(start).toBeLessThanOrEqual(200);
+  });
+
+  it('samples start value from startRange when startValue is not provided', () => {
+    const result = generateSerialSubtraction(undefined, 7, 3, [50, 60]);
+    const start = result.config.startValue;
+    expect(start).toBeGreaterThanOrEqual(50);
+    expect(start).toBeLessThanOrEqual(60);
+  });
+
+  it('prefers explicit startValue over startRange', () => {
+    const result = generateSerialSubtraction(150, 7, 3, [50, 60]);
+    expect(result.config.startValue).toBe(150);
   });
 });
 
@@ -244,6 +188,16 @@ describe('generateEstimation', () => {
       }
     }
   });
+
+  it('preserves tolerancePct in config when provided', () => {
+    const result = generateEstimation(3, 25);
+    expect(result.config.tolerancePct).toBe(25);
+  });
+
+  it('omits tolerancePct from config when not provided', () => {
+    const result = generateEstimation(3);
+    expect(result.config).not.toHaveProperty('tolerancePct');
+  });
 });
 
 // =============================================================================
@@ -252,37 +206,37 @@ describe('generateEstimation', () => {
 
 describe('scoreDrill', () => {
   it('returns 0 for empty questions', () => {
-    expect(scoreDrill('multiplication', [], 60000)).toBe(0);
-    expect(scoreDrill('multiplication', null, 60000)).toBe(0);
+    expect(scoreDrill('multiplication', [], 60000).score).toBe(0);
+    expect(scoreDrill('multiplication', null, 60000).score).toBe(0);
   });
 
   it('100% accuracy with fast responses gives high score', () => {
     const questions = [
-      { prompt: '5 x 3', expected: 15, answered: 15, correct: true, responseMs: 1000 },
-      { prompt: '7 x 4', expected: 28, answered: 28, correct: true, responseMs: 1500 },
-      { prompt: '6 x 8', expected: 48, answered: 48, correct: true, responseMs: 2000 }
+      { prompt: '5 x 3', expected: 15, answered: 15, responseMs: 1000 },
+      { prompt: '7 x 4', expected: 28, answered: 28, responseMs: 1500 },
+      { prompt: '6 x 8', expected: 48, answered: 48, responseMs: 2000 }
     ];
-    const score = scoreDrill('multiplication', questions, 120000);
+    const { score } = scoreDrill('multiplication', questions, 120000);
     expect(score).toBeGreaterThanOrEqual(90);
     expect(score).toBeLessThanOrEqual(100);
   });
 
-  it('0% accuracy gives 0', () => {
+  it('0% accuracy gives low score', () => {
     const questions = [
-      { prompt: '5 x 3', expected: 15, answered: 10, correct: false, responseMs: 1000 },
-      { prompt: '7 x 4', expected: 28, answered: 30, correct: false, responseMs: 1500 }
+      { prompt: '5 x 3', expected: 15, answered: 10, responseMs: 1000 },
+      { prompt: '7 x 4', expected: 28, answered: 30, responseMs: 1500 }
     ];
-    const score = scoreDrill('multiplication', questions, 60000);
+    const { score } = scoreDrill('multiplication', questions, 60000);
     // 0 accuracy * 0.8 = 0, plus small speed bonus
     expect(score).toBeLessThanOrEqual(20);
   });
 
   it('unanswered questions count against accuracy', () => {
     const questions = [
-      { prompt: '5 x 3', expected: 15, answered: 15, correct: true, responseMs: 1000 },
-      { prompt: '7 x 4', expected: 28, answered: null, correct: false, responseMs: 0 }
+      { prompt: '5 x 3', expected: 15, answered: 15, responseMs: 1000 },
+      { prompt: '7 x 4', expected: 28, answered: null, responseMs: 0 }
     ];
-    const score = scoreDrill('multiplication', questions, 60000);
+    const { score } = scoreDrill('multiplication', questions, 60000);
     // 50% accuracy = 40 base, plus speed bonus
     expect(score).toBeGreaterThanOrEqual(40);
     expect(score).toBeLessThanOrEqual(60);
@@ -290,22 +244,44 @@ describe('scoreDrill', () => {
 
   it('slow responses reduce speed bonus', () => {
     const fast = [
-      { prompt: '5 x 3', expected: 15, answered: 15, correct: true, responseMs: 1000 }
+      { prompt: '5 x 3', expected: 15, answered: 15, responseMs: 1000 }
     ];
     const slow = [
-      { prompt: '5 x 3', expected: 15, answered: 15, correct: true, responseMs: 55000 }
+      { prompt: '5 x 3', expected: 15, answered: 15, responseMs: 55000 }
     ];
-    const fastScore = scoreDrill('multiplication', fast, 60000);
-    const slowScore = scoreDrill('multiplication', slow, 60000);
+    const { score: fastScore } = scoreDrill('multiplication', fast, 60000);
+    const { score: slowScore } = scoreDrill('multiplication', slow, 60000);
     expect(fastScore).toBeGreaterThan(slowScore);
   });
 
   it('score is clamped between 0 and 100', () => {
     const questions = [
-      { prompt: '1 x 1', expected: 1, answered: 1, correct: true, responseMs: 100 }
+      { prompt: '1 x 1', expected: 1, answered: 1, responseMs: 100 }
     ];
-    const score = scoreDrill('multiplication', questions, 120000);
+    const { score } = scoreDrill('multiplication', questions, 120000);
     expect(score).toBeLessThanOrEqual(100);
     expect(score).toBeGreaterThanOrEqual(0);
+  });
+
+  it('recomputes correct flags server-side, ignoring client values', () => {
+    const questions = [
+      { prompt: '5 x 3', expected: 15, answered: 15, correct: false, responseMs: 1000 },
+      { prompt: '7 x 4', expected: 28, answered: 99, correct: true, responseMs: 1000 }
+    ];
+    const { questions: recomputed } = scoreDrill('multiplication', questions, 60000);
+    expect(recomputed[0].correct).toBe(true);   // client said false, server recomputes true
+    expect(recomputed[1].correct).toBe(false);   // client said true, server recomputes false
+  });
+
+  it('estimation drill uses tolerancePct from config', () => {
+    const questions = [
+      { prompt: '500 + 300', expected: 800, answered: 850, responseMs: 1000 }
+    ];
+    // 850 is within 10% of 800 (80 tolerance), so correct
+    const { questions: q10 } = scoreDrill('estimation', questions, 60000, { tolerancePct: 10 });
+    expect(q10[0].correct).toBe(true);
+    // 850 is NOT within 5% of 800 (40 tolerance), so incorrect
+    const { questions: q5 } = scoreDrill('estimation', questions, 60000, { tolerancePct: 5 });
+    expect(q5[0].correct).toBe(false);
   });
 });

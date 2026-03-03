@@ -69,18 +69,35 @@ export async function getPostSession(id) {
 }
 
 export async function submitPostSession(sessionData) {
+  const config = await getPostConfig();
   const data = await readJSONFile(SESSIONS_FILE, { sessions: [] });
   const now = new Date().toISOString();
+
+  // Strip client-provided score/correct and recompute server-side
+  const rawTasks = Array.isArray(sessionData.tasks) ? sessionData.tasks : [];
+  const rescoredTasks = rawTasks.map(t => {
+    const { score: _score, correct: _correct, ...rest } = t || {};
+    // Strip correct from individual questions too
+    const sanitizedQuestions = (rest.questions || []).map(q => {
+      const { correct: _qCorrect, ...qRest } = q;
+      return qRest;
+    });
+    const drillConfig = config.mentalMath?.drillTypes?.[rest.type] || {};
+    const timeLimitMs = (drillConfig.timeLimitSec || 120) * 1000;
+    const { score, questions } = scoreDrill(rest.type, sanitizedQuestions, timeLimitMs, rest.config || drillConfig);
+    return { ...rest, questions, score };
+  });
+
   const session = {
     id: randomUUID(),
     date: now.split('T')[0],
     startedAt: now,
     completedAt: now,
-    durationMs: sessionData.tasks.reduce((sum, t) => sum + t.totalMs, 0),
+    durationMs: rescoredTasks.reduce((sum, t) => sum + (t.totalMs || 0), 0),
     cadence: sessionData.cadence || 'daily',
     modules: sessionData.modules,
-    tasks: sessionData.tasks,
-    score: computeSessionScore(sessionData.tasks, sessionData.modules),
+    tasks: rescoredTasks,
+    score: computeSessionScore(rescoredTasks, sessionData.modules),
     tags: sessionData.tags || {}
   };
 
@@ -94,10 +111,13 @@ export async function submitPostSession(sessionData) {
 
 export async function getPostStats(days = 30) {
   const sessions = await getPostSessions();
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-  const cutoffStr = cutoff.toISOString().split('T')[0];
-  const recent = sessions.filter(s => s.date >= cutoffStr);
+  let recent = sessions;
+  if (days > 0) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+    recent = sessions.filter(s => s.date >= cutoffStr);
+  }
 
   if (recent.length === 0) {
     return { days, sessionCount: 0, overall: null, byModule: {}, byDrill: {} };
@@ -142,8 +162,13 @@ export function generateDoublingChain(startValue, steps = 8) {
   return { type: 'doubling-chain', config: { startValue: start, steps }, questions };
 }
 
-export function generateSerialSubtraction(start, subtrahend = 7, steps = 10) {
-  const startVal = start ?? (Math.floor(Math.random() * 101) + 100); // 100-200
+export function generateSerialSubtraction(start, subtrahend = 7, steps = 10, startRange) {
+  let startVal = start;
+  if (startVal == null && Array.isArray(startRange) && startRange.length === 2) {
+    const [lo, hi] = startRange;
+    startVal = Math.floor(Math.random() * (hi - lo + 1)) + lo;
+  }
+  startVal = startVal ?? (Math.floor(Math.random() * 101) + 100); // 100-200
   const questions = [];
   let current = startVal;
   for (let i = 0; i < steps; i++) {
@@ -176,7 +201,7 @@ export function generatePowers(bases = [2, 3, 5], maxExponent = 10, count = 8) {
   return { type: 'powers', config: { bases, maxExponent, count }, questions };
 }
 
-export function generateEstimation(count = 5) {
+export function generateEstimation(count = 5, tolerancePct) {
   const ops = ['+', '-', 'x'];
   const questions = [];
   for (let i = 0; i < count; i++) {
@@ -197,7 +222,9 @@ export function generateEstimation(count = 5) {
     }
     questions.push({ prompt, expected });
   }
-  return { type: 'estimation', config: { count }, questions };
+  const config = { count };
+  if (tolerancePct != null) config.tolerancePct = tolerancePct;
+  return { type: 'estimation', config, questions };
 }
 
 export function generateDrill(type, config = {}) {
@@ -205,13 +232,13 @@ export function generateDrill(type, config = {}) {
     case 'doubling-chain':
       return generateDoublingChain(config.startValue, config.steps);
     case 'serial-subtraction':
-      return generateSerialSubtraction(config.startValue, config.subtrahend, config.steps);
+      return generateSerialSubtraction(config.startValue, config.subtrahend, config.steps, config.startRange);
     case 'multiplication':
       return generateMultiplication(config.count, config.maxDigits);
     case 'powers':
       return generatePowers(config.bases, config.maxExponent, config.count);
     case 'estimation':
-      return generateEstimation(config.count);
+      return generateEstimation(config.count, config.tolerancePct);
     default:
       return null;
   }
@@ -221,21 +248,33 @@ export function generateDrill(type, config = {}) {
 // SCORING (pure functions)
 // =============================================================================
 
-export function scoreDrill(type, questions, timeLimitMs) {
-  if (!questions?.length) return 0;
+export function scoreDrill(type, questions, timeLimitMs, config = {}) {
+  if (!questions?.length) return { score: 0, questions };
 
-  const answered = questions.filter(q => q.answered !== null && q.answered !== undefined);
-  const correct = questions.filter(q => q.correct);
-  const correctRatio = correct.length / questions.length;
+  // Recompute correctness server-side rather than trusting client flags
+  const recomputed = questions.map(q => {
+    let correct;
+    if (q.answered == null) {
+      correct = false;
+    } else if (type === 'estimation') {
+      const tolerance = ((config.tolerancePct ?? 10) / 100);
+      correct = Math.abs(q.answered - q.expected) <= Math.abs(q.expected * tolerance);
+    } else {
+      correct = q.answered === q.expected;
+    }
+    return { ...q, correct };
+  });
+
+  const answered = recomputed.filter(q => q.answered != null);
+  const correctCount = recomputed.filter(q => q.correct).length;
+  const correctRatio = correctCount / recomputed.length;
 
   const totalResponseMs = answered.reduce((sum, q) => sum + (q.responseMs || 0), 0);
   const avgResponseMs = answered.length > 0 ? totalResponseMs / answered.length : timeLimitMs;
 
-  // For estimation drills, accuracy is based on tolerance rather than exact match
-  // but we use the pre-computed correct flag from the client
   const speedBonus = Math.max(0, 1 - avgResponseMs / timeLimitMs);
   const score = Math.round((correctRatio * 0.8 + speedBonus * 0.2) * 100);
-  return Math.min(100, Math.max(0, score));
+  return { score: Math.min(100, Math.max(0, score)), questions: recomputed };
 }
 
 function computeSessionScore(tasks, modules) {
