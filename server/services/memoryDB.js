@@ -445,7 +445,7 @@ export async function searchMemories(queryEmbedding, options = {}) {
  * Uses Reciprocal Rank Fusion (RRF) to merge rankings
  */
 export async function hybridSearchMemories(queryText, queryEmbedding, options = {}) {
-  const { limit = 20, minRelevance = 0.5, bm25Weight = 0.4, vectorWeight = 0.6 } = options;
+  const { limit = 20, minRelevance = 0.5, ftsWeight = options.bm25Weight ?? 0.4, vectorWeight = 0.6 } = options;
   const RRF_K = 60;
 
   const filterConditions = ["status = 'active'"];
@@ -511,15 +511,15 @@ export async function hybridSearchMemories(queryText, queryEmbedding, options = 
   const rrfScores = new Map();
 
   ftsResults.forEach((row, rank) => {
-    const current = rrfScores.get(row.id) || { row, bm25Rank: null, vectorRank: null, rrfScore: 0 };
+    const current = rrfScores.get(row.id) || { row, ftsRank: null, vectorRank: null, rrfScore: 0 };
     current.row = row;
-    current.bm25Rank = rank + 1;
-    current.rrfScore += bm25Weight / (RRF_K + rank + 1);
+    current.ftsRank = rank + 1;
+    current.rrfScore += ftsWeight / (RRF_K + rank + 1);
     rrfScores.set(row.id, current);
   });
 
   vectorResults.forEach((row, rank) => {
-    const current = rrfScores.get(row.id) || { row, bm25Rank: null, vectorRank: null, rrfScore: 0 };
+    const current = rrfScores.get(row.id) || { row, ftsRank: null, vectorRank: null, rrfScore: 0 };
     if (!current.row) current.row = row;
     current.vectorRank = rank + 1;
     current.rrfScore += vectorWeight / (RRF_K + rank + 1);
@@ -530,10 +530,10 @@ export async function hybridSearchMemories(queryText, queryEmbedding, options = 
     .map(data => ({
       ...rowToMeta(data.row),
       rrfScore: data.rrfScore,
-      bm25Rank: data.bm25Rank,
+      ftsRank: data.ftsRank,
       vectorRank: data.vectorRank,
-      searchMethod: data.bm25Rank && data.vectorRank ? 'hybrid' :
-                   data.bm25Rank ? 'bm25' : 'vector'
+      searchMethod: data.ftsRank && data.vectorRank ? 'hybrid' :
+                   data.ftsRank ? 'fts' : 'vector'
     }))
     .sort((a, b) => b.rrfScore - a.rrfScore)
     .slice(0, limit);

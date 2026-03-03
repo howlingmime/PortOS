@@ -83,7 +83,8 @@ BEGIN
     NEW.expires_at IS DISTINCT FROM OLD.expires_at OR
     NEW.source_task_id IS DISTINCT FROM OLD.source_task_id OR
     NEW.source_agent_id IS DISTINCT FROM OLD.source_agent_id OR
-    NEW.source_app_id IS DISTINCT FROM OLD.source_app_id
+    NEW.source_app_id IS DISTINCT FROM OLD.source_app_id OR
+    NEW.updated_at IS DISTINCT FROM OLD.updated_at
   );
 
   -- Access-stat-only update: skip sync_sequence and updated_at bump
