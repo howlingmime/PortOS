@@ -13,18 +13,7 @@
  *   5. Conflict resolution: last-writer-wins by updated_at timestamp
  */
 
-import { query, withTransaction } from '../lib/db.js';
-
-/**
- * Convert embedding to pgvector string format.
- * Handles both JS arrays and existing pgvector strings.
- */
-function toPgvector(embedding) {
-  if (!embedding) return null;
-  if (typeof embedding === 'string') return embedding;
-  if (Array.isArray(embedding)) return `[${embedding.join(',')}]`;
-  return null;
-}
+import { query, withTransaction, arrayToPgvector } from '../lib/db.js';
 
 /**
  * Get memories changed since a given sync sequence.
@@ -96,16 +85,8 @@ export async function applyRemoteChanges(incomingMemories) {
 
   return withTransaction(async (client) => {
     for (const mem of incomingMemories) {
-      // Check if memory exists locally
-      const existing = await client.query(
-        'SELECT id, updated_at FROM memories WHERE id = $1',
-        [mem.id]
-      );
-
-      if (existing.rows.length === 0) {
-        // New memory — insert it
-        await client.query(
-          `INSERT INTO memories (
+      const result = await client.query(
+        `INSERT INTO memories (
             id, type, content, summary, category, tags,
             embedding, embedding_model, confidence, importance,
             access_count, last_accessed, status,
@@ -117,41 +98,32 @@ export async function applyRemoteChanges(incomingMemories) {
             $11, $12, $13,
             $14, $15, $16,
             $17, $18, $19
-          )`,
+          )
+          ON CONFLICT (id) DO UPDATE SET
+            type = EXCLUDED.type, content = EXCLUDED.content,
+            summary = EXCLUDED.summary, category = EXCLUDED.category, tags = EXCLUDED.tags,
+            embedding = EXCLUDED.embedding, embedding_model = EXCLUDED.embedding_model,
+            confidence = EXCLUDED.confidence, importance = EXCLUDED.importance,
+            status = EXCLUDED.status, expires_at = EXCLUDED.expires_at,
+            updated_at = EXCLUDED.updated_at,
+            source_task_id = EXCLUDED.source_task_id, source_agent_id = EXCLUDED.source_agent_id,
+            source_app_id = EXCLUDED.source_app_id
+          WHERE EXCLUDED.updated_at > memories.updated_at
+          RETURNING (xmax = 0) AS inserted`,
           [
             mem.id, mem.type, mem.content, mem.summary, mem.category, mem.tags || [],
-            toPgvector(mem.embedding), mem.embeddingModel, mem.confidence, mem.importance,
+            arrayToPgvector(mem.embedding), mem.embeddingModel, mem.confidence, mem.importance,
             mem.accessCount || 0, mem.lastAccessed,
             mem.status, mem.sourceTaskId, mem.sourceAgentId, mem.sourceAppId,
             mem.expiresAt, mem.createdAt, mem.updatedAt
           ]
         );
-        applied++;
-      } else {
-        // Exists — last-writer-wins by updated_at
-        const localUpdatedAt = existing.rows[0].updated_at;
-        const remoteUpdatedAt = new Date(mem.updatedAt);
 
-        if (remoteUpdatedAt > localUpdatedAt) {
-          await client.query(
-            `UPDATE memories SET
-              type = $2, content = $3, summary = $4, category = $5, tags = $6,
-              embedding = $7, embedding_model = $8, confidence = $9, importance = $10,
-              status = $11, expires_at = $12, updated_at = $13,
-              source_task_id = $14, source_agent_id = $15, source_app_id = $16
-            WHERE id = $1`,
-            [
-              mem.id, mem.type, mem.content, mem.summary, mem.category, mem.tags || [],
-              toPgvector(mem.embedding), mem.embeddingModel, mem.confidence, mem.importance,
-              mem.status, mem.expiresAt, mem.updatedAt,
-              mem.sourceTaskId, mem.sourceAgentId, mem.sourceAppId
-            ]
-          );
-          applied++;
-          conflicts++;
-        } else {
-          skipped++; // Local version is newer or equal
-        }
+      if (result.rows.length > 0) {
+        applied++;
+        if (!result.rows[0].inserted) conflicts++;
+      } else {
+        skipped++;
       }
     }
 

@@ -137,5 +137,5 @@ const syncMemoryItemSchema = z.object({
 
 // Sync request body schema
 export const memorySyncSchema = z.object({
-  memories: z.array(syncMemoryItemSchema).min(1).max(1000)
+  memories: z.array(syncMemoryItemSchema).max(1000)
 });

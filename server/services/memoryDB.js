@@ -548,13 +548,6 @@ export async function rebuildBM25Index() {
  * Get BM25/FTS stats
  */
 export async function getBM25Stats() {
-  const result = await query(`
-    SELECT COUNT(*) as doc_count,
-           COUNT(DISTINCT unnest_tag) as unique_tags
-    FROM memories, LATERAL unnest(tags) AS unnest_tag
-    WHERE status = 'active'
-  `).catch(() => ({ rows: [{ doc_count: 0, unique_tags: 0 }] }));
-
   const totalResult = await query("SELECT COUNT(*) as total FROM memories WHERE status = 'active'");
 
   return {
