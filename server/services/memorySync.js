@@ -79,18 +79,21 @@ export async function getChangesSince(sinceSequence = '0', limit = 100) {
  * Batches inserts (100 per query) to reduce round-trips and lock time.
  *
  * @param {Array} incomingMemories - Array of memory objects from remote peer
- * @returns {Promise<{applied: number, skipped: number, conflicts: number}>}
+ * @returns {Promise<{inserted: number, updated: number, skipped: number}>}
+ *   inserted - new rows created
+ *   updated  - existing rows replaced (remote was newer)
+ *   skipped  - rows rejected by last-writer-wins (local was newer)
  */
 export async function applyRemoteChanges(incomingMemories) {
-  if (incomingMemories.length === 0) return { applied: 0, skipped: 0, conflicts: 0 };
+  if (incomingMemories.length === 0) return { inserted: 0, updated: 0, skipped: 0 };
 
   const COLS = 17;
   const BATCH_SIZE = 100;
 
   return withTransaction(async (client) => {
-    let applied = 0;
+    let inserted = 0;
+    let updated = 0;
     let skipped = 0;
-    let conflicts = 0;
 
     for (let i = 0; i < incomingMemories.length; i += BATCH_SIZE) {
       const batch = incomingMemories.slice(i, i + BATCH_SIZE);
@@ -126,16 +129,16 @@ export async function applyRemoteChanges(incomingMemories) {
             source_task_id = EXCLUDED.source_task_id, source_agent_id = EXCLUDED.source_agent_id,
             source_app_id = EXCLUDED.source_app_id
           WHERE EXCLUDED.updated_at > memories.updated_at
-          RETURNING (xmax = 0) AS inserted`,
+          RETURNING (xmax = 0) AS is_insert`,
         params
       );
 
-      applied += result.rows.length;
-      conflicts += result.rows.filter(r => !r.inserted).length;
+      inserted += result.rows.filter(r => r.is_insert).length;
+      updated += result.rows.filter(r => !r.is_insert).length;
       skipped += batch.length - result.rows.length;
     }
 
-    return { applied, skipped, conflicts };
+    return { inserted, updated, skipped };
   });
 }
 

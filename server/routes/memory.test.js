@@ -192,14 +192,14 @@ describe('Memory Routes', () => {
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z'
       }];
-      memorySync.applyRemoteChanges.mockResolvedValue({ applied: 1, conflicts: 0 });
+      memorySync.applyRemoteChanges.mockResolvedValue({ inserted: 1, updated: 0, skipped: 0 });
 
       const response = await request(app)
         .post('/api/memory/sync')
         .send({ memories: remoteMems });
 
       expect(response.status).toBe(200);
-      expect(response.body.applied).toBe(1);
+      expect(response.body.inserted).toBe(1);
       expect(memorySync.applyRemoteChanges).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ id: '00000000-0000-0000-0000-000000000001', type: 'fact', content: 'synced memory' })])
       );
