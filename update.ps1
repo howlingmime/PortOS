@@ -16,6 +16,17 @@ Write-Host ""
 Write-Host "Updating dependencies..." -ForegroundColor Yellow
 
 Write-Host "  Installing root dependencies..."
+# Clean stale workspace copies that block npm install (Windows EISDIR fix).
+# .npmrc sets install-links=true (exFAT compat) so npm copies workspace packages
+# as real dirs; on re-runs npm fails to overwrite them. Remove stale copies first.
+$repoNodeModules = Join-Path -Path $PSScriptRoot -ChildPath "node_modules"
+@("portos-server", "portos-client") | ForEach-Object {
+    $wsPath = Join-Path -Path $repoNodeModules -ChildPath $_
+    if ((Test-Path $wsPath) -and -not ((Get-Item $wsPath).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        Remove-Item $wsPath -Recurse -Force
+        Write-Host "    Cleaned stale $wsPath"
+    }
+}
 npm install --install-links
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
