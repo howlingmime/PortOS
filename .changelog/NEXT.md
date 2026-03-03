@@ -9,6 +9,7 @@
 ## Changed
 
 - `setup-db.js` now shows platform-specific Docker install/start instructions and prompts to continue when Docker is unavailable (TTY only; CI/piped scripts keep silent behavior)
+- Setup scripts now show `npm start` as the primary production command alongside `npm run pm2:start`
 
 ## Fixed
 
