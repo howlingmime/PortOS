@@ -31,8 +31,7 @@ export async function getChangesSince(sinceSequence = 0, limit = 100) {
   const result = await query(
     `SELECT id, type, content, summary, category, tags,
             embedding, embedding_model, confidence, importance,
-            access_count, last_accessed, status,
-            source_task_id, source_agent_id, source_app_id,
+            status, source_task_id, source_agent_id, source_app_id,
             expires_at, created_at, updated_at, sync_sequence
      FROM memories
      WHERE sync_sequence > $1
@@ -44,6 +43,8 @@ export async function getChangesSince(sinceSequence = 0, limit = 100) {
   const hasMore = result.rows.length > limit;
   const rows = hasMore ? result.rows.slice(0, limit) : result.rows;
 
+  // access_count and last_accessed are instance-local read stats,
+  // not replicated — omitted from sync payload intentionally.
   const memories = rows.map(row => ({
     id: row.id,
     type: row.type,
@@ -55,8 +56,6 @@ export async function getChangesSince(sinceSequence = 0, limit = 100) {
     embeddingModel: row.embedding_model,
     confidence: row.confidence,
     importance: row.importance,
-    accessCount: row.access_count,
-    lastAccessed: row.last_accessed?.toISOString() ?? null,
     status: row.status,
     sourceTaskId: row.source_task_id,
     sourceAgentId: row.source_agent_id,
@@ -88,19 +87,18 @@ export async function applyRemoteChanges(incomingMemories) {
 
   return withTransaction(async (client) => {
     for (const mem of incomingMemories) {
+      // access_count and last_accessed are instance-local, not synced
       const result = await client.query(
         `INSERT INTO memories (
             id, type, content, summary, category, tags,
             embedding, embedding_model, confidence, importance,
-            access_count, last_accessed, status,
-            source_task_id, source_agent_id, source_app_id,
+            status, source_task_id, source_agent_id, source_app_id,
             expires_at, created_at, updated_at
           ) VALUES (
             $1, $2, $3, $4, $5, $6,
             $7, $8, $9, $10,
-            $11, $12, $13,
-            $14, $15, $16,
-            $17, $18, $19
+            $11, $12, $13, $14,
+            $15, $16, $17
           )
           ON CONFLICT (id) DO UPDATE SET
             type = EXCLUDED.type, content = EXCLUDED.content,
@@ -116,7 +114,6 @@ export async function applyRemoteChanges(incomingMemories) {
           [
             mem.id, mem.type, mem.content, mem.summary, mem.category, mem.tags || [],
             arrayToPgvector(mem.embedding), mem.embeddingModel, mem.confidence, mem.importance,
-            mem.accessCount || 0, mem.lastAccessed,
             mem.status, mem.sourceTaskId, mem.sourceAgentId, mem.sourceAppId,
             mem.expiresAt, mem.createdAt, mem.updatedAt
           ]

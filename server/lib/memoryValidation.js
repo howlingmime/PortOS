@@ -123,8 +123,6 @@ const syncMemoryItemSchema = z.object({
   embeddingModel: z.string().max(200).nullable().optional(),
   confidence: z.number().min(0).max(1).nullable().optional(),
   importance: z.number().min(0).max(1).nullable().optional(),
-  accessCount: z.number().int().min(0).optional().default(0),
-  lastAccessed: z.string().datetime().nullable().optional(),
   status: memoryStatusEnum.optional().default('active'),
   sourceTaskId: z.string().nullable().optional(),
   sourceAgentId: z.string().nullable().optional(),

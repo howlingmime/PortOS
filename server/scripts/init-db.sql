@@ -93,9 +93,9 @@ BEGIN
   END IF;
 
   IF NEW.updated_at IS NULL OR NEW.updated_at = OLD.updated_at THEN
-    NEW.updated_at = NOW();
+    NEW.updated_at := NOW();
   END IF;
-  NEW.sync_sequence = nextval('memories_sync_sequence_seq');
+  NEW.sync_sequence := nextval('memories_sync_sequence_seq');
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
