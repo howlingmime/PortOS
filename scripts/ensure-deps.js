@@ -23,7 +23,12 @@ function install(dir, label) {
     return true;
   } catch {
     console.log(`⚠️  npm install failed for ${label} — cleaning node_modules and retrying...`);
-    rmSync(join(dir, 'node_modules'), { recursive: true, force: true });
+    try {
+      rmSync(join(dir, 'node_modules'), { recursive: true, force: true });
+    } catch (cleanupErr) {
+      console.error(`❌ Failed to clean node_modules for ${label}: ${cleanupErr.message}`);
+      return false;
+    }
     try {
       execFileSync(NPM, ['install'], { cwd: dir, stdio: 'inherit', windowsHide: true });
       return true;
@@ -45,6 +50,7 @@ for (const { dir, label } of WORKSPACES) {
 
 // Verify critical packages exist even if node_modules dirs were present
 const criticalPackages = [
+  { dir: ROOT, label: 'root', pkg: 'pm2/package.json' },
   { dir: join(ROOT, 'client'), label: 'client', pkg: 'vite/bin/vite.js' },
   { dir: join(ROOT, 'server'), label: 'server', pkg: 'express/package.json' },
   { dir: join(ROOT, 'server'), label: 'server', pkg: 'pg/package.json' },
