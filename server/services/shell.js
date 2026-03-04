@@ -2,10 +2,10 @@ import * as pty from 'node-pty';
 import os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 
-// Store active shell sessions
+// Store active shell sessions (persist across socket reconnects)
 const shellSessions = new Map();
 
-const MAX_SESSIONS_PER_SOCKET = 3;
+const MAX_TOTAL_SESSIONS = 5;
 
 // Allowlist of safe environment variable prefixes to pass to PTY sessions
 // Prevents leaking secrets (API keys, tokens) to the shell
@@ -42,10 +42,9 @@ function getDefaultShell() {
  * Create a new shell session
  */
 export function createShellSession(socket, options = {}) {
-  const existing = getSessionsForSocket(socket);
-  if (existing.length >= MAX_SESSIONS_PER_SOCKET) {
-    console.warn(`🐚 Socket ${socket.id} exceeded max sessions (${MAX_SESSIONS_PER_SOCKET})`);
-    socket.emit('shell:error', { error: `Max ${MAX_SESSIONS_PER_SOCKET} shell sessions per connection` });
+  if (shellSessions.size >= MAX_TOTAL_SESSIONS) {
+    console.warn(`🐚 Max total sessions reached (${MAX_TOTAL_SESSIONS})`);
+    socket.emit('shell:error', { error: `Max ${MAX_TOTAL_SESSIONS} shell sessions. Kill an existing session first.` });
     return null;
   }
 
@@ -76,26 +75,93 @@ export function createShellSession(socket, options = {}) {
     return null;
   }
 
+  // Buffer recent output for re-attach (last 50KB)
+  const outputBuffer = [];
+  let bufferSize = 0;
+  const MAX_BUFFER = 50 * 1024;
+
   // Store session info
   shellSessions.set(sessionId, {
     pty: ptyProcess,
     socket,
-    createdAt: Date.now()
+    cwd,
+    createdAt: Date.now(),
+    outputBuffer,
+    bufferSize: () => bufferSize
   });
 
   // Handle pty output
   ptyProcess.onData((data) => {
-    socket.emit('shell:output', { sessionId, data });
+    // Buffer output for re-attach
+    outputBuffer.push(data);
+    bufferSize += data.length;
+    while (bufferSize > MAX_BUFFER && outputBuffer.length > 1) {
+      bufferSize -= outputBuffer.shift().length;
+    }
+    const session = shellSessions.get(sessionId);
+    session?.socket?.emit('shell:output', { sessionId, data });
   });
 
   // Handle pty exit
   ptyProcess.onExit(({ exitCode }) => {
     console.log(`🐚 Shell session ${sessionId.slice(0, 8)} exited (code: ${exitCode})`);
+    const session = shellSessions.get(sessionId);
     shellSessions.delete(sessionId);
-    socket.emit('shell:exit', { sessionId, code: exitCode });
+    session?.socket?.emit('shell:exit', { sessionId, code: exitCode });
+    // Notify all sockets about session list change
+    broadcastSessionList();
   });
 
+  broadcastSessionList();
   return sessionId;
+}
+
+/**
+ * Attach an existing session to a new socket
+ */
+export function attachSession(sessionId, socket) {
+  const session = shellSessions.get(sessionId);
+  if (!session) return null;
+  // Detach from old socket
+  session.socket = socket;
+  console.log(`🐚 Attached session ${sessionId.slice(0, 8)} to socket ${socket.id}`);
+  return {
+    sessionId,
+    bufferedOutput: session.outputBuffer.join('')
+  };
+}
+
+// Subscribers for session list broadcasts
+const sessionListSubscribers = new Set();
+
+export function subscribeSessionList(socket) {
+  sessionListSubscribers.add(socket);
+}
+
+export function unsubscribeSessionList(socket) {
+  sessionListSubscribers.delete(socket);
+}
+
+function broadcastSessionList() {
+  const list = listAllSessions();
+  for (const sock of sessionListSubscribers) {
+    sock.emit('shell:sessions', list);
+  }
+}
+
+/**
+ * List all active sessions with metadata
+ */
+export function listAllSessions() {
+  const sessions = [];
+  for (const [sessionId, session] of shellSessions.entries()) {
+    sessions.push({
+      sessionId,
+      cwd: session.cwd,
+      createdAt: session.createdAt
+    });
+  }
+  return sessions;
 }
 
 /**
@@ -131,33 +197,25 @@ export function killSession(sessionId) {
     console.log(`🐚 Killing shell session ${sessionId.slice(0, 8)}`);
     session.pty.kill();
     shellSessions.delete(sessionId);
+    broadcastSessionList();
     return true;
   }
   return false;
 }
 
 /**
- * Get all active sessions for a socket
+ * Detach all sessions from a socket (on disconnect) — sessions stay alive
  */
-export function getSessionsForSocket(socket) {
-  const sessions = [];
-  for (const [sessionId, session] of shellSessions.entries()) {
+export function detachSocketSessions(socket) {
+  let count = 0;
+  for (const [, session] of shellSessions.entries()) {
     if (session.socket === socket) {
-      sessions.push(sessionId);
+      session.socket = null;
+      count++;
     }
   }
-  return sessions;
-}
-
-/**
- * Clean up all sessions for a socket (on disconnect)
- */
-export function cleanupSocketSessions(socket) {
-  const sessions = getSessionsForSocket(socket);
-  for (const sessionId of sessions) {
-    killSession(sessionId);
-  }
-  return sessions.length;
+  unsubscribeSessionList(socket);
+  return count;
 }
 
 /**

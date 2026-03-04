@@ -384,6 +384,22 @@ export function initSocket(io) {
       }
     });
 
+    socket.on('shell:attach', (rawData) => {
+      const validated = validateSocketData(shellStopSchema, rawData, socket, 'shell:attach');
+      if (!validated) return;
+      const result = shellService.attachSession(validated.sessionId, socket);
+      if (result) {
+        socket.emit('shell:attached', result);
+      } else {
+        socket.emit('shell:error', { error: 'Session not found' });
+      }
+    });
+
+    socket.on('shell:list', () => {
+      shellService.subscribeSessionList(socket);
+      socket.emit('shell:sessions', shellService.listAllSessions());
+    });
+
     socket.on('shell:input', (rawData) => {
       const validated = validateSocketData(shellInputSchema, rawData, socket, 'shell:input');
       if (!validated) return;
@@ -404,7 +420,7 @@ export function initSocket(io) {
       shellService.killSession(validated.sessionId);
     });
 
-    // Cleanup on disconnect
+    // Cleanup on disconnect — detach sessions, don't kill them
     socket.on('disconnect', () => {
       console.log(`🔌 Client disconnected: ${socket.id}`);
       cleanupStream(socket.id);
@@ -413,10 +429,9 @@ export function initSocket(io) {
       notificationSubscribers.delete(socket);
       agentSubscribers.delete(socket);
       instanceSubscribers.delete(socket);
-      // Clean up any shell sessions for this socket
-      const shellsClosed = shellService.cleanupSocketSessions(socket);
-      if (shellsClosed > 0) {
-        console.log(`🐚 Cleaned up ${shellsClosed} shell session(s)`);
+      const detached = shellService.detachSocketSessions(socket);
+      if (detached > 0) {
+        console.log(`🐚 Detached ${detached} shell session(s) (still running)`);
       }
     });
   });
