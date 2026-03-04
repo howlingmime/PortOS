@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { readdir, readFile, writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 
@@ -13,10 +12,15 @@ async function run() {
   // Ensure migrations directory exists
   await mkdir(migrationsDir, { recursive: true });
 
-  // Load applied migrations list (default to [] on corrupt file)
+  // Load applied migrations list (default to [] on read/parse failure)
   let applied = [];
-  if (existsSync(appliedFile)) {
-    const raw = await readFile(appliedFile, 'utf-8');
+  const raw = await readFile(appliedFile, 'utf-8').catch(err => {
+    if (err.code !== 'ENOENT') {
+      console.warn(`⚠️ Could not read ${appliedFile}: ${err.message}, defaulting to []`);
+    }
+    return null;
+  });
+  if (raw !== null) {
     try { applied = JSON.parse(raw); } catch { applied = []; }
     if (!Array.isArray(applied)) applied = [];
   }
