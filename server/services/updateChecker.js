@@ -86,13 +86,14 @@ export function compareSemver(a, b) {
 
 async function loadState() {
   await ensureDir(PATHS.data);
-  const raw = await readJSONFile(UPDATE_FILE, defaultState());
+  const raw = await readJSONFile(UPDATE_FILE, defaultState(), { allowArray: false });
   const defaults = defaultState();
+  const stateFromFile = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   return {
     ...defaults,
-    ...raw,
-    ignoredVersions: Array.isArray(raw.ignoredVersions) ? raw.ignoredVersions : defaults.ignoredVersions,
-    updateInProgress: typeof raw.updateInProgress === 'boolean' ? raw.updateInProgress : defaults.updateInProgress,
+    ...stateFromFile,
+    ignoredVersions: Array.isArray(stateFromFile.ignoredVersions) ? stateFromFile.ignoredVersions : defaults.ignoredVersions,
+    updateInProgress: typeof stateFromFile.updateInProgress === 'boolean' ? stateFromFile.updateInProgress : defaults.updateInProgress,
   };
 }
 

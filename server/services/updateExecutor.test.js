@@ -32,13 +32,18 @@ beforeEach(() => {
 
 describe('executeUpdate', () => {
   it('returns failure on Windows', async () => {
-    const origPlatform = process.platform;
-    Object.defineProperty(process, 'platform', { value: 'win32' });
-    const emits = [];
-    const result = await executeUpdate('v1.0.0', (...args) => emits.push(args));
-    Object.defineProperty(process, 'platform', { value: origPlatform });
-    expect(result.success).toBe(false);
-    expect(emits[0][1]).toBe('error');
+    const originalPlatformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+    try {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      const emits = [];
+      const result = await executeUpdate('v1.0.0', (...args) => emits.push(args));
+      expect(result.success).toBe(false);
+      expect(emits[0][1]).toBe('error');
+    } finally {
+      if (originalPlatformDescriptor) {
+        Object.defineProperty(process, 'platform', originalPlatformDescriptor);
+      }
+    }
   });
 
   it('parses STEP markers from stdout', async () => {
