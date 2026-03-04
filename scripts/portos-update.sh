@@ -60,8 +60,9 @@ step "restart" "running" "Restarting PortOS..."
 
 log "=== PortOS update to $TAG restarting ==="
 
-# Write completion marker before restart so server reads it on boot
-echo "{\"version\":\"${TAG#v}\",\"completedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$ROOT_DIR/data/update-complete.json"
+# Write completion marker atomically before restart so server reads it on boot
+echo "{\"version\":\"${TAG#v}\",\"completedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$ROOT_DIR/data/update-complete.json.tmp"
+mv "$ROOT_DIR/data/update-complete.json.tmp" "$ROOT_DIR/data/update-complete.json"
 
 # Use the local pm2 binary to restart
 node "$ROOT_DIR/node_modules/pm2/bin/pm2" restart ecosystem.config.cjs >> "$LOG_FILE" 2>&1

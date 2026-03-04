@@ -42,7 +42,10 @@ export async function getCurrentVersion() {
  */
 export function compareSemver(a, b) {
   const extractParts = (v) => {
-    const [core, pre] = v.split('+')[0].split('-', 2);
+    const noBuild = v.split('+')[0];
+    const hyphenIdx = noBuild.indexOf('-');
+    const core = hyphenIdx === -1 ? noBuild : noBuild.slice(0, hyphenIdx);
+    const pre = hyphenIdx === -1 ? null : noBuild.slice(hyphenIdx + 1);
     return { nums: core.split('.').map(Number), pre: pre || null };
   };
   const comparePreRelease = (preA, preB) => {
