@@ -64,14 +64,14 @@ for (const { dir, label, pkg } of criticalPackages) {
 }
 
 for (const [dir, { label, pkgs }] of criticalByDir) {
-  const missing = pkgs.filter(pkg => !existsSync(join(dir, 'node_modules', pkg)));
+  const missing = pkgs.filter(pkg => !existsSync(join(dir, 'node_modules', ...pkg.split('/'))));
   if (!missing.length) continue;
 
   console.log(`📦 Missing ${missing.map(p => p.split('/')[0]).join(', ')} in ${label} — reinstalling deps...`);
   if (!install(dir, label)) process.exit(1);
   needed = true;
 
-  const stillMissing = pkgs.filter(pkg => !existsSync(join(dir, 'node_modules', pkg)));
+  const stillMissing = pkgs.filter(pkg => !existsSync(join(dir, 'node_modules', ...pkg.split('/'))));
   if (stillMissing.length) {
     console.error(`❌ Still missing in ${label} after reinstall: ${stillMissing.map(p => p.split('/')[0]).join(', ')}`);
     process.exit(1);
