@@ -37,10 +37,11 @@ function TicketCard({ ticket, isDragOverlay }) {
   );
 }
 
-function DraggableTicket({ ticket, instanceId }) {
+function DraggableTicket({ ticket, disabled }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: ticket.key,
-    data: { ticket }
+    data: { ticket },
+    disabled
   });
 
   const style = transform ? {
@@ -76,7 +77,7 @@ function DraggableTicket({ ticket, instanceId }) {
   );
 }
 
-function DroppableColumn({ category, tickets, instanceId, isOver }) {
+function DroppableColumn({ category, tickets, isOver, disabled }) {
   const { setNodeRef } = useDroppable({ id: category });
   const config = COLUMN_CONFIG[category];
 
@@ -92,7 +93,7 @@ function DroppableColumn({ category, tickets, instanceId, isOver }) {
       </div>
       <div className="space-y-2">
         {tickets.map(ticket => (
-          <DraggableTicket key={ticket.key} ticket={ticket} instanceId={instanceId} />
+          <DraggableTicket key={ticket.key} ticket={ticket} disabled={disabled} />
         ))}
         {tickets.length === 0 && (
           <div className={`text-xs text-center py-4 ${isOver ? 'text-gray-300' : 'text-gray-500'}`}>
@@ -202,8 +203,8 @@ export default function KanbanBoard({ tickets: initialTickets, instanceId }) {
             key={category}
             category={category}
             tickets={columns[category]}
-            instanceId={instanceId}
             isOver={overColumn === category}
+            disabled={!!transitioning}
           />
         ))}
       </div>
