@@ -239,15 +239,15 @@ export default function AlcoholTab() {
     <div className="space-y-6">
       {/* Rolling Averages Summary */}
       {summary && (
-        <div className="bg-port-card border border-port-border rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-port-card border border-port-border rounded-xl p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
             <div className="flex items-center gap-2">
               <Beer size={18} className="text-port-accent" />
               <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">
                 Alcohol Summary
               </h3>
             </div>
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${RISK_BG[summary.riskLevel]}`}>
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border self-start sm:self-auto ${RISK_BG[summary.riskLevel]}`}>
               {summary.riskLevel === 'high' && <AlertTriangle size={12} />}
               {summary.riskLevel === 'low' && <TrendingDown size={12} />}
               {summary.riskLevel === 'moderate' && <TrendingUp size={12} />}
@@ -304,7 +304,7 @@ export default function AlcoholTab() {
       </div>
 
       {/* Log a Drink */}
-      <div className="bg-port-card border border-port-border rounded-xl p-6">
+      <div className="bg-port-card border border-port-border rounded-xl p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Log a Drink</h3>
           <button
@@ -327,7 +327,7 @@ export default function AlcoholTab() {
                 key={`${drink.name}-${idx}`}
                 onClick={() => handleQuickAdd(drink)}
                 disabled={logging}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs bg-port-border/50 text-gray-300 rounded-lg hover:bg-port-accent/10 hover:text-port-accent transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 px-3 py-2 min-h-[40px] text-xs bg-port-border/50 text-gray-300 rounded-lg hover:bg-port-accent/10 hover:text-port-accent transition-colors disabled:opacity-50"
               >
                 <Plus size={12} />
                 {drink.name}
@@ -433,8 +433,8 @@ export default function AlcoholTab() {
         )}
 
         {/* Custom entry form */}
-        <form onSubmit={handleCustomAdd} className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[120px]">
+        <form onSubmit={handleCustomAdd} className="grid grid-cols-2 sm:grid-cols-[1fr_5rem_5rem_4rem_9rem_auto] items-end gap-3">
+          <div className="col-span-2 sm:col-span-1">
             <label className="text-xs text-gray-500 block mb-1">Name (optional)</label>
             <input
               type="text"
@@ -444,7 +444,7 @@ export default function AlcoholTab() {
               className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-sm text-white placeholder-gray-600"
             />
           </div>
-          <div className="w-20">
+          <div>
             <label className="text-xs text-gray-500 block mb-1">Oz</label>
             <input
               type="number"
@@ -457,7 +457,7 @@ export default function AlcoholTab() {
               className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-sm text-white placeholder-gray-600"
             />
           </div>
-          <div className="w-20">
+          <div>
             <label className="text-xs text-gray-500 block mb-1">ABV %</label>
             <input
               type="number"
@@ -471,7 +471,7 @@ export default function AlcoholTab() {
               className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-sm text-white placeholder-gray-600"
             />
           </div>
-          <div className="w-16">
+          <div>
             <label className="text-xs text-gray-500 block mb-1">Count</label>
             <input
               type="number"
@@ -482,7 +482,7 @@ export default function AlcoholTab() {
               className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-sm text-white"
             />
           </div>
-          <div className="w-36">
+          <div>
             <label className="text-xs text-gray-500 block mb-1">Date</label>
             <input
               type="date"
@@ -494,7 +494,7 @@ export default function AlcoholTab() {
           <button
             type="submit"
             disabled={logging || !oz || !abv}
-            className="flex items-center gap-2 px-4 py-2 bg-port-accent text-white rounded-lg hover:bg-port-accent/80 disabled:opacity-50 transition-colors"
+            className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 px-4 py-2 min-h-[40px] bg-port-accent text-white rounded-lg hover:bg-port-accent/80 disabled:opacity-50 transition-colors"
           >
             {logging ? <BrailleSpinner /> : <Plus size={16} />}
             Log
@@ -504,12 +504,12 @@ export default function AlcoholTab() {
 
       {/* All Drink Entries */}
       {allEntries?.length > 0 && (
-        <div className="bg-port-card border border-port-border rounded-xl p-6">
+        <div className="bg-port-card border border-port-border rounded-xl p-4 sm:p-6">
           <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">
             All Drink Entries ({allEntries.length} days)
           </h3>
-          <div className="max-h-[70vh] overflow-y-auto rounded-lg border border-port-border">
-            <table className="w-full text-sm">
+          <div className="max-h-[70vh] overflow-x-auto overflow-y-auto rounded-lg border border-port-border">
+            <table className="w-full text-sm min-w-[600px]">
               <thead className="sticky top-0 bg-port-card z-10">
                 <tr className="border-b border-port-border text-left text-xs text-gray-500 uppercase">
                   <th className="px-3 py-2">Date</th>

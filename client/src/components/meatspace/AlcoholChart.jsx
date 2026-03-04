@@ -79,8 +79,8 @@ export default function AlcoholChart({ sex = 'male', onRefreshKey, onViewChange 
   };
 
   return (
-    <div className="bg-port-card border border-port-border rounded-xl p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-port-card border border-port-border rounded-xl p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
         <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">
           Daily Consumption
         </h3>
@@ -90,7 +90,7 @@ export default function AlcoholChart({ sex = 'male', onRefreshKey, onViewChange 
               <button
                 key={u}
                 onClick={() => setUnit(u)}
-                className={`px-2 py-1 text-xs rounded transition-colors ${
+                className={`px-2 py-1 min-h-[40px] text-xs rounded transition-colors ${
                   unit === u
                     ? 'bg-port-accent/10 text-port-accent'
                     : 'text-gray-500 hover:text-gray-300'
@@ -106,7 +106,7 @@ export default function AlcoholChart({ sex = 'male', onRefreshKey, onViewChange 
               <button
                 key={v.id}
                 onClick={() => { setView(v.id); onViewChange?.(v.id); }}
-                className={`px-2 py-1 text-xs rounded transition-colors ${
+                className={`px-2 py-1 min-h-[40px] text-xs rounded transition-colors ${
                   view === v.id
                     ? 'bg-port-accent/10 text-port-accent'
                     : 'text-gray-500 hover:text-gray-300'
