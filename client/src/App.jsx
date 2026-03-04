@@ -21,18 +21,29 @@ import Insights from './pages/Insights';
 import Instances from './pages/Instances';
 import MeatSpace from './pages/MeatSpace';
 
+// Auto-reload on stale chunk errors (e.g., after a rebuild changes chunk hashes)
+const lazyWithReload = (importFn) => lazy(() =>
+  importFn().catch(err => {
+    if (err.message?.includes('MIME type') || err.message?.includes('Failed to fetch dynamically imported module')) {
+      window.location.reload();
+      return new Promise(() => {}); // hang until reload completes
+    }
+    throw err;
+  })
+);
+
 // Lazy load heavier pages for code splitting
 // DevTools pages are large (~2300 lines total) so lazy load them
-const AIProviders = lazy(() => import('./pages/AIProviders'));
-const HistoryPage = lazy(() => import('./pages/DevTools').then(m => ({ default: m.HistoryPage })));
-const RunsHistoryPage = lazy(() => import('./pages/DevTools').then(m => ({ default: m.RunsHistoryPage })));
-const RunnerPage = lazy(() => import('./pages/DevTools').then(m => ({ default: m.RunnerPage })));
-const UsagePage = lazy(() => import('./pages/DevTools').then(m => ({ default: m.UsagePage })));
-const ProcessesPage = lazy(() => import('./pages/DevTools').then(m => ({ default: m.ProcessesPage })));
-const AgentsPage = lazy(() => import('./pages/DevTools').then(m => ({ default: m.AgentsPage })));
-const GitHub = lazy(() => import('./pages/GitHub'));
-const CyberCity = lazy(() => import('./pages/CyberCity'));
-const AppDetail = lazy(() => import('./pages/AppDetail'));
+const AIProviders = lazyWithReload(() => import('./pages/AIProviders'));
+const HistoryPage = lazyWithReload(() => import('./pages/DevTools').then(m => ({ default: m.HistoryPage })));
+const RunsHistoryPage = lazyWithReload(() => import('./pages/DevTools').then(m => ({ default: m.RunsHistoryPage })));
+const RunnerPage = lazyWithReload(() => import('./pages/DevTools').then(m => ({ default: m.RunnerPage })));
+const UsagePage = lazyWithReload(() => import('./pages/DevTools').then(m => ({ default: m.UsagePage })));
+const ProcessesPage = lazyWithReload(() => import('./pages/DevTools').then(m => ({ default: m.ProcessesPage })));
+const AgentsPage = lazyWithReload(() => import('./pages/DevTools').then(m => ({ default: m.AgentsPage })));
+const GitHub = lazyWithReload(() => import('./pages/GitHub'));
+const CyberCity = lazyWithReload(() => import('./pages/CyberCity'));
+const AppDetail = lazyWithReload(() => import('./pages/AppDetail'));
 
 // Loading fallback for lazy-loaded pages
 const PageLoader = () => (

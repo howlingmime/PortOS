@@ -303,8 +303,13 @@ startUpdateScheduler();
 const CLIENT_DIST = join(__dirname, '..', 'client', 'dist');
 if (existsSync(CLIENT_DIST)) {
   app.use(express.static(CLIENT_DIST));
-  // SPA fallback: serve index.html for non-API routes
-  app.get('/{*splat}', (req, res) => {
+  // SPA fallback: serve index.html for page navigations only
+  // Skip asset requests (.js, .css, etc.) so stale chunk requests get a proper 404
+  // instead of index.html with text/html MIME type
+  app.get('/{*splat}', (req, res, next) => {
+    if (req.path.match(/\.\w+$/) && !req.path.endsWith('.html')) {
+      return next();
+    }
     res.sendFile(join(CLIENT_DIST, 'index.html'));
   });
   console.log(`📦 Serving built UI from client/dist`);
