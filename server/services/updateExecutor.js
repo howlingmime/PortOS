@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import { join } from 'path';
 import { PATHS } from '../lib/fileUtils.js';
-import { setUpdateInProgress, recordUpdateResult } from './updateChecker.js';
+import { recordUpdateResult } from './updateChecker.js';
 
 const SCRIPT_PATH = join(PATHS.root, 'scripts', 'portos-update.sh');
 
@@ -20,7 +20,8 @@ export async function executeUpdate(tag, emit) {
     return { success: false, error: msg };
   }
 
-  await setUpdateInProgress(true);
+  // The route sets updateInProgress synchronously before calling us,
+  // so skip the redundant write here (it's already true)
   emit('starting', 'running', `Starting update to ${tag}...`);
 
   return new Promise((resolve) => {

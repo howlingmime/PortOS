@@ -134,6 +134,11 @@ export default function UpdateTab() {
   };
 
   const handleUpdate = async () => {
+    // Set target version BEFORE executing so it's available when the
+    // restarting step arrives via socket (which may beat the HTTP response)
+    if (status?.latestRelease?.version) {
+      targetVersionRef.current = status.latestRelease.version;
+    }
     setUpdating(true);
     setSteps([]);
     setUpdateError(null);
@@ -142,6 +147,7 @@ export default function UpdateTab() {
       setUpdating(false);
       return null;
     });
+    // Update from response if available (should match, but server is authoritative)
     if (result?.tag) {
       targetVersionRef.current = result.tag.replace(/^v/, '');
     }

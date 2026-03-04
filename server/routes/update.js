@@ -55,6 +55,11 @@ router.post('/execute', asyncHandler(async (req, res) => {
     throw new ServerError('Invalid release tag format', { status: 400, code: 'INVALID_TAG' });
   }
 
+  // Lock out duplicate requests synchronously BEFORE spawning the update,
+  // preventing the race where a second request slips in before executeUpdate's
+  // first await persists the flag
+  await updateChecker.setUpdateInProgress(true);
+
   const io = req.app.get('io');
 
   // Start update in background, stream progress via socket
@@ -64,11 +69,13 @@ router.post('/execute', asyncHandler(async (req, res) => {
     }
   };
 
-  // Don't await — respond immediately, progress streams via socket
+  // Don't await — respond immediately, progress streams via socket.
+  // The update script emits STEP:restart:running when it reaches the PM2
+  // restart phase, which triggers the client's health polling.
   executeUpdate(tag, emit).then(result => {
     // Note: this .then() may never fire if the update script's PM2 restart
     // kills this server process first. The client handles this by polling
-    // /api/system/health after receiving the 'restarting' step (see below).
+    // /api/system/health after receiving the 'restart' step.
     if (io) {
       if (result.success) {
         io.emit('portos:update:complete', { success: true, newVersion: tag.replace(/^v/, '') });
@@ -81,10 +88,6 @@ router.post('/execute', asyncHandler(async (req, res) => {
       io.emit('portos:update:error', { message: err.message, step: 'unknown' });
     }
   });
-
-  // Emit a restarting step immediately so the client knows to start
-  // health polling now, before the PM2 restart kills this process
-  emit('restarting', 'running', 'Server will restart momentarily...');
 
   res.json({ started: true, tag });
 }));

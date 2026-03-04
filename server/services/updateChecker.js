@@ -31,7 +31,8 @@ const defaultState = () => ({
 export async function getCurrentVersion() {
   const pkgPath = join(PATHS.root, 'package.json');
   const pkg = await readJSONFile(pkgPath, { version: '0.0.0' });
-  return pkg.version;
+  const version = (typeof pkg.version === 'string' && pkg.version) ? pkg.version : '0.0.0';
+  return version;
 }
 
 /**
@@ -182,6 +183,8 @@ export async function recordUpdateResult(result) {
  * Start the periodic update checker.
  */
 export function startUpdateScheduler() {
+  if (startupTimeout || schedulerInterval) return;
+
   // Initial check after startup delay
   startupTimeout = setTimeout(() => {
     startupTimeout = null;
