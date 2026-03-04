@@ -11,8 +11,9 @@ const ignoreSchema = z.object({
   version: z.string().min(1, 'version is required')
 });
 
-// GET /api/update/status — returns update state
+// GET /api/update/status — returns update state (also clears stale locks)
 router.get('/status', asyncHandler(async (req, res) => {
+  await updateChecker.clearStaleUpdateInProgress();
   const status = await updateChecker.getUpdateStatus();
   res.json(status);
 }));

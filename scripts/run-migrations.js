@@ -21,8 +21,14 @@ async function run() {
     return null;
   });
   if (raw !== null) {
-    try { applied = JSON.parse(raw); } catch { applied = []; }
-    if (!Array.isArray(applied)) applied = [];
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch (err) {
+      throw new Error(`Corrupted migrations file ${appliedFile} — fix or delete it manually: ${err.message}`);
+    }
+    if (!Array.isArray(parsed)) {
+      throw new Error(`Corrupted migrations file ${appliedFile} — expected array, got ${typeof parsed}`);
+    }
+    applied = parsed;
   }
 
   // Scan for migration files (*.js, sorted by filename)
