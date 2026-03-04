@@ -379,7 +379,7 @@ export default function TaskItem({ task, isSystem, awaitingApproval, onRefresh, 
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           {!editing && (
             <>
               {/* Mark as Blocked button - only show for non-blocked, non-completed tasks */}

@@ -307,7 +307,7 @@ export default function TaskAddForm({ providers, apps, onTaskAdded, compact = fa
                   {!template.isBuiltin && (
                     <button
                       onClick={(e) => deleteTemplate(template.id, e)}
-                      className="hidden group-hover:flex absolute -top-1 -right-1 w-4 h-4 bg-port-error rounded-full items-center justify-center"
+                      className="flex md:hidden md:group-hover:flex absolute -top-1 -right-1 w-4 h-4 bg-port-error rounded-full items-center justify-center"
                       title="Delete template"
                     >
                       <X size={10} />
@@ -514,7 +514,7 @@ export default function TaskAddForm({ providers, apps, onTaskAdded, compact = fa
                 <button
                   type="button"
                   onClick={() => removeScreenshot(s.id)}
-                  className="absolute -top-2 -right-2 w-5 h-5 bg-port-error rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute -top-2 -right-2 w-5 h-5 bg-port-error rounded-full flex items-center justify-center md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                   aria-label={`Remove screenshot ${s.filename}`}
                 >
                   <X size={12} aria-hidden="true" />
