@@ -469,7 +469,11 @@ export default function Apps() {
                                 <span>Loading tickets...</span>
                               </div>
                             ) : jiraTickets[app.id]?.length > 0 ? (
-                              <KanbanBoard tickets={jiraTickets[app.id]} instanceId={app.jira.instanceId} />
+                              <KanbanBoard
+                                tickets={jiraTickets[app.id]}
+                                instanceId={app.jira.instanceId}
+                                onTicketsChange={(updated) => setJiraTickets(prev => ({ ...prev, [app.id]: updated }))}
+                              />
                             ) : (
                               <div className="px-3 py-2 text-sm text-gray-500 bg-port-card border border-port-border rounded-lg">
                                 No tickets assigned to you in the current sprint

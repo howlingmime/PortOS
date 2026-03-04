@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { GripVertical } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as api from '../services/api';
@@ -58,8 +58,10 @@ function DraggableTicket({ ticket, disabled }) {
         <button
           {...listeners}
           {...attributes}
-          className="flex items-center px-1 text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing shrink-0"
+          className={`flex items-center px-1 text-gray-600 hover:text-gray-400 shrink-0 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing'}`}
           aria-label={`Drag ${ticket.key}`}
+          disabled={disabled}
+          aria-disabled={disabled}
         >
           <GripVertical size={14} />
         </button>
@@ -78,7 +80,7 @@ function DraggableTicket({ ticket, disabled }) {
 }
 
 function DroppableColumn({ category, tickets, isOver, disabled }) {
-  const { setNodeRef } = useDroppable({ id: category });
+  const { setNodeRef } = useDroppable({ id: category, disabled });
   const config = COLUMN_CONFIG[category];
 
   return (
@@ -105,7 +107,7 @@ function DroppableColumn({ category, tickets, isOver, disabled }) {
   );
 }
 
-export default function KanbanBoard({ tickets: initialTickets, instanceId }) {
+export default function KanbanBoard({ tickets: initialTickets, instanceId, onTicketsChange }) {
   const [tickets, setTickets] = useState(initialTickets);
   const [activeTicket, setActiveTicket] = useState(null);
   const [transitioning, setTransitioning] = useState(null);
@@ -115,7 +117,8 @@ export default function KanbanBoard({ tickets: initialTickets, instanceId }) {
   useEffect(() => { setTickets(initialTickets); }, [initialTickets]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
   );
 
   const columns = {};
@@ -172,9 +175,11 @@ export default function KanbanBoard({ tickets: initialTickets, instanceId }) {
 
       await api.transitionTicket(instanceId, ticket.key, match.id, { silent: true });
       // Update the status name too
-      setTickets(prev => prev.map(t =>
+      const updated = tickets.map(t =>
         t.key === ticket.key ? { ...t, status: match.to, statusCategory: targetCategory } : t
-      ));
+      );
+      setTickets(updated);
+      onTicketsChange?.(updated);
       toast.success(`${ticket.key} moved to ${match.to}`);
     } catch (err) {
       setTickets(previousTickets);
