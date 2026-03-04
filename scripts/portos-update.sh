@@ -9,6 +9,7 @@ set -euo pipefail
 TAG="${1:?Usage: portos-update.sh <tag>}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+mkdir -p "$ROOT_DIR/data"
 LOG_FILE="$ROOT_DIR/data/update.log"
 
 cd "$ROOT_DIR"
