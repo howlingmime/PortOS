@@ -56,22 +56,29 @@ export async function updatePostConfig(updates) {
 // SESSIONS
 // =============================================================================
 
+async function loadSessions() {
+  const raw = await readJSONFile(SESSIONS_FILE, { sessions: [] }, { allowArray: false });
+  const data = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : { sessions: [] };
+  if (!Array.isArray(data.sessions)) data.sessions = [];
+  return data;
+}
+
 export async function getPostSessions(from, to) {
-  const data = await readJSONFile(SESSIONS_FILE, { sessions: [] });
-  let sessions = data.sessions || [];
+  const data = await loadSessions();
+  let sessions = data.sessions;
   if (from) sessions = sessions.filter(s => s.date >= from);
   if (to) sessions = sessions.filter(s => s.date <= to);
   return sessions;
 }
 
 export async function getPostSession(id) {
-  const data = await readJSONFile(SESSIONS_FILE, { sessions: [] });
-  return (data.sessions || []).find(s => s.id === id) || null;
+  const data = await loadSessions();
+  return data.sessions.find(s => s.id === id) || null;
 }
 
 export async function submitPostSession(sessionData) {
   const config = await getPostConfig();
-  const data = await readJSONFile(SESSIONS_FILE, { sessions: [] });
+  const data = await loadSessions();
   const now = new Date().toISOString();
 
   // Strip client-provided score/correct and recompute server-side

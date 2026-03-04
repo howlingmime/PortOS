@@ -268,8 +268,8 @@ export async function removeDrink(date, index) {
 // === Custom Drink Buttons ===
 
 async function loadCustomDrinks() {
-  const data = await readJSONFile(CUSTOM_DRINKS_FILE, null);
-  if (!data) {
+  const data = await readJSONFile(CUSTOM_DRINKS_FILE, null, { allowArray: false });
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
     // Return defaults in-memory without writing — persist only on explicit mutations
     return { drinks: DEFAULT_DRINK_BUTTONS.map(d => ({ ...d })) };
   }
