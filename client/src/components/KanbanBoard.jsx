@@ -56,6 +56,7 @@ function DraggableTicket({ ticket, disabled }) {
     >
       <div className="flex items-stretch gap-0">
         <button
+          type="button"
           {...listeners}
           {...attributes}
           className={`flex items-center px-1 text-gray-600 hover:text-gray-400 shrink-0 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing'}`}
@@ -155,13 +156,11 @@ export default function KanbanBoard({ tickets: initialTickets, instanceId, onTic
 
     // Optimistic update — notify parent immediately so cache stays in sync
     const previousTickets = [...tickets];
-    setTickets(prev => {
-      const optimistic = prev.map(t =>
-        t.key === ticket.key ? { ...t, statusCategory: targetCategory } : t
-      );
-      onTicketsChange?.(optimistic);
-      return optimistic;
-    });
+    const optimistic = tickets.map(t =>
+      t.key === ticket.key ? { ...t, statusCategory: targetCategory } : t
+    );
+    setTickets(optimistic);
+    onTicketsChange?.(optimistic);
     setTransitioning(ticket.key);
 
     try {
@@ -179,13 +178,14 @@ export default function KanbanBoard({ tickets: initialTickets, instanceId, onTic
 
       await api.transitionJiraTicket(instanceId, ticket.key, match.id, { silent: true });
       // Update the status name too, based on latest state
+      let updated;
       setTickets(prev => {
-        const updated = prev.map(t =>
+        updated = prev.map(t =>
           t.key === ticket.key ? { ...t, status: match.to, statusCategory: targetCategory } : t
         );
-        onTicketsChange?.(updated);
         return updated;
       });
+      onTicketsChange?.(updated);
       toast.success(`${ticket.key} moved to ${match.to}`);
     } catch (err) {
       setTickets(previousTickets);
