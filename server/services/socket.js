@@ -649,8 +649,11 @@ function setupPeerAgentEventForwarding() {
   instanceEvents.on('peer:agent:completed', (data) => broadcastToInstances('instances:peer:agent:completed', data));
 }
 
-// Set up update event forwarding
+// Set up update event forwarding (idempotent — safe if called more than once)
+let updateForwardingSetup = false;
 function setupUpdateEventForwarding() {
+  if (updateForwardingSetup) return;
+  updateForwardingSetup = true;
   updateEvents.on('update:available', (data) => {
     if (ioInstance) {
       ioInstance.emit('portos:update:available', data);

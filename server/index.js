@@ -254,58 +254,44 @@ initBrainMemoryBridge();
 startBackupScheduler().catch(err => console.error(`❌ Backup scheduler init failed: ${err.message}`));
 // Check for update completion marker from a previous update cycle
 const updateMarkerPath = join(__dirname, '..', 'data', 'update-complete.json');
-readFile(updateMarkerPath, 'utf-8').then(raw => {
-  const parsed = JSON.parse(raw);
-  return { marker: parsed, parseError: null };
-}, err => {
-  // ENOENT = no marker file = no recent update, nothing to do
-  if (err?.code === 'ENOENT') return null;
-  // Unexpected read error — log and remove the problematic marker
-  console.error(`❌ Failed to read update marker: ${err?.message ?? err}`);
-  return { marker: null, parseError: err };
-}).then(async result => {
-  if (!result) return; // No marker file
-  if (!result.marker) {
-    // Read failed with unexpected error — remove corrupted marker to avoid reprocessing
-    return unlink(updateMarkerPath).catch(unlinkErr => {
-      if (unlinkErr?.code !== 'ENOENT') console.error(`❌ Failed to remove problematic update marker: ${unlinkErr.message}`);
-    });
+const removeMarker = () => unlink(updateMarkerPath).catch(e => {
+  if (e?.code !== 'ENOENT') console.error(`❌ Failed to remove update marker: ${e.message}`);
+});
+
+(async () => {
+  let raw;
+  try { raw = await readFile(updateMarkerPath, 'utf-8'); }
+  catch (err) {
+    if (err?.code === 'ENOENT') return; // No marker = no recent update
+    console.error(`❌ Failed to read update marker: ${err?.message ?? err}`);
+    return removeMarker();
   }
-  const marker = result.marker;
-  // Validate marker has expected fields before recording as success
+
+  let marker;
+  try { marker = JSON.parse(raw); }
+  catch (err) {
+    console.error(`❌ Corrupted update marker (invalid JSON): ${err?.message ?? err}`);
+    return removeMarker();
+  }
+
   if (!marker.version || !marker.completedAt) {
     console.error(`❌ Update marker missing required fields (version: ${marker.version}, completedAt: ${marker.completedAt})`);
-    return unlink(updateMarkerPath).catch(unlinkErr => {
-      if (unlinkErr?.code !== 'ENOENT') console.error(`❌ Failed to remove invalid update marker: ${unlinkErr.message}`);
-    });
+    return removeMarker();
   }
-  // Verify marker version matches the currently running version to catch partial updates
+
   const runningVersion = await getCurrentVersion();
   if (marker.version !== runningVersion) {
     console.error(`❌ Update marker version (${marker.version}) doesn't match running version (${runningVersion}) — recording as failed`);
-    return recordUpdateResult({ version: marker.version, success: false, completedAt: marker.completedAt, log: `Version mismatch: expected ${marker.version}, running ${runningVersion}` })
-      .finally(() => unlink(updateMarkerPath).catch(unlinkErr => {
-        if (unlinkErr?.code !== 'ENOENT') console.error(`❌ Failed to remove update marker: ${unlinkErr.message}`);
-      }));
+    await recordUpdateResult({ version: marker.version, success: false, completedAt: marker.completedAt, log: `Version mismatch: expected ${marker.version}, running ${runningVersion}` })
+      .catch(e => console.error(`❌ Failed to record update result: ${e.message}`));
+    return removeMarker();
   }
+
   console.log(`✅ Update to v${marker.version} completed at ${marker.completedAt}`);
-  return recordUpdateResult({ version: marker.version, success: true, completedAt: marker.completedAt, log: '' })
-    .then(() => unlink(updateMarkerPath).catch(unlinkErr => {
-      if (unlinkErr?.code !== 'ENOENT') console.error(`❌ Failed to remove update marker: ${unlinkErr.message}`);
-    }))
-    .catch(recordErr => {
-      console.error(`❌ Failed to record update result: ${recordErr.message}`);
-      return unlink(updateMarkerPath).catch(unlinkErr => {
-        if (unlinkErr?.code !== 'ENOENT') console.error(`❌ Failed to remove update marker after record failure: ${unlinkErr.message}`);
-      });
-    });
-}).catch(err => {
-  // JSON.parse failure — corrupted marker file
-  console.error(`❌ Corrupted update marker (invalid JSON): ${err?.message ?? err}`);
-  unlink(updateMarkerPath).catch(unlinkErr => {
-    if (unlinkErr?.code !== 'ENOENT') console.error(`❌ Failed to remove corrupted update marker: ${unlinkErr.message}`);
-  });
-});
+  await recordUpdateResult({ version: marker.version, success: true, completedAt: marker.completedAt, log: '' })
+    .catch(e => console.error(`❌ Failed to record update result: ${e.message}`));
+  return removeMarker();
+})().catch(err => console.error(`❌ Update marker processing failed: ${err.message}`));
 
 // Clear stale updateInProgress if the server was killed mid-update
 clearStaleUpdateInProgress().catch(err => console.error(`❌ Stale update recovery failed: ${err.message}`));
