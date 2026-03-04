@@ -200,7 +200,7 @@ export default function Shell() {
   }, []);
 
   const startSession = useCallback(() => {
-    if (!socket) return;
+    if (!socket?.connected) return;
     if (termInstanceRef.current) {
       termInstanceRef.current.clear();
       termInstanceRef.current.writeln('\x1b[36mStarting shell session...\x1b[0m');
@@ -214,7 +214,7 @@ export default function Shell() {
   }, [socket]);
 
   const attachToSession = useCallback((sessionId) => {
-    if (!socket) return;
+    if (!socket?.connected) return;
     if (termInstanceRef.current) {
       termInstanceRef.current.clear();
       termInstanceRef.current.writeln('\x1b[36mAttaching to session...\x1b[0m');
@@ -265,6 +265,13 @@ export default function Shell() {
       // Request session list first — decide what to do in handleSessions
       hasInitializedRef.current = false;
       socket.emit('shell:list');
+    };
+
+    const handleDisconnect = () => {
+      // Clear session state so reconnect auto-reattaches
+      sessionIdRef.current = null;
+      setActiveSessionId(null);
+      setConnected(false);
     };
 
     const handleSessions = (sessionList) => {
@@ -345,6 +352,7 @@ export default function Shell() {
     };
 
     socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
     socket.on('shell:sessions', handleSessions);
     socket.on('shell:started', handleShellStarted);
     socket.on('shell:attached', handleShellAttached);
@@ -358,6 +366,7 @@ export default function Shell() {
 
     return () => {
       socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
       socket.off('shell:sessions', handleSessions);
       socket.off('shell:started', handleShellStarted);
       socket.off('shell:attached', handleShellAttached);
