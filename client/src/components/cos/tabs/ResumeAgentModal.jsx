@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { X, CheckCircle, AlertCircle, RotateCcw } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { X, CheckCircle, AlertCircle, RotateCcw, Image } from 'lucide-react';
+import { processScreenshotUploads } from '../../../utils/fileUpload';
+import toast from 'react-hot-toast';
 
 export default function ResumeAgentModal({ agent, taskType = 'user', providers, apps, onSubmit, onClose }) {
   const taskDescription = agent.metadata?.taskDescription || agent.taskId || 'Resume previous task';
@@ -24,6 +26,20 @@ export default function ResumeAgentModal({ agent, taskType = 'user', providers, 
     model: agent.metadata?.model || '',
     app: agent.metadata?.app || ''
   });
+  const [screenshots, setScreenshots] = useState([]);
+  const fileInputRef = useRef(null);
+
+  const handleFileSelect = async (e) => {
+    await processScreenshotUploads(e.target.files, {
+      onSuccess: (fileInfo) => setScreenshots(prev => [...prev, fileInfo]),
+      onError: (msg) => toast.error(msg)
+    });
+    e.target.value = '';
+  };
+
+  const removeScreenshot = (id) => {
+    setScreenshots(prev => prev.filter(s => s.id !== id));
+  };
 
   const selectedProvider = providers?.find(p => p.id === formData.provider);
   const availableModels = selectedProvider?.models || [];
@@ -40,7 +56,8 @@ export default function ResumeAgentModal({ agent, taskType = 'user', providers, 
       model: formData.model,
       provider: formData.provider,
       app: formData.app,
-      type: taskType
+      type: taskType,
+      screenshots: screenshots.length > 0 ? screenshots.map(s => s.path) : undefined
     });
   };
 
@@ -88,6 +105,53 @@ export default function ResumeAgentModal({ agent, taskType = 'user', providers, 
               className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm focus:border-port-accent focus:outline-hidden resize-none"
               autoFocus
             />
+          </div>
+
+          {/* Screenshot Upload */}
+          <div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-3 py-2 bg-port-bg border border-port-border rounded-lg text-gray-400 hover:text-white text-sm transition-colors"
+              >
+                <Image size={16} aria-hidden="true" />
+                Add Screenshot
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+                aria-label="Upload screenshot files"
+              />
+              {screenshots.length > 0 && (
+                <span className="text-xs text-gray-500">{screenshots.length} screenshot{screenshots.length > 1 ? 's' : ''}</span>
+              )}
+            </div>
+            {screenshots.length > 0 && (
+              <div className="flex gap-2 flex-wrap mt-2">
+                {screenshots.map(s => (
+                  <div key={s.id} className="relative group">
+                    <img
+                      src={s.preview}
+                      alt={s.filename}
+                      className="w-20 h-20 object-cover rounded-lg border border-port-border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeScreenshot(s.id)}
+                      className="absolute -top-2 -right-2 w-5 h-5 bg-port-error rounded-full flex items-center justify-center md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                      aria-label={`Remove screenshot ${s.filename}`}
+                    >
+                      <X size={12} aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* App Selection */}

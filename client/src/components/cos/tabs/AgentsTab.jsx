@@ -80,14 +80,15 @@ export default function AgentsTab({ agents, onRefresh, liveOutputs, providers, a
     setResumingAgent(agent);
   };
 
-  const handleResumeSubmit = async ({ description, context, model, provider, app, type = 'user' }) => {
+  const handleResumeSubmit = async ({ description, context, model, provider, app, type = 'user', screenshots }) => {
     await api.addCosTask({
       description,
       context,
       model: model || undefined,
       provider: provider || undefined,
       app: app || undefined,
-      type
+      type,
+      screenshots
     }).catch(err => {
       toast.error(err.message);
       return;
