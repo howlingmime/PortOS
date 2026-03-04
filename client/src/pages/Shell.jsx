@@ -51,11 +51,16 @@ export default function Shell() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch app folders for the cd selector
+  // Fetch app folders from the managed apps list
   useEffect(() => {
-    fetch('/api/scaffold/directories')
+    fetch('/api/apps')
       .then(res => res.ok ? res.json() : Promise.reject())
-      .then(data => setAppFolders(data.directories || []))
+      .then(apps => setAppFolders(
+        (apps || [])
+          .filter(a => a.repoPath)
+          .map(a => ({ name: a.name, path: a.repoPath }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      ))
       .catch(() => {});
   }, []);
 
