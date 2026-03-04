@@ -108,7 +108,7 @@ function DroppableColumn({ category, tickets, isOver, disabled }) {
   );
 }
 
-export default function KanbanBoard({ tickets: initialTickets, instanceId, onTicketsChange }) {
+export default function KanbanBoard({ tickets: initialTickets = [], instanceId, onTicketsChange }) {
   const [tickets, setTickets] = useState(initialTickets);
   const [activeTicket, setActiveTicket] = useState(null);
   const [transitioning, setTransitioning] = useState(null);
