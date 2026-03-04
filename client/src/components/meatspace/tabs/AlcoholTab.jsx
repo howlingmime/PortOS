@@ -89,8 +89,11 @@ export default function AlcoholTab() {
 
   useEffect(() => {
     fetchDrinkButtons();
+  }, [fetchDrinkButtons]);
+
+  useEffect(() => {
     fetchData();
-  }, [fetchDrinkButtons, fetchData, refreshKey]);
+  }, [fetchData, refreshKey]);
 
   // Fetch correlation data for HRV chart
   const chartDays = { '7d': 7, '30d': 30, '90d': 90 }[chartView] || 30;

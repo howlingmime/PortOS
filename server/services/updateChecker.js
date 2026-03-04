@@ -126,11 +126,15 @@ export async function checkForUpdate() {
 export async function getUpdateStatus() {
   const state = await loadState();
   const currentVersion = await getCurrentVersion();
-  const isNewer = state.latestRelease
-    ? compareSemver(state.latestRelease.version, currentVersion) > 0
+  const latestVersion =
+    state.latestRelease && typeof state.latestRelease.version === 'string'
+      ? state.latestRelease.version
+      : null;
+  const isNewer = latestVersion
+    ? compareSemver(latestVersion, currentVersion) > 0
     : false;
-  const isIgnored = state.latestRelease
-    ? state.ignoredVersions.includes(state.latestRelease.version)
+  const isIgnored = latestVersion
+    ? state.ignoredVersions.includes(latestVersion)
     : false;
 
   return {
