@@ -127,6 +127,18 @@ router.post('/push', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
+// POST /api/git/push-all - Push all branches with unpushed commits
+router.post('/push-all', asyncHandler(async (req, res) => {
+  const { path } = req.body;
+
+  if (!path) {
+    throw new ServerError('path is required', { status: 400, code: 'VALIDATION_ERROR' });
+  }
+
+  const result = await git.pushAll(path);
+  res.json(result);
+}));
+
 // POST /api/git/info - Get full git info for a path
 router.post('/info', asyncHandler(async (req, res) => {
   const { path } = req.body;

@@ -91,6 +91,7 @@ export default function GitTab({ appId, appName, repoPath }) {
   const [checkingOut, setCheckingOut] = useState(null);
   const [pushing, setPushing] = useState(null);
   const [syncing, setSyncing] = useState(null);
+  const [pushingAll, setPushingAll] = useState(false);
 
   const loadGitInfo = useCallback(async () => {
     if (!repoPath) return;
@@ -217,6 +218,22 @@ export default function GitTab({ appId, appName, repoPath }) {
     }
   };
 
+  const handlePushAll = async () => {
+    if (!repoPath || pushingAll) return;
+    setPushingAll(true);
+    const result = await api.pushAllBranches(repoPath).catch(() => null);
+    setPushingAll(false);
+    if (result?.success) {
+      toast.success(`Pushed ${result.pushed} branch${result.pushed === 1 ? '' : 'es'}`);
+    } else if (result) {
+      const failedNames = Object.entries(result.results || {})
+        .filter(([, v]) => !v.success)
+        .map(([name]) => name);
+      toast.error(`Push failed for: ${failedNames.join(', ')}`);
+    }
+    await loadGitInfo();
+  };
+
   const getStatusIcon = (file) => {
     if (file.added) return <Plus size={14} className="text-port-success" />;
     if (file.deleted) return <Minus size={14} className="text-port-error" />;
@@ -235,14 +252,26 @@ export default function GitTab({ appId, appName, repoPath }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">Git Status</h2>
-        <button
-          onClick={handleUpdateBranches}
-          disabled={updating}
-          className="flex items-center gap-1.5 px-3 py-2 bg-port-card border border-port-border rounded-lg text-sm text-gray-300 hover:text-white hover:border-port-accent disabled:opacity-50"
-        >
-          <Download size={16} className={updating ? 'animate-bounce' : ''} />
-          {updating ? 'Updating...' : 'Update'}
-        </button>
+        <div className="flex items-center gap-2">
+          {branches.some(b => b.tracking && b.ahead > 0) && (
+            <button
+              onClick={handlePushAll}
+              disabled={pushingAll}
+              className="flex items-center gap-1.5 px-3 py-2 bg-port-card border border-port-border rounded-lg text-sm text-gray-300 hover:text-white hover:border-port-success disabled:opacity-50"
+            >
+              <Upload size={16} className={pushingAll ? 'animate-bounce' : ''} />
+              {pushingAll ? 'Pushing...' : 'Push'}
+            </button>
+          )}
+          <button
+            onClick={handleUpdateBranches}
+            disabled={updating}
+            className="flex items-center gap-1.5 px-3 py-2 bg-port-card border border-port-border rounded-lg text-sm text-gray-300 hover:text-white hover:border-port-accent disabled:opacity-50"
+          >
+            <Download size={16} className={updating ? 'animate-bounce' : ''} />
+            {updating ? 'Updating...' : 'Update'}
+          </button>
+        </div>
       </div>
 
       {loading ? (

@@ -329,6 +329,10 @@ export const pushBranch = (path, branch) => request('/git/push', {
   method: 'POST',
   body: JSON.stringify({ path, branch })
 });
+export const pushAllBranches = (path) => request('/git/push-all', {
+  method: 'POST',
+  body: JSON.stringify({ path })
+});
 export const getBranches = (path) => request('/git/branches', {
   method: 'POST',
   body: JSON.stringify({ path })

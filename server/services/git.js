@@ -313,6 +313,38 @@ export async function push(dir, branch = null) {
 }
 
 /**
+ * Push all local branches that are ahead of their remote tracking branch.
+ * Never uses --force. Returns per-branch results.
+ */
+export async function pushAll(dir) {
+  const allBranches = await getBranches(dir);
+  const pushable = allBranches.filter(b => b.tracking && b.ahead > 0);
+
+  if (pushable.length === 0) {
+    return { success: true, pushed: 0, results: {}, message: 'Nothing to push' };
+  }
+
+  const results = {};
+  let failed = 0;
+
+  for (const branch of pushable) {
+    const r = await execGit(['push', 'origin', branch.name], dir, { ignoreExitCode: true });
+    const output = (r.stdout || '') + (r.stderr || '');
+    const ok = !output.includes('rejected') && !output.includes('fatal') && !output.includes('error:');
+    results[branch.name] = { success: ok, output: output.trim() };
+    if (!ok) failed++;
+  }
+
+  return {
+    success: failed === 0,
+    pushed: pushable.length - failed,
+    failed,
+    total: pushable.length,
+    results
+  };
+}
+
+/**
  * Create and switch to a new branch
  */
 export async function createBranch(dir, branchName) {
