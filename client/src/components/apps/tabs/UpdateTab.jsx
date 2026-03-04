@@ -59,6 +59,13 @@ export default function UpdateTab() {
         }
         return [...prev, entry];
       });
+      // When the server signals it's restarting, begin health polling immediately.
+      // The PM2 restart may kill the server before portos:update:complete fires.
+      if (step === 'restarting' || step === 'restart') {
+        setUpdating(false);
+        setPolling(true);
+        toast.loading('PortOS is restarting...', { id: 'portos-update-restart', duration: Infinity });
+      }
     };
 
     const handleComplete = ({ success, newVersion }) => {

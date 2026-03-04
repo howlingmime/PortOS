@@ -26,11 +26,41 @@ export async function executeUpdate(tag, emit) {
   return new Promise((resolve) => {
     const child = spawn('bash', [SCRIPT_PATH, tag], {
       detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', 'pipe', 'pipe'],
       cwd: PATHS.root
     });
 
     let lastStep = 'starting';
+
+    // Parse STEP:name:status:message lines from stdout/stderr streams
+    const makeLineHandler = () => {
+      let buffer = '';
+      return (data) => {
+        buffer += data.toString();
+        let newlineIdx;
+        while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, newlineIdx);
+          buffer = buffer.slice(newlineIdx + 1);
+          const match = line.match(/STEP:([^:]+):([^:]+):(.+)/);
+          if (match) {
+            const [, name, status, message] = match;
+            lastStep = name;
+            emit(name, status, message);
+          }
+        }
+      };
+    };
+
+    // Pipe stdout/stderr for progress tracking, with EPIPE guards
+    // in case the parent process exits before the detached child finishes writing
+    if (child.stdout) {
+      child.stdout.on('error', () => {}); // Swallow EPIPE if parent exits
+      child.stdout.on('data', makeLineHandler());
+    }
+    if (child.stderr) {
+      child.stderr.on('error', () => {}); // Swallow EPIPE if parent exits
+      child.stderr.on('data', makeLineHandler());
+    }
 
     child.on('close', (code) => {
       const success = code === 0;

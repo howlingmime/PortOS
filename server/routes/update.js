@@ -66,6 +66,9 @@ router.post('/execute', asyncHandler(async (req, res) => {
 
   // Don't await — respond immediately, progress streams via socket
   executeUpdate(tag, emit).then(result => {
+    // Note: this .then() may never fire if the update script's PM2 restart
+    // kills this server process first. The client handles this by polling
+    // /api/system/health after receiving the 'restarting' step (see below).
     if (io) {
       if (result.success) {
         io.emit('portos:update:complete', { success: true, newVersion: tag.replace(/^v/, '') });
@@ -78,6 +81,10 @@ router.post('/execute', asyncHandler(async (req, res) => {
       io.emit('portos:update:error', { message: err.message, step: 'unknown' });
     }
   });
+
+  // Emit a restarting step immediately so the client knows to start
+  // health polling now, before the PM2 restart kills this process
+  emit('restarting', 'running', 'Server will restart momentarily...');
 
   res.json({ started: true, tag });
 }));
