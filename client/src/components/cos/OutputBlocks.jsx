@@ -31,20 +31,20 @@ export default function OutputBlocks({ output }) {
   }, [output]);
 
   return (
-    <div className="space-y-0.5">
+    <div className="space-y-0.5 min-w-0 overflow-hidden">
       {blocks.map((block, i) => {
         if (block.type === 'tool') {
           const line = block.line;
           if (line.startsWith('🔧')) {
-            return <div key={i} className="py-0.5 text-xs font-mono text-port-accent">{line}</div>;
+            return <div key={i} className="py-0.5 text-xs font-mono text-port-accent break-all">{line}</div>;
           }
           if (line.startsWith('  →')) {
-            return <div key={i} className="py-0.5 text-xs font-mono text-gray-500 pl-4">{line.substring(4)}</div>;
+            return <div key={i} className="py-0.5 text-xs font-mono text-gray-500 pl-4 break-all">{line.substring(4)}</div>;
           }
           if (line.startsWith('  ↳')) {
-            return <div key={i} className="py-0.5 text-xs font-mono text-gray-600 pl-4">{line.substring(4)}</div>;
+            return <div key={i} className="py-0.5 text-xs font-mono text-gray-600 pl-4 break-all">{line.substring(4)}</div>;
           }
-          return <div key={i} className="py-0.5 text-xs font-mono text-yellow-500">{line}</div>;
+          return <div key={i} className="py-0.5 text-xs font-mono text-yellow-500 break-all">{line}</div>;
         }
         return <MarkdownOutput key={i} content={block.content} />;
       })}

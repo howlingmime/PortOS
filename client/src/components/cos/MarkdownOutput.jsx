@@ -12,13 +12,13 @@ const components = {
     // Fenced code block (has language className like "language-js")
     if (className) {
       return (
-        <code className="block bg-port-bg rounded p-2 my-1 text-xs font-mono text-cyan-400 overflow-x-auto">
+        <code className="block bg-port-bg rounded p-2 my-1 text-xs font-mono text-cyan-400 overflow-x-auto whitespace-pre-wrap break-all">
           {children}
         </code>
       );
     }
     // Inline code
-    return <code className="bg-port-bg px-1 py-0.5 rounded text-cyan-400 font-mono text-xs">{children}</code>;
+    return <code className="bg-port-bg px-1 py-0.5 rounded text-cyan-400 font-mono text-xs break-all">{children}</code>;
   },
   pre: ({ children }) => <pre className="my-1 overflow-x-auto">{children}</pre>,
   ul: ({ children }) => <ul className="my-0.5 pl-4 space-y-0.5">{children}</ul>,
@@ -45,7 +45,7 @@ const components = {
 
 export default function MarkdownOutput({ content }) {
   return (
-    <div className="markdown-output">
+    <div className="markdown-output min-w-0 overflow-hidden break-words">
       <ReactMarkdown components={components}>{content}</ReactMarkdown>
     </div>
   );
