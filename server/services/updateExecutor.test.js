@@ -34,7 +34,7 @@ describe('executeUpdate', () => {
   it('returns failure on Windows', async () => {
     const originalPlatformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform');
     try {
-      Object.defineProperty(process, 'platform', { value: 'win32' });
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
       const emits = [];
       const result = await executeUpdate('v1.0.0', (...args) => emits.push(args));
       expect(result.success).toBe(false);
