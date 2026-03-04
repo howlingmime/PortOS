@@ -200,8 +200,9 @@ describe('Thinking Levels Service', () => {
       expect(getModelForLevel('high', provider)).toBe('heavy-model');
     });
 
-    it('should return opus for xhigh', () => {
-      expect(getModelForLevel('xhigh')).toBe('claude-opus-4-20250514');
+    it('should return provider heavy for xhigh', () => {
+      const provider = { heavyModel: 'heavy-model', defaultModel: 'default-model' };
+      expect(getModelForLevel('xhigh', provider)).toBe('heavy-model');
     });
 
     it('should return null for invalid level', () => {

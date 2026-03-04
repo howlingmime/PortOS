@@ -233,7 +233,7 @@ function getModelForLevel(level, provider = {}) {
     case 'provider-heavy':
       return provider.heavyModel || null
     case 'opus':
-      return 'claude-opus-4-20250514'
+      return provider.heavyModel || provider.defaultModel || null
     default:
       return modelKey
   }
