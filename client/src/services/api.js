@@ -91,6 +91,16 @@ export const uploadAppleHealthXml = (file) => {
 export const checkHealth = () => request('/system/health');
 export const getSystemHealth = (options) => request('/system/health/details', options);
 
+// Update
+export const getUpdateStatus = () => request('/update/status');
+export const checkForUpdate = () => request('/update/check', { method: 'POST' });
+export const ignoreUpdateVersion = (version) => request('/update/ignore', {
+  method: 'POST',
+  body: JSON.stringify({ version })
+});
+export const clearIgnoredVersions = () => request('/update/ignore', { method: 'DELETE' });
+export const executePortosUpdate = () => request('/update/execute', { method: 'POST' });
+
 // Apps
 export const getApps = () => request('/apps');
 export const getApp = (id) => request(`/apps/${id}`);
@@ -1395,6 +1405,18 @@ export const updateAlcoholDrink = (date, index, data) => request(`/meatspace/alc
 export const removeAlcoholDrink = (date, index) => request(`/meatspace/alcohol/log/${date}/${index}`, {
   method: 'DELETE'
 });
+export const getCustomDrinks = () => request('/meatspace/alcohol/custom-drinks');
+export const addCustomDrink = (data) => request('/meatspace/alcohol/custom-drinks', {
+  method: 'POST',
+  body: JSON.stringify(data)
+});
+export const updateCustomDrink = (index, data) => request(`/meatspace/alcohol/custom-drinks/${index}`, {
+  method: 'PUT',
+  body: JSON.stringify(data)
+});
+export const removeCustomDrink = (index) => request(`/meatspace/alcohol/custom-drinks/${index}`, {
+  method: 'DELETE'
+});
 export const getBloodTests = () => request('/meatspace/blood');
 export const addBloodTest = (data) => request('/meatspace/blood', {
   method: 'POST',
@@ -1422,10 +1444,40 @@ export const updateEyeExam = (index, data) => request(`/meatspace/eyes/${index}`
 export const removeEyeExam = (index) => request(`/meatspace/eyes/${index}`, {
   method: 'DELETE'
 });
+
+// MeatSpace - POST (Power On Self Test)
+export const getPostConfig = () => request('/meatspace/post/config');
+export const updatePostConfig = (data) => request('/meatspace/post/config', {
+  method: 'PUT',
+  body: JSON.stringify(data)
+});
+export const getPostSessions = (from, to) => {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  return request(`/meatspace/post/sessions?${params}`);
+};
+export const getPostSession = (id) => request(`/meatspace/post/sessions/${id}`);
+export const submitPostSession = (data) => request('/meatspace/post/sessions', {
+  method: 'POST',
+  body: JSON.stringify(data)
+});
+export const getPostStats = (days) => request(`/meatspace/post/stats${days != null ? `?days=${days}` : ''}`);
+export const generatePostDrill = (type, config = {}) => request('/meatspace/post/drill', {
+  method: 'POST',
+  body: JSON.stringify({ type, config })
+});
+
 // JIRA
 export const getJiraInstances = () => request('/jira/instances');
 export const getJiraProjects = (instanceId) => request(`/jira/instances/${instanceId}/projects`);
 export const getMySprintTickets = (instanceId, projectKey) => request(`/jira/instances/${instanceId}/my-sprint-tickets/${projectKey}`);
+export const getJiraTicketTransitions = (instanceId, ticketId, options) => request(`/jira/instances/${instanceId}/tickets/${ticketId}/transitions`, options);
+export const transitionJiraTicket = (instanceId, ticketId, transitionId, options) => request(`/jira/instances/${instanceId}/tickets/${ticketId}/transition`, {
+  method: 'POST',
+  body: JSON.stringify({ transitionId }),
+  ...options
+});
 
 // Browser - CDP browser management
 export const getBrowserStatus = () => request('/browser');

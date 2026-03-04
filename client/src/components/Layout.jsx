@@ -55,13 +55,15 @@ import {
   Github,
   Link2,
   Database,
-  Shield
+  Shield,
+  Zap
 } from 'lucide-react';
 import packageJson from '../../package.json';
 import Logo from './Logo';
 import { useErrorNotifications } from '../hooks/useErrorNotifications';
 import { useNotifications } from '../hooks/useNotifications';
 import { useAgentFeedbackToast } from '../hooks/useAgentFeedbackToast';
+import { useUpdateChecker } from '../hooks/useUpdateChecker';
 import NotificationDropdown from './NotificationDropdown';
 import ThemeSwitcher from './ThemeSwitcher';
 import CmdKSearch from './CmdKSearch';
@@ -163,7 +165,8 @@ const navItems = [
       { to: '/meatspace/health', label: 'Health', icon: Heart },
       { to: '/meatspace/import', label: 'Import', icon: Upload },
       { to: '/meatspace/lifestyle', label: 'Lifestyle', icon: ClipboardList },
-      { to: '/meatspace/overview', label: 'Overview', icon: Activity }
+      { to: '/meatspace/overview', label: 'Overview', icon: Activity },
+      { to: '/meatspace/post', label: 'POST', icon: Zap }
     ]
   },
   { to: '/security', label: 'Security', icon: Camera, single: true },
@@ -189,6 +192,9 @@ export default function Layout() {
 
   // Subscribe to agent completion feedback toasts
   useAgentFeedbackToast();
+
+  // Check for PortOS updates and show toast when available
+  useUpdateChecker();
 
   // Notifications for user task alerts
   const {

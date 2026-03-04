@@ -70,7 +70,7 @@ module.exports = {
     },
     {
       name: 'portos-ui',
-      script: path.join(__dirname, 'node_modules', 'vite', 'bin', 'vite.js'),
+      script: path.join(__dirname, 'client', 'node_modules', 'vite', 'bin', 'vite.js'),
       cwd: path.join(__dirname, 'client'),
       log_date_format: LOG_DATE_FORMAT,
       windowsHide: IS_WIN,

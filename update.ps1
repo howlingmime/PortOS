@@ -12,11 +12,16 @@ git pull --rebase --autostash
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host ""
 
+# Stop PM2 apps to release file locks before updating
+Write-Host "Stopping PortOS apps..." -ForegroundColor Yellow
+npm run pm2:stop 2>$null
+Write-Host ""
+
 # Update dependencies
 Write-Host "Updating dependencies..." -ForegroundColor Yellow
 
 Write-Host "  Installing root dependencies..."
-npm install --install-links
+npm install
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "  Installing client dependencies..."

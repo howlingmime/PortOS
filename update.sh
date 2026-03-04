@@ -11,6 +11,11 @@ echo "Pulling latest changes..."
 git pull --rebase --autostash
 echo ""
 
+# Stop PM2 apps to release file locks before updating
+echo "Stopping PortOS apps..."
+npm run pm2:stop 2>/dev/null || true
+echo ""
+
 # Update dependencies
 echo "Updating dependencies..."
 npm install

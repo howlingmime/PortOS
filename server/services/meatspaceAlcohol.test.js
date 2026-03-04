@@ -264,3 +264,6 @@ describe('computeRollingAverages', () => {
     expect(result.totalEntries).toBe(3);
   });
 });
+
+// Custom drink normalization and index validation are covered by meatspaceCustomDrinks.test.js
+// which exercises the actual service exports (getCustomDrinks, updateCustomDrink, etc.)
