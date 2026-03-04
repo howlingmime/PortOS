@@ -3070,6 +3070,17 @@ export async function addTask(taskData, taskType = 'user') {
     tasks = parseTasksMarkdown(content);
   }
 
+  // Reject duplicate: same description already pending or in_progress
+  const normalizedDesc = taskData.description.trim().toLowerCase();
+  const duplicate = tasks.find(t =>
+    (t.status === 'pending' || t.status === 'in_progress') &&
+    t.description?.trim().toLowerCase() === normalizedDesc
+  );
+  if (duplicate) {
+    console.log(`⚠️ Duplicate task rejected: "${taskData.description.substring(0, 60)}" matches ${duplicate.id}`);
+    return { duplicate: true, existingTask: duplicate };
+  }
+
   // Generate a unique ID if not provided
   const id = taskData.id || `${taskType === 'user' ? 'task' : 'sys'}-${Date.now().toString(36)}`;
 
