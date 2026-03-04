@@ -5,7 +5,15 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import { useSocket } from '../hooks/useSocket';
-import { RefreshCw, Power, PowerOff } from 'lucide-react';
+import { RefreshCw, Power, PowerOff, FolderOpen, ChevronDown } from 'lucide-react';
+
+const QUICK_COMMANDS = [
+  { label: 'claude', command: 'claude --dangerously-skip-permissions' },
+  { label: 'git status', command: 'git status' },
+  { label: 'git pull', command: 'git pull --rebase --autostash' },
+  { label: 'npm test', command: 'npm test' },
+  { label: 'npm run dev', command: 'npm run dev' },
+];
 
 // Read a CSS custom property as hex (e.g., '--port-bg' → '#0f0f0f')
 const getThemeHex = (varName) => {
@@ -25,6 +33,9 @@ export default function Shell() {
   const initialOptsRef = useRef(null);
   const socket = useSocket();
   const [connected, setConnected] = useState(false);
+  const [appFolders, setAppFolders] = useState([]);
+  const [folderDropdownOpen, setFolderDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   // Read query params once on mount for initial session options
   useEffect(() => {
@@ -39,6 +50,32 @@ export default function Shell() {
       initialOptsRef.current = {};
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch app folders for the cd selector
+  useEffect(() => {
+    fetch('/api/scaffold/directories')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setAppFolders(data.directories || []))
+      .catch(() => {});
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setFolderDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Send a command string to the active shell session
+  const sendCommand = useCallback((cmd) => {
+    if (!socket || !sessionIdRef.current) return;
+    socket.emit('shell:input', { sessionId: sessionIdRef.current, data: cmd + '\n' });
+    termInstanceRef.current?.focus();
+  }, [socket]);
 
   // Initialize terminal once
   useEffect(() => {
@@ -285,6 +322,54 @@ export default function Shell() {
           )}
         </div>
       </div>
+
+      {/* Quick commands toolbar */}
+      {connected && (
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          {/* Quick command buttons */}
+          {QUICK_COMMANDS.map(({ label, command }) => (
+            <button
+              key={label}
+              onClick={() => sendCommand(command)}
+              className="px-3 py-1.5 bg-port-card hover:bg-port-border text-gray-300 hover:text-white rounded text-xs font-mono transition-colors border border-port-border min-h-[40px]"
+              title={command}
+            >
+              {label}
+            </button>
+          ))}
+
+          {/* App folder cd selector */}
+          <div className="relative ml-auto" ref={dropdownRef}>
+            <button
+              onClick={() => setFolderDropdownOpen(prev => !prev)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-port-card hover:bg-port-border text-gray-300 hover:text-white rounded text-xs transition-colors border border-port-border min-h-[40px]"
+            >
+              <FolderOpen size={14} />
+              cd to app
+              <ChevronDown size={12} className={`transition-transform ${folderDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {folderDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 w-64 max-h-80 overflow-y-auto bg-port-card border border-port-border rounded-lg shadow-xl z-50">
+                {appFolders.map(({ name, path }) => (
+                  <button
+                    key={name}
+                    onClick={() => {
+                      sendCommand(`cd ${path}`);
+                      setFolderDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs font-mono text-gray-300 hover:bg-port-border hover:text-white transition-colors"
+                  >
+                    {name}
+                  </button>
+                ))}
+                {appFolders.length === 0 && (
+                  <div className="px-3 py-2 text-xs text-gray-500">No folders found</div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Terminal container */}
       <div className="flex-1 bg-port-bg rounded-lg border border-port-border overflow-hidden">
