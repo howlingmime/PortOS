@@ -40,8 +40,9 @@ export async function getCurrentVersion() {
  *  -1 if a < b, 0 if equal, 1 if a > b
  */
 export function compareSemver(a, b) {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
+  // Strip pre-release/build metadata (e.g. "1.2.3-rc.1+build" → "1.2.3")
+  const pa = a.replace(/[-+].*$/, '').split('.').map(Number);
+  const pb = b.replace(/[-+].*$/, '').split('.').map(Number);
   for (let i = 0; i < 3; i++) {
     const na = pa[i] || 0;
     const nb = pb[i] || 0;
