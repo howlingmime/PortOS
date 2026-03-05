@@ -491,6 +491,64 @@ Summary: 35 findings across 28 files. 0 shared utilities to extract (ensureDataD
 - [ ] **[HIGH]** `server/services/shell.js` - No tests for PTY sessions
 - [ ] Overall: 29.4% service coverage (35/119), 12.0% route coverage (6/50)
 
+## Better Audit - 2026-03-05 (Pass 2)
+
+Summary: 18 new findings across 16 files. 2 shared utilities to extract.
+
+### Foundation — Shared Utilities
+1. **dateUtils** — `getDateString(date)` → `date.toISOString().split('T')[0]`. Replaces duplicates in agentActivity.js, productivity.js. Add to `server/lib/fileUtils.js`.
+2. **timeConstants** — `HOUR`, `DAY` constants. Replaces duplicates in autonomousJobs.js, taskSchedule.js. Add to `server/lib/fileUtils.js`.
+
+### File Ownership Map
+
+| File | Primary Category | Reason |
+|------|-----------------|--------|
+| `server/services/cos.js` | Bugs & Perf | CRITICAL TOCTOU race condition |
+| `server/services/cosRunnerClient.js` | Bugs & Perf | Missing fetch timeout |
+| `client/src/pages/PromptManager.jsx` | Bugs & Perf | Missing fetch error handling |
+| `server/services/mediaService.js` | Code Quality | Class-based → functional |
+| `client/src/hooks/useTheme.js` | Code Quality | Empty catch blocks |
+| `server/services/runner.js` | Code Quality | Silent JSON parse catch |
+| `server/lib/db.js` | Code Quality | Silent health check error |
+| `client/src/pages/Settings.jsx` | Code Quality | Empty catch handlers |
+| `server/services/agentActivity.js` | DRY | Duplicate getDateString |
+| `server/services/productivity.js` | DRY | Duplicate getDateString |
+| `server/services/autonomousJobs.js` | DRY | Duplicate time constants |
+| `server/services/taskSchedule.js` | DRY | Duplicate time constants |
+| `server/lib/logger.js` | DRY | Unused module — DELETE |
+| `server/lib/logger.test.js` | DRY | Unused test — DELETE |
+| `server/lib/fileUtils.js` | DRY | Add shared getDateString + time constants |
+| `server/integrations/moltworld/api.js` | Stack-Specific | Missing fetch timeout |
+| `server/integrations/moltbook/api.js` | Stack-Specific | Missing fetch timeout |
+
+### Bugs, Performance & Error Handling
+- [ ] **[CRITICAL]** `server/services/cos.js:3103,3394,3454,3486,3526` - TOCTOU race condition: addTask, updateTask, deleteTask, reorderTasks, approveTask lack withStateLock mutex. Concurrent calls lose data. Fix: Wrap read-modify-write in withStateLock(). Complexity: Simple
+- [ ] **[MEDIUM]** `server/services/cosRunnerClient.js:237-268` - executeCliRunViaRunner() fetch has no timeout. Fix: Add AbortController with 60s timeout. Complexity: Simple
+- [ ] **[HIGH]** `client/src/pages/PromptManager.jsx:85-91,95-100,112-127` - Multiple fetch calls missing response.ok check. Fix: Add error handling with toast notifications. Complexity: Simple
+
+### Code Quality & Style
+- [ ] **[HIGH]** `server/services/mediaService.js:4-186` - Class-based implementation violates functional programming convention. Fix: Convert to functional module with closures. Complexity: Medium
+- [ ] **[MEDIUM]** `client/src/hooks/useTheme.js:123,136` - Empty .catch(() => {}) swallows errors. Fix: Add console.log with warning. Complexity: Simple
+- [ ] **[MEDIUM]** `server/services/runner.js:140` - Silent try/catch on JSON parse without logging. Fix: Add warning log. Complexity: Simple
+- [ ] **[MEDIUM]** `server/lib/db.js:87-89` - Health check error swallowed without logging. Fix: Add error log. Complexity: Simple
+- [ ] **[MEDIUM]** `client/src/pages/Settings.jsx:23,30` - Empty .catch(() => {}) handlers. Fix: Add toast.error() feedback. Complexity: Simple
+
+### DRY & YAGNI
+- [ ] **[HIGH]** `server/services/agentActivity.js:42` + `server/services/productivity.js:28` - Duplicate getDateString. Fix: Extract to fileUtils.js. Complexity: Simple
+- [ ] **[HIGH]** `server/services/autonomousJobs.js:5-6` + `server/services/taskSchedule.js:9-10` - Duplicate HOUR/DAY constants. Fix: Extract to fileUtils.js. Complexity: Simple
+- [ ] **[HIGH]** `server/lib/logger.js` - Unused 84-line module (0 imports). Fix: Delete file and its test. Complexity: Simple
+
+### Stack-Specific (Node/React)
+- [ ] **[MEDIUM]** `server/integrations/moltworld/api.js:41` + `server/integrations/moltbook/api.js:84` - Fetch calls without timeout. Fix: Add AbortController with 10s timeout. Complexity: Simple
+
+### Architecture & SOLID (tracked, not auto-remediated)
+- [ ] **[CRITICAL]** `server/services/cos.js` ↔ `server/services/subAgentSpawner.js` - Circular dependency via dynamic imports. (Complexity: Complex)
+- [ ] **[HIGH]** `server/routes/apps.js:68-77,126-135` - Duplicated app status computation logic. (Complexity: Simple)
+- [ ] **[HIGH]** `server/routes/scaffold.js` (1270 lines) - God route file mixing navigation, templates, scaffolding, GitHub. (Complexity: Medium)
+
+### Test Coverage (tracked, not auto-remediated)
+- Same gaps as Pass 1 — see above section.
+
 ---
 
 ## Next Actions
