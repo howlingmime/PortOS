@@ -32,7 +32,8 @@ export async function getChangesSince(sinceSequence = '0', limit = 100) {
     `SELECT id, type, content, summary, category, tags,
             embedding, embedding_model, confidence, importance,
             status, source_task_id, source_agent_id, source_app_id,
-            expires_at, created_at, updated_at, sync_sequence
+            expires_at, created_at, updated_at, sync_sequence,
+            origin_instance_id
      FROM memories
      WHERE sync_sequence > $1
      ORDER BY sync_sequence ASC
@@ -63,7 +64,8 @@ export async function getChangesSince(sinceSequence = '0', limit = 100) {
     expiresAt: row.expires_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
-    syncSequence: String(row.sync_sequence)
+    syncSequence: String(row.sync_sequence),
+    originInstanceId: row.origin_instance_id
   }));
 
   const maxSequence = memories.length > 0
@@ -87,7 +89,7 @@ export async function getChangesSince(sinceSequence = '0', limit = 100) {
 export async function applyRemoteChanges(incomingMemories) {
   if (incomingMemories.length === 0) return { inserted: 0, updated: 0, skipped: 0 };
 
-  const COLS = 17;
+  const COLS = 18;
   const BATCH_SIZE = 100;
 
   return withTransaction(async (client) => {
@@ -107,7 +109,7 @@ export async function applyRemoteChanges(incomingMemories) {
           mem.id, mem.type, mem.content, mem.summary, mem.category, mem.tags || [],
           arrayToPgvector(mem.embedding), mem.embeddingModel, mem.confidence, mem.importance,
           mem.status, mem.sourceTaskId, mem.sourceAgentId, mem.sourceAppId,
-          mem.expiresAt, mem.createdAt, mem.updatedAt
+          mem.expiresAt, mem.createdAt, mem.updatedAt, mem.originInstanceId
         );
       });
 
@@ -117,7 +119,7 @@ export async function applyRemoteChanges(incomingMemories) {
             id, type, content, summary, category, tags,
             embedding, embedding_model, confidence, importance,
             status, source_task_id, source_agent_id, source_app_id,
-            expires_at, created_at, updated_at
+            expires_at, created_at, updated_at, origin_instance_id
           ) VALUES ${values.join(', ')}
           ON CONFLICT (id) DO UPDATE SET
             type = EXCLUDED.type, content = EXCLUDED.content,
@@ -127,7 +129,8 @@ export async function applyRemoteChanges(incomingMemories) {
             status = EXCLUDED.status, expires_at = EXCLUDED.expires_at,
             updated_at = EXCLUDED.updated_at,
             source_task_id = EXCLUDED.source_task_id, source_agent_id = EXCLUDED.source_agent_id,
-            source_app_id = EXCLUDED.source_app_id
+            source_app_id = EXCLUDED.source_app_id,
+            origin_instance_id = EXCLUDED.origin_instance_id
           WHERE EXCLUDED.updated_at > memories.updated_at
           RETURNING (xmax = 0) AS is_insert`,
         params

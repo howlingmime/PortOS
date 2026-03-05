@@ -1059,8 +1059,8 @@ export const openBrainLinkFolder = (id) => request(`/brain/links/${id}/open-fold
 // Brain - Graph
 export const getBrainGraph = () => request('/brain/graph');
 
-// Brain - Sync
-export const syncBrainData = () => request('/brain/sync', { method: 'POST' });
+// Brain - Bridge Sync (brain data to CoS memory system)
+export const syncBrainData = () => request('/brain/bridge-sync', { method: 'POST' });
 
 // Media - Server media devices
 export const getMediaDevices = () => request('/media/devices');

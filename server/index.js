@@ -55,6 +55,9 @@ import githubRoutes from './routes/github.js';
 import settingsRoutes from './routes/settings.js';
 import updateRoutes from './routes/update.js';
 import { ensureSelf, startPolling } from './services/instances.js';
+import { initSyncLog } from './services/brainSyncLog.js';
+import { backfillOriginInstanceId } from './services/brainStorage.js';
+import { initSyncOrchestrator } from './services/syncOrchestrator.js';
 import { initSocket } from './services/socket.js';
 import { initScriptRunner } from './services/scriptRunner.js';
 import { errorMiddleware, setupProcessErrorHandlers, asyncHandler } from './lib/errorHandler.js';
@@ -335,6 +338,13 @@ httpServer.listen(PORT, HOST, () => {
   // Set up process error handlers with io instance
   setupProcessErrorHandlers(io);
 
-  // Initialize instance identity and start peer polling
-  ensureSelf().then(() => startPolling()).catch(err => console.error(`❌ Instance init failed: ${err.message}`));
+  // Initialize instance identity, sync log, backfill origin tags, start peer polling + sync
+  ensureSelf()
+    .then(() => initSyncLog())
+    .then(() => backfillOriginInstanceId())
+    .then(() => {
+      startPolling();
+      initSyncOrchestrator();
+    })
+    .catch(err => console.error(`❌ Instance init failed: ${err.message}`));
 });
