@@ -127,12 +127,18 @@ export async function syncWithPeer(peer) {
 
   try {
     const brainResult = await syncBrainFromPeer(peer, cursor);
-    const memoryResult = await syncMemoryFromPeer(peer, cursor);
 
-    // Persist both cursors in a single lock acquisition
+    // Save brain cursor immediately so progress is preserved if memory sync fails
     await withCursors(async (cursors) => {
       if (!cursors[peerId]) cursors[peerId] = {};
       cursors[peerId].brainSeq = brainResult.brainSeq;
+      cursors[peerId].lastSyncAt = new Date().toISOString();
+    });
+
+    const memoryResult = await syncMemoryFromPeer(peer, cursor);
+
+    await withCursors(async (cursors) => {
+      if (!cursors[peerId]) cursors[peerId] = {};
       cursors[peerId].memorySeq = memoryResult.memorySeq;
       cursors[peerId].lastSyncAt = new Date().toISOString();
     });
