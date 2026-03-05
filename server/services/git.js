@@ -606,7 +606,7 @@ export async function getRemoteBranches(dir) {
 
   // Get merged remote branches relative to default branch
   const mergedResult = await execGit(
-    ['branch', '-r', '--merged', defaultBranch, '--format=%(refname:short)'],
+    ['branch', '-r', '--merged', `origin/${defaultBranch}`, '--format=%(refname:short)'],
     dir,
     { ignoreExitCode: true }
   );
