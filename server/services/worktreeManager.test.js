@@ -131,8 +131,9 @@ describe('Persistent Worktree Path Construction', () => {
   });
 
   it('should use feature agent ID as parent directory', () => {
-    const path = buildPersistentWorktreePath('/data/cos/worktrees', 'fa-12345678');
-    expect(path).toContain('/fa-12345678/');
+    const result = buildPersistentWorktreePath('/data/cos/worktrees', 'fa-12345678');
+    const normalized = result.replace(/\\/g, '/');
+    expect(normalized).toContain('/fa-12345678/');
   });
 });
 

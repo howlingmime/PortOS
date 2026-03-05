@@ -46,7 +46,7 @@ async function callAI(prompt, providerId, model) {
       let settled = false;
 
       const child = spawn(provider.command, args, {
-        env: (() => { const e = { ...process.env, ...provider.envVars }; delete e.CLAUDECODE; return e; })(),
+        env: (() => { const e = { ...process.env, ...(provider.envVars || {}) }; delete e.CLAUDECODE; return e; })(),
         shell: false,
         windowsHide: true
       });

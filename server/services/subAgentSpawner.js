@@ -1483,7 +1483,7 @@ export async function spawnAgentForTask(task) {
         // Merge base branch into feature worktree before starting
         const { mergeBaseIntoFeatureWorktree } = await import('./worktreeManager.js');
         if (fa.git.autoMergeBase) {
-          await mergeBaseIntoFeatureWorktree(fa.id, await getAppWorkspace(fa.appId), fa.git.baseBranch).catch(err => {
+          await mergeBaseIntoFeatureWorktree(fa.id, fa.git.baseBranch).catch(err => {
             emitLog('warn', `🌳 Feature agent base merge failed: ${err.message}`, { featureAgentId: fa.id });
           });
         }

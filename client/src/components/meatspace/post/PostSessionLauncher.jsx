@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Zap, History, Settings, Play, Brain } from 'lucide-react';
 import { getProviders } from '../../../services/api';
-import { LLM_DRILL_TYPES } from './constants';
 
 const DRILL_LABELS = {
   'doubling-chain': 'Doubling Chain',
