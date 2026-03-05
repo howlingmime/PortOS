@@ -349,6 +349,15 @@ export const syncBranch = (path, branch) => request('/git/sync', {
   method: 'POST',
   body: JSON.stringify({ path, branch })
 });
+export const getRemoteBranches = (path) => request('/git/remote-branches', {
+  method: 'POST',
+  body: JSON.stringify({ path })
+});
+export const deleteBranch = (path, branch, { local = false, remote = false } = {}) =>
+  request('/git/delete-branch', {
+    method: 'POST',
+    body: JSON.stringify({ path, branch, local, remote })
+  });
 
 // Usage
 export const getUsage = () => request('/usage');

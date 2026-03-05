@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GitBranch, Plus, Minus, FileText, RefreshCw, Download, Rocket, Upload, ArrowUpDown, Check } from 'lucide-react';
+import { GitBranch, Plus, Minus, FileText, RefreshCw, Download, Rocket, Upload, ArrowUpDown, Check, Trash2, GitMerge, Globe } from 'lucide-react';
 import toast from 'react-hot-toast';
 import BrailleSpinner from '../../BrailleSpinner';
 import * as api from '../../../services/api';
@@ -92,6 +92,11 @@ export default function GitTab({ appId, appName, repoPath }) {
   const [pushing, setPushing] = useState(null);
   const [syncing, setSyncing] = useState(null);
   const [pushingAll, setPushingAll] = useState(false);
+  const [remoteBranches, setRemoteBranches] = useState([]);
+  const [defaultBranch, setDefaultBranch] = useState('main');
+  const [loadingRemote, setLoadingRemote] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   const loadGitInfo = useCallback(async () => {
     if (!repoPath) return;
@@ -110,9 +115,21 @@ export default function GitTab({ appId, appName, repoPath }) {
     setLoading(false);
   }, [repoPath]);
 
+  const loadRemoteBranches = useCallback(async () => {
+    if (!repoPath) return;
+    setLoadingRemote(true);
+    const result = await api.getRemoteBranches(repoPath).catch(() => null);
+    if (result) {
+      setRemoteBranches(result.branches || []);
+      setDefaultBranch(result.defaultBranch || 'main');
+    }
+    setLoadingRemote(false);
+  }, [repoPath]);
+
   useEffect(() => {
     loadGitInfo();
-  }, [loadGitInfo]);
+    loadRemoteBranches();
+  }, [loadGitInfo, loadRemoteBranches]);
 
   const loadDiff = async () => {
     if (!repoPath) return;
@@ -232,6 +249,22 @@ export default function GitTab({ appId, appName, repoPath }) {
       toast.error(`Push failed for: ${failedNames.join(', ')}`);
     }
     await loadGitInfo();
+  };
+
+  const handleDeleteBranch = async (branchName, { local, remote }) => {
+    if (!repoPath || deleting) return;
+    setDeleting(branchName);
+    setDeleteConfirm(null);
+    const result = await api.deleteBranch(repoPath, branchName, { local, remote }).catch((err) => {
+      toast.error(`Delete failed: ${err.message}`);
+      return null;
+    });
+    setDeleting(null);
+    if (result) {
+      const parts = Object.entries(result.results || {}).map(([k, v]) => `${k}: ${v}`);
+      toast.success(`Branch ${branchName} — ${parts.join(', ')}`);
+      await Promise.all([loadGitInfo(), loadRemoteBranches()]);
+    }
   };
 
   const getStatusIcon = (file) => {
@@ -507,6 +540,102 @@ export default function GitTab({ appId, appName, repoPath }) {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Remote Branches */}
+          <div className="bg-port-card border border-port-border rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Globe size={16} className="text-gray-400" />
+                <h3 className="text-sm font-medium text-gray-400">Remote Branches</h3>
+                {remoteBranches.length > 0 && (
+                  <span className="text-xs text-gray-500">({remoteBranches.length})</span>
+                )}
+              </div>
+              <button
+                onClick={loadRemoteBranches}
+                disabled={loadingRemote}
+                className="text-xs text-port-accent hover:underline disabled:opacity-50"
+              >
+                {loadingRemote ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+            {loadingRemote && remoteBranches.length === 0 ? (
+              <div className="text-center py-4"><BrailleSpinner text="Loading remote branches" /></div>
+            ) : (
+              <div className="space-y-1.5 max-h-80 overflow-auto">
+                {remoteBranches.map((rb) => (
+                  <div
+                    key={rb.fullRef}
+                    className={`flex items-center justify-between py-2 px-2 rounded-lg hover:bg-port-bg ${rb.isDefault ? 'bg-port-accent/5' : ''}`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <GitBranch size={14} className={rb.isDefault ? 'text-port-accent shrink-0' : 'text-gray-500 shrink-0'} />
+                      <span className={`text-sm truncate ${rb.isDefault ? 'text-port-accent font-medium' : 'text-gray-300'}`}>
+                        {rb.name}
+                      </span>
+                      {rb.merged && !rb.isDefault && (
+                        <span className="flex items-center gap-1 text-xs text-port-success px-1.5 py-0.5 bg-port-success/10 rounded shrink-0">
+                          <GitMerge size={10} />
+                          merged
+                        </span>
+                      )}
+                      {rb.hasLocal && (
+                        <span className="text-xs text-gray-500 shrink-0">local</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {rb.lastCommitDate && (
+                        <span className="text-xs text-gray-500">
+                          {new Date(rb.lastCommitDate).toLocaleDateString()}
+                        </span>
+                      )}
+                      {!rb.isDefault && (
+                        <>
+                          {deleteConfirm === rb.name ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleDeleteBranch(rb.name, { local: rb.hasLocal, remote: true })}
+                                disabled={deleting === rb.name}
+                                className="px-2 py-1 text-xs bg-port-error/20 text-port-error rounded hover:bg-port-error/30 disabled:opacity-50"
+                              >
+                                {deleting === rb.name ? 'Deleting...' : rb.hasLocal ? 'Delete both' : 'Delete remote'}
+                              </button>
+                              {rb.hasLocal && (
+                                <button
+                                  onClick={() => handleDeleteBranch(rb.name, { local: false, remote: true })}
+                                  disabled={deleting === rb.name}
+                                  className="px-2 py-1 text-xs bg-port-warning/20 text-port-warning rounded hover:bg-port-warning/30 disabled:opacity-50"
+                                >
+                                  Remote only
+                                </button>
+                              )}
+                              <button
+                                onClick={() => setDeleteConfirm(null)}
+                                className="px-2 py-1 text-xs text-gray-400 hover:text-white"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setDeleteConfirm(rb.name)}
+                              className="p-1.5 text-gray-500 hover:text-port-error hover:bg-port-bg rounded"
+                              title="Delete branch"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {remoteBranches.length === 0 && !loadingRemote && (
+                  <div className="text-gray-500 text-sm">No remote branches found</div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       ) : (
