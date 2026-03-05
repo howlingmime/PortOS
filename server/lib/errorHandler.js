@@ -219,8 +219,5 @@ export function setupProcessErrorHandlers(io) {
     if (io) {
       emitErrorEvent(io, serverError);
     }
-
-    // Exit after broadcasting critical error
-    process.exit(1);
   });
 }

@@ -493,6 +493,7 @@ export function broadcast(io, event, data) {
 // Broadcast to CoS subscribers only
 function broadcastToCos(event, data) {
   for (const socket of cosSubscribers) {
+    if (!socket.connected) { cosSubscribers.delete(socket); continue; }
     socket.emit(event, data);
   }
 }
@@ -500,6 +501,7 @@ function broadcastToCos(event, data) {
 // Broadcast to error subscribers only
 function broadcastToErrors(event, data) {
   for (const socket of errorSubscribers) {
+    if (!socket.connected) { errorSubscribers.delete(socket); continue; }
     socket.emit(event, data);
   }
 }
@@ -576,6 +578,7 @@ function setupAppsEventForwarding() {
 // Broadcast to notification subscribers only
 function broadcastToNotifications(event, data) {
   for (const socket of notificationSubscribers) {
+    if (!socket.connected) { notificationSubscribers.delete(socket); continue; }
     socket.emit(event, data);
   }
 }
@@ -601,6 +604,7 @@ function setupProviderStatusEventForwarding() {
 // Broadcast to agent subscribers only
 function broadcastToAgents(event, data) {
   for (const socket of agentSubscribers) {
+    if (!socket.connected) { agentSubscribers.delete(socket); continue; }
     socket.emit(event, data);
   }
 }
@@ -652,6 +656,7 @@ function setupMoltworldQueueEventForwarding() {
 // Broadcast to instance subscribers only
 function broadcastToInstances(event, data) {
   for (const socket of instanceSubscribers) {
+    if (!socket.connected) { instanceSubscribers.delete(socket); continue; }
     socket.emit(event, data);
   }
 }

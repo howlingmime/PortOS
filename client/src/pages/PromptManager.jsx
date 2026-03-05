@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FileText, Variable, RefreshCw, Save, Plus, Trash2, Eye, Briefcase } from 'lucide-react';
+import toast from 'react-hot-toast';
 import BrailleSpinner from '../components/BrailleSpinner';
 import ProviderModelSelector from '../components/ProviderModelSelector';
 
@@ -47,6 +48,7 @@ export default function PromptManager() {
 
   const [providers, setProviders] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -153,7 +155,7 @@ export default function PromptManager() {
         message = errorBody.error || errorBody.message;
       }
       setSaving(false);
-      alert(message);
+      toast.error(message);
       return;
     }
 
@@ -171,50 +173,41 @@ export default function PromptManager() {
     await loadData();
   };
 
-  const deleteStage = async (stageName) => {
+  const requestDeleteStage = async (stageName) => {
     // Check if stage is in use
-    let usageRes;
     const usageResponse = await fetch(`/api/prompts/${stageName}/usage`).catch(() => null);
-    if (!usageResponse || !usageResponse.ok) {
-      usageRes = { isSystemStage: false, usedBy: [] };
-    } else {
-      usageRes = await usageResponse.json().catch(() => ({ isSystemStage: false, usedBy: [] }));
+    const usageRes = (!usageResponse || !usageResponse.ok)
+      ? { isSystemStage: false, usedBy: [] }
+      : await usageResponse.json().catch(() => ({ isSystemStage: false, usedBy: [] }));
+
+    setDeleteConfirm({ stageName, ...usageRes });
+  };
+
+  const confirmDeleteStage = async () => {
+    const { stageName, isSystemStage } = deleteConfirm;
+    setDeleteConfirm(null);
+
+    const url = isSystemStage
+      ? `/api/prompts/${stageName}?force=true`
+      : `/api/prompts/${stageName}`;
+
+    const res = await fetch(url, { method: 'DELETE' }).catch(err => {
+      toast.error(`Failed to delete: ${err.message}`);
+      return null;
+    });
+
+    if (!res) return;
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      toast.error(`Failed to delete: ${error.error || 'Unknown error'}`);
+      return;
     }
 
-    let confirmMessage = `Delete stage "${stageName}"?`;
-
-    if (usageRes.isSystemStage) {
-      confirmMessage = `⚠️ WARNING: "${stageName}" is a SYSTEM stage!\n\n` +
-        `Used by: ${usageRes.usedBy.join(', ')}\n\n` +
-        `Deleting this will break PortOS functionality.\n\n` +
-        `Are you SURE you want to delete it?`;
-    } else {
-      confirmMessage += `\n\nThis cannot be undone.`;
+    if (selectedStage === stageName) {
+      setSelectedStage(null);
     }
-
-    if (!confirm(confirmMessage)) return;
-
-    try {
-      // System stages require force flag
-      const url = usageRes.isSystemStage
-        ? `/api/prompts/${stageName}?force=true`
-        : `/api/prompts/${stageName}`;
-
-      const res = await fetch(url, { method: 'DELETE' });
-
-      if (!res.ok) {
-        const error = await res.json();
-        alert(`Failed to delete: ${error.error || 'Unknown error'}`);
-        return;
-      }
-
-      if (selectedStage === stageName) {
-        setSelectedStage(null);
-      }
-      await loadData();
-    } catch (err) {
-      alert(`Failed to delete: ${err.message}`);
-    }
+    await loadData();
   };
 
   // Job skill functions
@@ -335,7 +328,7 @@ export default function PromptManager() {
                     <div className="text-xs text-gray-500 truncate">{config.description}</div>
                   </button>
                   <button
-                    onClick={() => deleteStage(name)}
+                    onClick={() => requestDeleteStage(name)}
                     className="shrink-0 p-1 text-gray-500 hover:text-port-error"
                     title="Delete stage"
                   >
@@ -813,6 +806,46 @@ export default function PromptManager() {
                   <Save size={14} /> Create Stage
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Stage Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-port-card border border-port-border rounded-xl p-6 max-w-md w-full">
+            <h3 className="text-lg font-medium text-white mb-3">
+              {deleteConfirm.isSystemStage ? 'Delete System Stage?' : 'Delete Stage?'}
+            </h3>
+            {deleteConfirm.isSystemStage ? (
+              <div className="space-y-2 mb-6">
+                <p className="text-port-warning text-sm font-medium">
+                  "{deleteConfirm.stageName}" is a system stage.
+                </p>
+                {deleteConfirm.usedBy?.length > 0 && (
+                  <p className="text-gray-400 text-sm">Used by: {deleteConfirm.usedBy.join(', ')}</p>
+                )}
+                <p className="text-gray-400 text-sm">Deleting this will break PortOS functionality.</p>
+              </div>
+            ) : (
+              <p className="text-gray-400 text-sm mb-6">
+                Delete "{deleteConfirm.stageName}"? This cannot be undone.
+              </p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-2 text-gray-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteStage}
+                className="px-4 py-2 bg-port-error hover:bg-port-error/80 text-white rounded"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
