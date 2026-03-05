@@ -434,6 +434,8 @@ export function initSocket(io) {
       if (detached > 0) {
         console.log(`🐚 Detached ${detached} shell session(s) (still running)`);
       }
+      // Remove all event handlers registered on this socket to prevent leaks
+      socket.removeAllListeners();
     });
   });
 
