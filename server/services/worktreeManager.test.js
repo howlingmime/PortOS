@@ -110,6 +110,31 @@ detached
   });
 });
 
+describe('Persistent Worktree Path Construction', () => {
+  function buildPersistentWorktreePath(worktreesDir, featureAgentId) {
+    return `${worktreesDir}/../feature-agents/${featureAgentId}/worktree`;
+  }
+
+  it('should place worktree under feature-agents directory', () => {
+    const path = buildPersistentWorktreePath('/data/cos/worktrees', 'fa-abc12345');
+    expect(path).toContain('feature-agents');
+    expect(path).toContain('fa-abc12345');
+    expect(path.endsWith('worktree')).toBe(true);
+  });
+
+  it('should be separate from regular worktrees directory', () => {
+    const regularPath = '/data/cos/worktrees/agent-12345678';
+    const persistentPath = buildPersistentWorktreePath('/data/cos/worktrees', 'fa-abc12345');
+    expect(persistentPath).not.toContain('/worktrees/fa-');
+    expect(regularPath).not.toContain('feature-agents');
+  });
+
+  it('should use feature agent ID as parent directory', () => {
+    const path = buildPersistentWorktreePath('/data/cos/worktrees', 'fa-12345678');
+    expect(path).toContain('/fa-12345678/');
+  });
+});
+
 describe('Orphaned Worktree Detection', () => {
   function findOrphanedWorktrees(worktrees, worktreesDir, activeAgentIds) {
     return worktrees.filter(wt => {
