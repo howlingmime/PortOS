@@ -160,7 +160,7 @@ export async function syncAllPeers() {
 
   // Compact sync log below the minimum peer cursor to bound log growth
   const cursors = await loadCursors();
-  const seqs = Object.values(cursors).map(c => c.brainSeq ?? 0).filter(s => s > 0);
+  const seqs = Object.values(cursors).map(c => c.brainSeq ?? 0);
   if (seqs.length > 0) {
     const minSeq = Math.min(...seqs);
     await brainSyncLog.compactLog(minSeq);

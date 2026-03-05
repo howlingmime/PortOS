@@ -255,9 +255,10 @@ export async function remove(type, id) {
   }
 
   const originInstanceId = data.records[id]?.originInstanceId ?? 'unknown';
+  const deleteRecord = { updatedAt: now() };
   delete data.records[id];
   await saveJsonStore(type, data);
-  await brainSyncLog.appendChange('delete', type, id, null, originInstanceId);
+  await brainSyncLog.appendChange('delete', type, id, deleteRecord, originInstanceId);
 
   console.log(`🧠 Deleted ${type} record: ${id}`);
   return true;
@@ -589,6 +590,10 @@ export async function applyRemoteRecord(type, id, record, op) {
 
     if (op === 'delete') {
       if (!data.records[id]) return { applied: false, reason: 'not_found' };
+      // LWW: only delete if local record isn't newer than the remote delete
+      if (record?.updatedAt && data.records[id].updatedAt > record.updatedAt) {
+        return { applied: false, reason: 'local_newer' };
+      }
       delete data.records[id];
     } else {
       const existing = data.records[id];
