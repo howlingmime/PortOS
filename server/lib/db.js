@@ -9,6 +9,10 @@ import pg from 'pg';
 
 const { Pool } = pg;
 
+if (!process.env.PGPASSWORD) {
+  console.warn('⚠️ PGPASSWORD not set, using default database password');
+}
+
 // Connection config from environment or defaults
 const pool = new Pool({
   host: process.env.PGHOST || 'localhost',

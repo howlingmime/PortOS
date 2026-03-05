@@ -17,8 +17,50 @@ import * as goalProgress from '../services/goalProgress.js';
 import * as decisionLog from '../services/decisionLog.js';
 import { reinitialize as reinitializeEmbeddings } from '../services/memoryEmbeddings.js';
 import { asyncHandler, ServerError } from '../lib/errorHandler.js';
+import { validateRequest } from '../lib/validation.js';
+import { z } from 'zod';
 
 const router = Router();
+
+const cosConfigSchema = z.object({
+  userTasksFile: z.string().optional(),
+  cosTasksFile: z.string().optional(),
+  goalsFile: z.string().optional(),
+  evaluationIntervalMs: z.number().int().min(1000).optional(),
+  healthCheckIntervalMs: z.number().int().min(1000).optional(),
+  maxConcurrentAgents: z.number().int().min(1).optional(),
+  maxConcurrentAgentsPerProject: z.number().int().min(1).optional(),
+  maxProcessMemoryMb: z.number().int().min(128).optional(),
+  maxTotalProcesses: z.number().int().min(1).optional(),
+  mcpServers: z.array(z.object({
+    name: z.string(),
+    command: z.string(),
+    args: z.array(z.string()).optional()
+  })).optional(),
+  autoStart: z.boolean().optional(),
+  selfImprovementEnabled: z.boolean().optional(),
+  appImprovementEnabled: z.boolean().optional(),
+  improvementEnabled: z.boolean().optional(),
+  avatarStyle: z.enum(['svg', 'ascii', 'cyber', 'sigil']).optional(),
+  dynamicAvatar: z.boolean().optional(),
+  alwaysOn: z.boolean().optional(),
+  appReviewCooldownMs: z.number().int().min(0).optional(),
+  idleReviewEnabled: z.boolean().optional(),
+  idleReviewPriority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+  comprehensiveAppImprovement: z.boolean().optional(),
+  immediateExecution: z.boolean().optional(),
+  proactiveMode: z.boolean().optional(),
+  autonomousJobsEnabled: z.boolean().optional(),
+  autonomyLevel: z.enum(['standby', 'assistant', 'manager', 'yolo']).optional(),
+  rehabilitationGracePeriodDays: z.number().int().min(1).optional(),
+  completedAgentRetentionMs: z.number().int().min(0).optional(),
+  embeddingProviderId: z.string().optional(),
+  embeddingModel: z.string().optional(),
+  autoFixThresholds: z.object({
+    maxLinesChanged: z.number().int().min(1).optional(),
+    allowedCategories: z.array(z.string()).optional()
+  }).optional()
+}).strict();
 
 const SCHEDULE_FIELDS = ['type', 'enabled', 'intervalMs', 'providerId', 'model', 'prompt'];
 
@@ -74,8 +116,9 @@ router.get('/config', asyncHandler(async (req, res) => {
 
 // PUT /api/cos/config - Update configuration
 router.put('/config', asyncHandler(async (req, res) => {
-  const config = await cos.updateConfig(req.body);
-  if (req.body.embeddingProviderId !== undefined || req.body.embeddingModel !== undefined) {
+  const validated = validateRequest(cosConfigSchema, req.body);
+  const config = await cos.updateConfig(validated);
+  if (validated.embeddingProviderId !== undefined || validated.embeddingModel !== undefined) {
     reinitializeEmbeddings();
   }
   res.json(config);
@@ -988,7 +1031,7 @@ router.get('/actionable-insights', asyncHandler(async (req, res) => {
       priority: 'high',
       icon: 'AlertCircle',
       title: `${pendingApprovals.length} task${pendingApprovals.length > 1 ? 's' : ''} awaiting approval`,
-      description: pendingApprovals[0]?.description?.substring(0, 80) + (pendingApprovals[0]?.description?.length > 80 ? '...' : ''),
+      description: ((d) => d ? d.substring(0, 80) + (d.length > 80 ? '...' : '') : '')(pendingApprovals[0]?.description ?? ''),
       action: { label: 'Review', route: '/cos/tasks' },
       count: pendingApprovals.length
     });
