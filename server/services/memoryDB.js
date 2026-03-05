@@ -71,7 +71,7 @@ export async function createMemory(data, embedding = null) {
   const summary = data.summary || generateSummary(data.content);
   const now = new Date().toISOString();
 
-  const originInstanceId = (await getSelf())?.instanceId ?? null;
+  const originInstanceId = (await getSelf())?.instanceId ?? 'unknown';
 
   const memory = await withTransaction(async (client) => {
     const result = await client.query(

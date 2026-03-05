@@ -200,7 +200,7 @@ export async function create(type, recordData) {
 
   data.records[id] = record;
   await saveJsonStore(type, data);
-  brainSyncLog.appendChange('create', type, id, record, originInstanceId);
+  await brainSyncLog.appendChange('create', type, id, record, originInstanceId);
 
   console.log(`🧠 Created ${type} record: ${id}`);
   return { id, ...record };
@@ -226,7 +226,7 @@ export async function update(type, id, updates) {
 
   data.records[id] = record;
   await saveJsonStore(type, data);
-  brainSyncLog.appendChange('update', type, id, record, record.originInstanceId);
+  await brainSyncLog.appendChange('update', type, id, record, record.originInstanceId);
 
   console.log(`🧠 Updated ${type} record: ${id}`);
   return { id, ...record };
@@ -245,7 +245,7 @@ export async function remove(type, id) {
   const originInstanceId = data.records[id]?.originInstanceId ?? 'unknown';
   delete data.records[id];
   await saveJsonStore(type, data);
-  brainSyncLog.appendChange('delete', type, id, null, originInstanceId);
+  await brainSyncLog.appendChange('delete', type, id, null, originInstanceId);
 
   console.log(`🧠 Deleted ${type} record: ${id}`);
   return true;

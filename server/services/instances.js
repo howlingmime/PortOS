@@ -207,8 +207,10 @@ export async function probePeer(peer) {
 
   // Announce ourselves only when peer transitions to online (not every poll cycle)
   if (status === 'online' && previousStatus !== 'online') {
-    announceSelf(peer.address, peer.port);
-    instanceEvents.emit('peer:online', stored);
+    if (stored) {
+      announceSelf(peer.address, peer.port);
+      instanceEvents.emit('peer:online', stored);
+    }
   }
 
   return stored;

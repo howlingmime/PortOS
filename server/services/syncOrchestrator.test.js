@@ -5,7 +5,8 @@ vi.mock('./instances.js', () => ({
   getPeers: vi.fn()
 }));
 vi.mock('./brainSyncLog.js', () => ({
-  getChangesSince: vi.fn()
+  getChangesSince: vi.fn(),
+  compactLog: vi.fn().mockResolvedValue(0)
 }));
 vi.mock('./brainSync.js', () => ({
   applyRemoteChanges: vi.fn()
@@ -200,6 +201,13 @@ describe('syncOrchestrator', () => {
 
       // getPeers should not be called after stopping
       expect(getPeers).not.toHaveBeenCalled();
+    });
+
+    it('removes the peer:online event listener', () => {
+      initSyncOrchestrator();
+      stopSyncOrchestrator();
+
+      expect(instanceEvents.removeListener).toHaveBeenCalledWith('peer:online', expect.any(Function));
     });
   });
 });

@@ -10,8 +10,8 @@ import { readJSONFile, ensureDir, PATHS, dataPath } from '../lib/fileUtils.js';
 import { createMutex } from '../lib/asyncMutex.js';
 import { instanceEvents } from './instanceEvents.js';
 import { getPeers } from './instances.js';
-import * as brainSyncLog from './brainSyncLog.js';
 import * as brainSync from './brainSync.js';
+import * as brainSyncLog from './brainSyncLog.js';
 import * as memorySync from './memorySync.js';
 
 const CURSORS_FILE = dataPath('instances_sync_cursors.json');
@@ -20,6 +20,7 @@ const FETCH_TIMEOUT_MS = 15000;
 
 const withLock = createMutex();
 let syncTimer = null;
+let peerOnlineHandler = null;
 
 // --- Cursor persistence ---
 
@@ -146,6 +147,14 @@ export async function syncAllPeers() {
   const online = peers.filter(p => p.enabled && p.status === 'online' && p.instanceId);
 
   await Promise.allSettled(online.map(p => syncWithPeer(p)));
+
+  // Compact sync log below the minimum peer cursor to bound log growth
+  const cursors = await loadCursors();
+  const seqs = Object.values(cursors).map(c => c.brainSeq ?? 0).filter(s => s > 0);
+  if (seqs.length > 0) {
+    const minSeq = Math.min(...seqs);
+    await brainSyncLog.compactLog(minSeq);
+  }
 }
 
 /**
@@ -153,11 +162,12 @@ export async function syncAllPeers() {
  */
 export function initSyncOrchestrator() {
   // Sync immediately when a peer comes online
-  instanceEvents.on('peer:online', (peer) => {
+  peerOnlineHandler = (peer) => {
     syncWithPeer(peer).catch(err => {
       console.error(`❌ Sync with ${peer.name} failed: ${err.message}`);
     });
-  });
+  };
+  instanceEvents.on('peer:online', peerOnlineHandler);
 
   // Background safety-net interval
   syncTimer = setInterval(() => {
@@ -173,9 +183,13 @@ export function initSyncOrchestrator() {
  * Stop the sync orchestrator
  */
 export function stopSyncOrchestrator() {
+  if (peerOnlineHandler) {
+    instanceEvents.removeListener('peer:online', peerOnlineHandler);
+    peerOnlineHandler = null;
+  }
   if (syncTimer) {
     clearInterval(syncTimer);
     syncTimer = null;
-    console.log('🔄 Sync orchestrator stopped');
   }
+  console.log('🔄 Sync orchestrator stopped');
 }
