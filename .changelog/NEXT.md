@@ -2,6 +2,7 @@
 
 ## Added
 
+- Browser page: quick-launch shortcut buttons for Outlook and Teams in the Open URL section
 - Sync status indicators on Instances page showing brain and memory sync progress per peer
 - Self card displays local brain/memory sequence numbers
 - Each peer card shows cursor position vs remote max with synced/behind indicators

@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Globe, Play, Square, RefreshCw, Settings, Activity,
   Monitor, Wifi, WifiOff, Clock, Cpu, MemoryStick,
-  FileText, ChevronDown, ChevronRight, ExternalLink
+  FileText, ChevronDown, ChevronRight, ExternalLink,
+  Mail, MessageSquare
 } from 'lucide-react';
 import {
   getBrowserStatus, getBrowserConfig, updateBrowserConfig,
@@ -427,6 +428,31 @@ export default function BrowserPage() {
                   Go
                 </button>
               </form>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {[
+                  { label: 'Outlook', url: 'https://outlook.office.com/mail/', icon: Mail },
+                  { label: 'Teams', url: 'https://teams.microsoft.com/v2/', icon: MessageSquare },
+                ].map(({ label, url, icon: Icon }) => (
+                  <button
+                    key={label}
+                    onClick={() => {
+                      setNavUrl(url);
+                      setActionLoading('navigate');
+                      navigateBrowser(url).then(() => {
+                        toast.success(`Opened ${label}`);
+                        setNavUrl('');
+                        fetchStatus();
+                      }).catch(err => toast.error(`Failed to navigate: ${err.message}`))
+                        .finally(() => setActionLoading(null));
+                    }}
+                    disabled={actionLoading !== null}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-port-bg border border-port-border text-gray-400 rounded-lg hover:text-white hover:border-port-accent/50 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    <Icon size={14} />
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
