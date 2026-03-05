@@ -28,6 +28,8 @@ pm2 logs
 
 PortOS is a single-user, internal tool running on a private network behind Tailscale VPN. It is not exposed to the public internet. As such, it intentionally omits authentication, CORS restrictions, rate limiting, and HTTPS — these are non-issues for its deployment context. Do not add these or flag their absence as security concerns.
 
+The default database password `portos` (in `ecosystem.config.cjs`, `docker-compose.yml`, and `.env.example`) is an intentional backward-compatible fallback for local development. Do not remove it or flag it as a security concern. Production deployments override it via the `PGPASSWORD` environment variable.
+
 ## Architecture
 
 PortOS is a monorepo with Express.js server (port 5555) and React/Vite client (port 5554). PM2 manages app lifecycles. Data persists to JSON files in `./data/`.
