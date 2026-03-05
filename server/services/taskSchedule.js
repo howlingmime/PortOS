@@ -18,7 +18,7 @@ import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { cosEvents, emitLog } from './cos.js';
-import { readJSONFile } from '../lib/fileUtils.js';
+import { DAY, HOUR, readJSONFile } from '../lib/fileUtils.js';
 import { getAdaptiveCooldownMultiplier } from './taskLearning.js';
 import { isTaskTypeEnabledForApp, getAppTaskTypeInterval, getActiveApps, getAppTaskTypeOverrides } from './apps.js';
 import { PORTOS_UI_URL } from '../lib/ports.js';
@@ -38,9 +38,6 @@ export const INTERVAL_TYPES = {
   CUSTOM: 'custom'           // Custom interval in milliseconds
 };
 
-// Time constants in milliseconds
-const HOUR = 60 * 60 * 1000;
-const DAY = 24 * HOUR;
 const WEEK = 7 * DAY;
 
 /**

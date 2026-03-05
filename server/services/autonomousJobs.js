@@ -20,7 +20,7 @@ import { fileURLToPath } from 'url'
 import { v4 as uuidv4 } from 'uuid'
 import { spawn } from 'child_process'
 import { cosEvents } from './cosEvents.js'
-import { ensureDir, PATHS, readJSONFile } from '../lib/fileUtils.js'
+import { DAY, ensureDir, HOUR, PATHS, readJSONFile } from '../lib/fileUtils.js'
 import { createMutex } from '../lib/asyncMutex.js'
 import { checkAndPrompt as autobiographyCheckAndPrompt } from './autobiography.js'
 
@@ -90,9 +90,6 @@ const JOB_SKILL_MAP = {
   'job-autobiography-prompt': 'autobiography-prompt'
 }
 
-// Time constants
-const HOUR = 60 * 60 * 1000
-const DAY = 24 * HOUR
 const WEEK = 7 * DAY
 
 /**
