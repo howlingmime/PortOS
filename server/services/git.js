@@ -8,7 +8,7 @@ import { safeJSONParse } from '../lib/fileUtils.js';
  * @param {string[]} args - Git command arguments
  * @param {string} cwd - Working directory
  * @param {object} options - Additional options
- * @returns {Promise<{stdout: string, stderr: string}>}
+ * @returns {Promise<{stdout: string, stderr: string, exitCode: number}>}
  */
 function execGit(args, cwd, options = {}) {
   return new Promise((resolve, reject) => {

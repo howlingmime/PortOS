@@ -498,7 +498,7 @@ export default function Shell() {
                   <button
                     key={name}
                     onClick={() => {
-                      sendCommand(`cd '${path}'`);
+                      sendCommand(`cd '${path.replace(/'/g, "'\\''")}'`);
                       setFolderDropdownOpen(false);
                     }}
                     className="w-full text-left px-3 py-2 text-xs font-mono text-gray-300 hover:bg-port-border hover:text-white transition-colors"
