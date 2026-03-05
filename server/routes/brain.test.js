@@ -66,10 +66,22 @@ vi.mock('../services/brainMemoryBridge.js', () => ({
   syncAllBrainData: vi.fn()
 }));
 
+// Mock the brain sync log service
+vi.mock('../services/brainSyncLog.js', () => ({
+  getChangesSince: vi.fn()
+}));
+
+// Mock the brain sync service
+vi.mock('../services/brainSync.js', () => ({
+  applyRemoteChanges: vi.fn()
+}));
+
 // Import mocked modules
 import * as brainService from '../services/brain.js';
 import { getBrainGraphData } from '../services/brainGraph.js';
 import { syncAllBrainData } from '../services/brainMemoryBridge.js';
+import { getChangesSince } from '../services/brainSyncLog.js';
+import { applyRemoteChanges } from '../services/brainSync.js';
 
 describe('Brain Routes', () => {
   let app;
@@ -905,15 +917,15 @@ describe('Brain Routes', () => {
   });
 
   // ===========================================================================
-  // SYNC
+  // BRIDGE SYNC (renamed from /sync)
   // ===========================================================================
 
-  describe('POST /api/brain/sync', () => {
+  describe('POST /api/brain/bridge-sync', () => {
     it('should return sync stats', async () => {
       const mockStats = { synced: 5, skipped: 2, errors: 0 };
       syncAllBrainData.mockResolvedValue(mockStats);
 
-      const response = await request(app).post('/api/brain/sync');
+      const response = await request(app).post('/api/brain/bridge-sync');
       expect(response.status).toBe(200);
       expect(response.body.synced).toBe(5);
       expect(response.body.skipped).toBe(2);
@@ -923,8 +935,85 @@ describe('Brain Routes', () => {
     it('should return 500 when sync fails', async () => {
       syncAllBrainData.mockRejectedValue(new Error('Sync failed'));
 
-      const response = await request(app).post('/api/brain/sync');
+      const response = await request(app).post('/api/brain/bridge-sync');
       expect(response.status).toBe(500);
+    });
+  });
+
+  // ===========================================================================
+  // FEDERATION SYNC (peer-to-peer)
+  // ===========================================================================
+
+  describe('GET /api/brain/sync', () => {
+    it('should return changes since a given seq', async () => {
+      const mockResult = {
+        changes: [{ seq: 2, op: 'create', type: 'people', id: 'p1', record: { name: 'A' }, ts: '2026-01-01T00:00:00.000Z' }],
+        maxSeq: 2,
+        hasMore: false
+      };
+      getChangesSince.mockResolvedValue(mockResult);
+
+      const response = await request(app).get('/api/brain/sync?since=1');
+
+      expect(response.status).toBe(200);
+      expect(response.body.changes).toHaveLength(1);
+      expect(response.body.maxSeq).toBe(2);
+      expect(response.body.hasMore).toBe(false);
+      expect(getChangesSince).toHaveBeenCalledWith(1, 100);
+    });
+
+    it('should default since to 0', async () => {
+      getChangesSince.mockResolvedValue({ changes: [], maxSeq: 0, hasMore: false });
+
+      const response = await request(app).get('/api/brain/sync');
+
+      expect(response.status).toBe(200);
+      expect(getChangesSince).toHaveBeenCalledWith(0, 100);
+    });
+
+    it('should pass custom limit', async () => {
+      getChangesSince.mockResolvedValue({ changes: [], maxSeq: 0, hasMore: false });
+
+      await request(app).get('/api/brain/sync?since=0&limit=50');
+
+      expect(getChangesSince).toHaveBeenCalledWith(0, 50);
+    });
+  });
+
+  describe('POST /api/brain/sync', () => {
+    it('should apply remote changes and return stats', async () => {
+      const mockResult = { inserted: 2, updated: 1, deleted: 0, skipped: 1 };
+      applyRemoteChanges.mockResolvedValue(mockResult);
+
+      const response = await request(app)
+        .post('/api/brain/sync')
+        .send({
+          changes: [
+            { seq: 1, op: 'create', type: 'people', id: 'p1', record: { name: 'A' }, ts: '2026-01-01T00:00:00.000Z' },
+            { seq: 2, op: 'update', type: 'ideas', id: 'i1', record: { title: 'B' }, ts: '2026-01-01T00:00:00.000Z' }
+          ]
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.inserted).toBe(2);
+      expect(response.body.updated).toBe(1);
+      expect(applyRemoteChanges).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return 400 when changes array is empty', async () => {
+      const response = await request(app)
+        .post('/api/brain/sync')
+        .send({ changes: [] });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('should return 400 when changes is missing', async () => {
+      const response = await request(app)
+        .post('/api/brain/sync')
+        .send({});
+
+      expect(response.status).toBe(400);
     });
   });
 });

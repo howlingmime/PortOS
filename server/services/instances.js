@@ -70,6 +70,16 @@ export async function getSelf() {
   return data.self;
 }
 
+let cachedInstanceId = null;
+export async function getInstanceId() {
+  if (!cachedInstanceId) {
+    const id = (await getSelf())?.instanceId;
+    if (id) cachedInstanceId = id;
+    return id ?? 'unknown';
+  }
+  return cachedInstanceId;
+}
+
 export async function updateSelf(name) {
   return withData(async (data) => {
     if (!data.self) return null;
@@ -207,7 +217,10 @@ export async function probePeer(peer) {
 
   // Announce ourselves only when peer transitions to online (not every poll cycle)
   if (status === 'online' && previousStatus !== 'online') {
-    announceSelf(peer.address, peer.port);
+    if (stored) {
+      announceSelf(peer.address, peer.port);
+      instanceEvents.emit('peer:online', stored);
+    }
   }
 
   return stored;

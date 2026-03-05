@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS memories (
 -- Schema upgrades: add columns that may not exist on older installs
 ALTER TABLE memories ADD COLUMN IF NOT EXISTS sync_sequence BIGSERIAL;
 
+-- Origin instance tracking for federation
+ALTER TABLE memories ADD COLUMN IF NOT EXISTS origin_instance_id VARCHAR(36);
+CREATE INDEX IF NOT EXISTS idx_memories_origin_instance ON memories (origin_instance_id);
+
 -- HNSW index for fast vector similarity search (O(log n) instead of O(n))
 CREATE INDEX IF NOT EXISTS idx_memories_embedding
   ON memories USING hnsw (embedding vector_cosine_ops)

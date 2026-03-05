@@ -57,6 +57,14 @@ const taskResultSchema = z.object({
   responses: z.array(llmResponseSchema).optional().default([]),
   drillData: z.any().optional(),
   score: z.number().min(0).max(100).optional(),
+  evaluation: z.object({
+    score: z.number().min(0).max(100).optional(),
+    breakdown: z.array(z.object({
+      question: z.string().optional(),
+      score: z.number().min(0).max(100).optional(),
+      feedback: z.string().optional()
+    })).optional()
+  }).optional(),
   totalMs: z.number().min(0)
 });
 

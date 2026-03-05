@@ -342,22 +342,6 @@ export default function TaskAddForm({ providers, apps, onTaskAdded, compact = fa
     return (
       <>
         <div className="flex items-center gap-6 flex-wrap">
-          <div className="flex items-center gap-3">
-            <label htmlFor="add-position" className="text-sm text-gray-400">Queue Position:</label>
-            <button
-              id="add-position"
-              type="button"
-              onClick={() => setAddToTop(!addToTop)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                addToTop
-                  ? 'bg-port-accent/20 text-port-accent border border-port-accent/50'
-                  : 'bg-port-bg text-gray-400 border border-port-border'
-              }`}
-              aria-pressed={addToTop}
-            >
-              {addToTop ? 'Top of Queue' : 'Bottom of Queue'}
-            </button>
-          </div>
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -582,7 +566,23 @@ export default function TaskAddForm({ providers, apps, onTaskAdded, compact = fa
           </div>
         )}
         {!compact && (
-          <div className="flex justify-end gap-2">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mr-auto">
+              <label htmlFor="add-position" className="text-sm text-gray-400">Queue:</label>
+              <button
+                id="add-position"
+                type="button"
+                onClick={() => setAddToTop(!addToTop)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  addToTop
+                    ? 'bg-port-accent/20 text-port-accent border border-port-accent/50'
+                    : 'bg-port-bg text-gray-400 border border-port-border'
+                }`}
+                aria-pressed={addToTop}
+              >
+                {addToTop ? 'Top of Queue' : 'Bottom of Queue'}
+              </button>
+            </div>
             <button
               onClick={saveAsTemplate}
               type="button"

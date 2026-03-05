@@ -26,7 +26,9 @@ import {
   inboxQuerySchema,
   linkRecordSchema,
   linkInputSchema,
-  linksQuerySchema
+  linksQuerySchema,
+  brainSyncQuerySchema,
+  brainSyncPushSchema
 } from './brainValidation.js';
 
 describe('brainValidation.js', () => {
@@ -517,6 +519,79 @@ describe('brainValidation.js', () => {
       const result = linksQuerySchema.safeParse({ linkType: 'documentation' });
       expect(result.success).toBe(true);
       expect(result.data.linkType).toBe('documentation');
+    });
+  });
+
+  describe('brainSyncQuerySchema', () => {
+    it('should accept valid query with defaults', () => {
+      const result = brainSyncQuerySchema.safeParse({});
+      expect(result.success).toBe(true);
+      expect(result.data.since).toBe(0);
+      expect(result.data.limit).toBe(100);
+    });
+
+    it('should coerce string since to number', () => {
+      const result = brainSyncQuerySchema.safeParse({ since: '5', limit: '50' });
+      expect(result.success).toBe(true);
+      expect(result.data.since).toBe(5);
+      expect(result.data.limit).toBe(50);
+    });
+
+    it('should reject negative since', () => {
+      const result = brainSyncQuerySchema.safeParse({ since: -1 });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject limit exceeding 1000', () => {
+      const result = brainSyncQuerySchema.safeParse({ limit: 1001 });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject limit of 0', () => {
+      const result = brainSyncQuerySchema.safeParse({ limit: 0 });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('brainSyncPushSchema', () => {
+    const validChange = {
+      seq: 1,
+      op: 'create',
+      type: 'people',
+      id: 'abc-123',
+      record: { name: 'Test' },
+      originInstanceId: 'inst-1',
+      ts: '2026-01-01T00:00:00Z'
+    };
+
+    it('should accept valid push with one change', () => {
+      const result = brainSyncPushSchema.safeParse({ changes: [validChange] });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject empty changes array', () => {
+      const result = brainSyncPushSchema.safeParse({ changes: [] });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject invalid op values', () => {
+      const result = brainSyncPushSchema.safeParse({
+        changes: [{ ...validChange, op: 'upsert' }]
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should accept delete with null record', () => {
+      const result = brainSyncPushSchema.safeParse({
+        changes: [{ ...validChange, op: 'delete', record: null }]
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept change without optional fields', () => {
+      const { originInstanceId, record, ...minimal } = validChange;
+      const result = brainSyncPushSchema.safeParse({ changes: [minimal] });
+      expect(result.success).toBe(true);
     });
   });
 });

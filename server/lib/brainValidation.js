@@ -373,3 +373,29 @@ export const linksQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(50),
   offset: z.coerce.number().int().min(0).optional().default(0)
 });
+
+// =============================================================================
+// SYNC SCHEMAS
+// =============================================================================
+
+// Brain sync query schema (GET /api/brain/sync?since=N&limit=100)
+export const brainSyncQuerySchema = z.object({
+  since: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(1000).optional().default(100)
+});
+
+// Brain sync change object schema
+const brainSyncChangeSchema = z.object({
+  seq: z.number().int(),
+  op: z.enum(['create', 'update', 'delete']),
+  type: z.string(),
+  id: z.string(),
+  record: z.record(z.unknown()).nullable().optional(),
+  originInstanceId: z.string().optional(),
+  ts: z.string()
+});
+
+// Brain sync push schema (POST /api/brain/sync body)
+export const brainSyncPushSchema = z.object({
+  changes: z.array(brainSyncChangeSchema).min(1).max(1000)
+});

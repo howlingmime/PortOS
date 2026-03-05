@@ -14,6 +14,11 @@ import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 import EventEmitter from 'events';
 import { readJSONFile, safeJSONParse } from '../lib/fileUtils.js';
+import { createMutex } from '../lib/asyncMutex.js';
+import { getInstanceId } from './instances.js';
+import * as brainSyncLog from './brainSyncLog.js';
+
+const withRemoteLock = createMutex();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -187,15 +192,18 @@ export async function create(type, recordData) {
   const data = await loadJsonStore(type);
   const id = generateId();
   const timestamp = now();
+  const originInstanceId = await getInstanceId();
 
   const record = {
     ...recordData,
+    originInstanceId,
     createdAt: timestamp,
     updatedAt: timestamp
   };
 
   data.records[id] = record;
   await saveJsonStore(type, data);
+  await brainSyncLog.appendChange('create', type, id, record, originInstanceId);
 
   console.log(`🧠 Created ${type} record: ${id}`);
   return { id, ...record };
@@ -214,12 +222,15 @@ export async function update(type, id, updates) {
   const record = {
     ...data.records[id],
     ...updates,
+    // Preserve immutable fields — originInstanceId tracks the creating instance
+    originInstanceId: data.records[id].originInstanceId,
     createdAt: data.records[id].createdAt,
     updatedAt: now()
   };
 
   data.records[id] = record;
   await saveJsonStore(type, data);
+  await brainSyncLog.appendChange('update', type, id, record, record.originInstanceId);
 
   console.log(`🧠 Updated ${type} record: ${id}`);
   return { id, ...record };
@@ -235,8 +246,11 @@ export async function remove(type, id) {
     return false;
   }
 
+  const originInstanceId = data.records[id]?.originInstanceId ?? 'unknown';
+  const deleteRecord = { updatedAt: now() };
   delete data.records[id];
   await saveJsonStore(type, data);
+  await brainSyncLog.appendChange('delete', type, id, deleteRecord, originInstanceId);
 
   console.log(`🧠 Deleted ${type} record: ${id}`);
   return true;
@@ -553,6 +567,74 @@ export const deleteLink = (id) => remove('links', id);
 export async function getLinkByUrl(url) {
   const links = await getAll('links');
   return links.find(link => link.url === url) || null;
+}
+
+// =============================================================================
+// REMOTE SYNC OPERATIONS (no events, no sync log — echo prevention)
+// =============================================================================
+
+/**
+ * Apply a remote record to a JSON store (last-writer-wins by updatedAt)
+ */
+export async function applyRemoteRecord(type, id, record, op) {
+  return withRemoteLock(async () => {
+    const data = await loadJsonStore(type);
+
+    if (op === 'delete') {
+      if (!data.records[id]) return { applied: false, reason: 'not_found' };
+      // LWW: only delete if local record isn't newer than the remote delete (>= for consistency with update path)
+      if (record?.updatedAt && data.records[id].updatedAt >= record.updatedAt) {
+        return { applied: false, reason: 'local_newer' };
+      }
+      delete data.records[id];
+    } else {
+      const existing = data.records[id];
+      if (existing && existing.updatedAt >= record.updatedAt) {
+        return { applied: false, reason: 'local_newer' };
+      }
+      data.records[id] = { ...record };
+    }
+
+    await ensureBrainDir();
+    await writeFile(FILES[type], JSON.stringify(data, null, 2));
+    caches[type].data = data;
+    caches[type].timestamp = Date.now();
+
+    return { applied: true };
+  });
+}
+
+/**
+ * Backfill originInstanceId on records missing it (run once at startup)
+ */
+export async function backfillOriginInstanceId() {
+  const instanceId = await getInstanceId();
+  const entityTypes = ['people', 'projects', 'ideas', 'admin', 'memories', 'links'];
+  let totalBackfilled = 0;
+
+  for (const type of entityTypes) {
+    const data = await loadJsonStore(type);
+    let changed = false;
+
+    for (const [, record] of Object.entries(data.records)) {
+      if (!record.originInstanceId) {
+        record.originInstanceId = instanceId;
+        changed = true;
+        totalBackfilled++;
+      }
+    }
+
+    if (changed) {
+      await ensureBrainDir();
+      await writeFile(FILES[type], JSON.stringify(data, null, 2));
+      caches[type].data = data;
+      caches[type].timestamp = Date.now();
+    }
+  }
+
+  if (totalBackfilled > 0) {
+    console.log(`🧠 Backfilled originInstanceId on ${totalBackfilled} records`);
+  }
 }
 
 // =============================================================================

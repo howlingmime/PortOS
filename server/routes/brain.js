@@ -29,11 +29,15 @@ import {
   settingsUpdateInputSchema,
   linkInputSchema,
   linkUpdateInputSchema,
-  linksQuerySchema
+  linksQuerySchema,
+  brainSyncQuerySchema,
+  brainSyncPushSchema
 } from '../lib/brainValidation.js';
 import * as githubCloner from '../services/githubCloner.js';
 import { getBrainGraphData } from '../services/brainGraph.js';
 import { syncAllBrainData } from '../services/brainMemoryBridge.js';
+import * as brainSyncLog from '../services/brainSyncLog.js';
+import * as brainSync from '../services/brainSync.js';
 
 const router = Router();
 
@@ -729,17 +733,38 @@ router.get('/graph', asyncHandler(async (req, res) => {
 }));
 
 // =============================================================================
-// SYNC
+// SYNC (Federation)
 // =============================================================================
 
 /**
- * POST /api/brain/sync
+ * POST /api/brain/bridge-sync
  * Sync all brain data to CoS memory system (generates embeddings)
+ * (Renamed from /sync to avoid conflict with federation sync)
+ */
+router.post('/bridge-sync', asyncHandler(async (req, res) => {
+  const stats = await syncAllBrainData();
+  console.log(`🧠🔗 Brain bridge sync complete: ${stats.synced} synced, ${stats.skipped} skipped, ${stats.errors} errors`);
+  res.json(stats);
+}));
+
+/**
+ * GET /api/brain/sync?since={seq}&limit=100
+ * Get brain changes since a given sequence number (for peers to pull)
+ */
+router.get('/sync', asyncHandler(async (req, res) => {
+  const { since, limit } = validateRequest(brainSyncQuerySchema, req.query);
+  const result = await brainSyncLog.getChangesSince(since, limit);
+  res.json(result);
+}));
+
+/**
+ * POST /api/brain/sync
+ * Receive remote brain changes from a peer
  */
 router.post('/sync', asyncHandler(async (req, res) => {
-  const stats = await syncAllBrainData();
-  console.log(`🧠🔗 Brain sync complete: ${stats.synced} synced, ${stats.skipped} skipped, ${stats.errors} errors`);
-  res.json(stats);
+  const { changes } = validateRequest(brainSyncPushSchema, req.body);
+  const result = await brainSync.applyRemoteChanges(changes);
+  res.json(result);
 }));
 
 export default router;

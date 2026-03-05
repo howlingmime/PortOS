@@ -132,6 +132,7 @@ const syncMemoryItemSchema = z.object({
   expiresAt: z.string().datetime().nullable().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
+  originInstanceId: z.string().max(36).nullable().optional(),
   syncSequence: z.string().regex(/^\d+$/).optional()
 });
 

@@ -12,6 +12,7 @@ import { query, withTransaction, pgvectorToArray, arrayToPgvector } from '../lib
 import { cosEvents } from './cos.js';
 import * as notifications from './notifications.js';
 import { DEFAULT_MEMORY_CONFIG, generateSummary, decrementAgentPendingApproval } from './memoryConfig.js';
+import { getInstanceId } from './instances.js';
 
 /**
  * Convert a database row to the memory object format matching the file-based API
@@ -36,7 +37,8 @@ function rowToMemory(row) {
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
     expiresAt: row.expires_at?.toISOString() ?? null,
-    status: row.status
+    status: row.status,
+    originInstanceId: row.origin_instance_id
   };
 }
 
@@ -69,18 +71,20 @@ export async function createMemory(data, embedding = null) {
   const summary = data.summary || generateSummary(data.content);
   const now = new Date().toISOString();
 
+  const originInstanceId = await getInstanceId();
+
   const memory = await withTransaction(async (client) => {
     const result = await client.query(
       `INSERT INTO memories (
         id, type, content, summary, category, tags,
         embedding, embedding_model, confidence, importance,
         source_task_id, source_agent_id, source_app_id,
-        expires_at, status, created_at, updated_at
+        expires_at, status, created_at, updated_at, origin_instance_id
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10,
         $11, $12, $13,
-        $14, $15, $16, $17
+        $14, $15, $16, $17, $18
       ) RETURNING *`,
       [
         id, data.type, data.content, summary, data.category || 'other', data.tags || [],
@@ -88,7 +92,7 @@ export async function createMemory(data, embedding = null) {
         embedding ? DEFAULT_MEMORY_CONFIG.embeddingModel : null,
         data.confidence ?? 0.8, data.importance ?? 0.5,
         data.sourceTaskId || null, data.sourceAgentId || null, data.sourceAppId || null,
-        data.expiresAt || null, data.status || 'active', now, now
+        data.expiresAt || null, data.status || 'active', now, now, originInstanceId
       ]
     );
 

@@ -199,4 +199,32 @@ router.post('/sync', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
+// POST /api/git/remote-branches - Get remote branches with merge status
+router.post('/remote-branches', asyncHandler(async (req, res) => {
+  const { path } = req.body;
+
+  if (!path) {
+    throw new ServerError('path is required', { status: 400, code: 'VALIDATION_ERROR' });
+  }
+
+  const result = await git.getRemoteBranches(path);
+  res.json(result);
+}));
+
+// POST /api/git/delete-branch - Delete a branch locally and/or remotely
+router.post('/delete-branch', asyncHandler(async (req, res) => {
+  const { path, branch, local, remote } = req.body;
+
+  if (!path || !branch) {
+    throw new ServerError('path and branch are required', { status: 400, code: 'VALIDATION_ERROR' });
+  }
+
+  if (!local && !remote) {
+    throw new ServerError('at least one of local or remote must be true', { status: 400, code: 'VALIDATION_ERROR' });
+  }
+
+  const result = await git.deleteBranch(path, branch, { local, remote });
+  res.json(result);
+}));
+
 export default router;
