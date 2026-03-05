@@ -212,7 +212,7 @@ export async function removePersistentWorktree(featureAgentId, sourceWorkspace, 
 /**
  * Merge base branch into a persistent feature agent worktree before a run
  */
-export async function mergeBaseIntoFeatureWorktree(featureAgentId, sourceWorkspace, branchName, baseBranch = 'main') {
+export async function mergeBaseIntoFeatureWorktree(featureAgentId, sourceWorkspace, baseBranch = 'main') {
   const worktreePath = join(WORKTREES_DIR, '..', 'feature-agents', featureAgentId, 'worktree');
   if (!existsSync(worktreePath)) return { merged: false, reason: 'worktree-missing' };
 

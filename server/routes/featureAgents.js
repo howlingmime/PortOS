@@ -4,8 +4,7 @@
 
 import { Router } from 'express';
 import * as featureAgents from '../services/featureAgents.js';
-import { validateRequest } from '../lib/validation.js';
-import { featureAgentSchema, featureAgentUpdateSchema } from '../lib/validation.js';
+import { validateRequest, featureAgentSchema, featureAgentUpdateSchema } from '../lib/validation.js';
 import { asyncHandler, ServerError } from '../lib/errorHandler.js';
 
 const router = Router();
@@ -83,7 +82,7 @@ router.post('/:id/stop', asyncHandler(async (req, res) => {
 
 // GET /:id/runs - Run history
 router.get('/:id/runs', asyncHandler(async (req, res) => {
-  const limit = parseInt(req.query.limit) || 20;
+  const limit = parseInt(req.query.limit, 10) || 20;
   const runs = await featureAgents.getFeatureAgentRuns(req.params.id, limit);
   res.json(runs);
 }));
