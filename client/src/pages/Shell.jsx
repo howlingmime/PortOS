@@ -53,6 +53,7 @@ export default function Shell() {
   const [appFolders, setAppFolders] = useState([]);
   const [folderDropdownOpen, setFolderDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const sessionsRef = useRef([]);
 
   // Read query params once on mount for initial session options
   useEffect(() => {
@@ -278,6 +279,7 @@ export default function Shell() {
     };
 
     const handleSessions = (sessionList) => {
+      sessionsRef.current = sessionList;
       setSessions(sessionList);
       // On first load, auto-attach to existing session or create new
       if (!hasInitializedRef.current) {
@@ -338,13 +340,10 @@ export default function Shell() {
           termInstanceRef.current.writeln(`\r\n\x1b[33m[Shell exited with code ${code}]\x1b[0m`);
         }
         // Auto-attach to next available session if any remain
-        setSessions(prev => {
-          const remaining = prev.filter(s => s.sessionId !== sid);
-          if (remaining.length > 0) {
-            setTimeout(() => attachToSession(remaining[remaining.length - 1].sessionId), 100);
-          }
-          return prev; // actual list update comes from server broadcast
-        });
+        const remaining = sessionsRef.current.filter(s => s.sessionId !== sid);
+        if (remaining.length > 0) {
+          setTimeout(() => attachToSession(remaining[remaining.length - 1].sessionId), 100);
+        }
       }
     };
 

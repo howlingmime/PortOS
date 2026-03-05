@@ -25,6 +25,7 @@ import {
   errorRecoverSchema,
   shellInputSchema,
   shellResizeSchema,
+  shellSessionIdSchema,
   shellStopSchema,
   appUpdateSchema,
   appStandardizeSchema
@@ -385,7 +386,7 @@ export function initSocket(io) {
     });
 
     socket.on('shell:attach', (rawData) => {
-      const validated = validateSocketData(shellStopSchema, rawData, socket, 'shell:attach');
+      const validated = validateSocketData(shellSessionIdSchema, rawData, socket, 'shell:attach');
       if (!validated) return;
       const result = shellService.attachSession(validated.sessionId, socket);
       if (result) {

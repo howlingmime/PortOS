@@ -34,7 +34,7 @@ function execGit(args, cwd, options = {}) {
       if (code !== 0 && !options.ignoreExitCode) {
         reject(new Error(stderr || `git exited with code ${code}`));
       } else {
-        resolve({ stdout, stderr });
+        resolve({ stdout, stderr, exitCode: code });
       }
     });
 
@@ -330,7 +330,7 @@ export async function pushAll(dir) {
   for (const branch of pushable) {
     const r = await execGit(['push', 'origin', branch.name], dir, { ignoreExitCode: true });
     const output = (r.stdout || '') + (r.stderr || '');
-    const ok = !output.includes('rejected') && !output.includes('fatal') && !output.includes('error:');
+    const ok = r.exitCode === 0;
     results[branch.name] = { success: ok, output: output.trim() };
     if (!ok) failed++;
   }

@@ -40,10 +40,13 @@ export const shellResizeSchema = z.object({
   rows: z.number().int().positive().max(500)
 });
 
-// shell:stop — session ID
-export const shellStopSchema = z.object({
+// Shared session ID schema for shell operations
+export const shellSessionIdSchema = z.object({
   sessionId: z.string().min(1, 'sessionId is required')
 });
+
+// shell:stop — session ID
+export const shellStopSchema = shellSessionIdSchema;
 
 // app:update — app ID for pull/install/restart cycle
 export const appUpdateSchema = z.object({
