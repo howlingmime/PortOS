@@ -44,14 +44,17 @@ async function handleVerification(data, apiKey, aiConfig) {
 
   console.log(`🔐 Submitting verification: code=${code} answer=${answer}`);
 
+  const verifyController = new AbortController();
+  const verifyTimeoutId = setTimeout(() => verifyController.abort(), 10000);
   const resp = await fetch(`${API_BASE}/verify`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`
     },
-    body: JSON.stringify({ verification_code: code, answer })
-  });
+    body: JSON.stringify({ verification_code: code, answer }),
+    signal: verifyController.signal
+  }).finally(() => clearTimeout(verifyTimeoutId));
 
   const result = await resp.json().catch(() => ({}));
   if (resp.ok && result.success !== false) {
@@ -81,7 +84,9 @@ async function request(endpoint, options = {}, aiConfig) {
   console.log(`📚 Moltbook API: ${options.method || 'GET'} ${endpoint}`);
 
   let response;
-  const fetchResult = await fetch(url, config).then(r => ({ ok: true, response: r }), e => ({ ok: false, error: e }));
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const fetchResult = await fetch(url, { ...config, signal: controller.signal }).then(r => ({ ok: true, response: r }), e => ({ ok: false, error: e })).finally(() => clearTimeout(timeoutId));
 
   if (!fetchResult.ok) {
     console.error(`❌ Moltbook API unreachable: ${fetchResult.error.message}`);

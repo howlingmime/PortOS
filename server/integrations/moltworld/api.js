@@ -38,7 +38,9 @@ async function request(endpoint, options = {}) {
 
   console.log(`🌍 Moltworld API: ${options.method || 'GET'} ${endpoint}`);
 
-  const fetchResult = await fetch(url, config).then(r => ({ ok: true, response: r }), e => ({ ok: false, error: e }));
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const fetchResult = await fetch(url, { ...config, signal: controller.signal }).then(r => ({ ok: true, response: r }), e => ({ ok: false, error: e })).finally(() => clearTimeout(timeoutId));
 
   if (!fetchResult.ok) {
     console.error(`❌ Moltworld API unreachable: ${fetchResult.error.message}`);
