@@ -58,7 +58,7 @@ import {
   Shield,
   Zap
 } from 'lucide-react';
-import packageJson from '../../package.json';
+/* global __APP_VERSION__ */
 import Logo from './Logo';
 import { useErrorNotifications } from '../hooks/useErrorNotifications';
 import { useNotifications } from '../hooks/useNotifications';
@@ -547,7 +547,7 @@ export default function Layout() {
         <div className={`p-4 border-t border-port-border ${collapsed ? 'lg:flex lg:justify-center' : ''}`}>
           <div className={`flex items-center ${collapsed ? 'lg:justify-center' : 'justify-between'}`}>
             <span className={`text-sm text-gray-500 ${collapsed ? 'lg:hidden' : ''}`}>
-              v{packageJson.version}
+              v{__APP_VERSION__}
             </span>
             <div className="flex items-center gap-1">
               <ThemeSwitcher />
