@@ -20,14 +20,14 @@ export default function Settings() {
       setEnabled(backup.enabled ?? false);
       setCronExpression(backup.cronExpression || '0 2 * * *');
       setExcludePaths(backup.excludePaths || []);
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch(() => toast.error('Failed to load settings')).finally(() => setLoading(false));
   }, []);
 
   const handleSave = async () => {
     setSaving(true);
     await updateSettings({ backup: { destPath, enabled, cronExpression, excludePaths } })
       .then(() => toast.success('Settings saved'))
-      .catch(() => {})
+      .catch(() => toast.error('Failed to save settings'))
       .finally(() => setSaving(false));
   };
 
