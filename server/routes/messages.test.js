@@ -18,6 +18,7 @@ vi.mock('../services/messageSync.js', () => ({
   getSyncStatus: vi.fn(),
   getMessages: vi.fn(),
   getMessage: vi.fn(),
+  getThread: vi.fn(),
   deleteCache: vi.fn()
 }));
 
@@ -473,6 +474,40 @@ describe('Messages Routes', () => {
       const response = await request(app).delete(`/api/messages/drafts/${DRAFT_UUID_2}`);
 
       expect(response.status).toBe(404);
+    });
+  });
+
+  // === Thread Route ===
+
+  describe('GET /api/messages/thread/:accountId/:threadId', () => {
+    it('should return thread messages', async () => {
+      const threadMessages = [
+        { id: 'msg-1', subject: 'Hello', threadId: 'thread-1' },
+        { id: 'msg-2', subject: 'Hello', threadId: 'thread-1' }
+      ];
+      messageSync.getThread.mockResolvedValue(threadMessages);
+
+      const response = await request(app).get(`/api/messages/thread/${VALID_UUID}/thread-1`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.messages).toHaveLength(2);
+      expect(messageSync.getThread).toHaveBeenCalledWith(VALID_UUID, 'thread-1');
+    });
+
+    it('should return 400 for invalid accountId', async () => {
+      const response = await request(app).get(`/api/messages/thread/${INVALID_UUID}/thread-1`);
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Invalid accountId format');
+    });
+
+    it('should return empty array for unknown threadId', async () => {
+      messageSync.getThread.mockResolvedValue([]);
+
+      const response = await request(app).get(`/api/messages/thread/${VALID_UUID}/unknown`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.messages).toHaveLength(0);
     });
   });
 

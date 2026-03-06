@@ -304,6 +304,16 @@ router.post('/selectors/:provider/test', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
+// === Thread Route ===
+router.get('/thread/:accountId/:threadId', asyncHandler(async (req, res) => {
+  if (!z.string().uuid().safeParse(req.params.accountId).success) {
+    return res.status(400).json({ error: 'Invalid accountId format' });
+  }
+  if (!req.params.threadId) return res.status(400).json({ error: 'threadId is required' });
+  const messages = await messageSync.getThread(req.params.accountId, req.params.threadId);
+  res.json({ messages });
+}));
+
 // === Message Detail Route (last to avoid capturing /launch, /selectors paths) ===
 const messageParamsSchema = z.object({
   accountId: z.string().uuid(),

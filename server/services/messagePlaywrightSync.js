@@ -152,6 +152,7 @@ export async function syncPlaywright(account, cache, io, options = {}) {
   const sels = allSelectors[account.type] || {};
 
   // Use CDP Runtime.evaluate to extract messages from the page DOM
+  // Phase 1: Scrape list view to get message summaries
   const extractScript = buildExtractionScript(account.type, sels, mode);
   const extracted = await evaluateOnPage(page, extractScript);
 
@@ -161,30 +162,211 @@ export async function syncPlaywright(account, cache, io, options = {}) {
     return { messages: [], status: 'extraction-failed' };
   }
 
-  io?.emit('messages:sync:progress', { accountId: account.id, current: extracted.length, total: extracted.length });
+  console.log(`📧 Found ${extracted.length} conversations in list view`);
 
-  // Convert extracted data to message format
-  const messages = extracted.map(msg => ({
-    id: uuidv4(),
-    externalId: makeExternalId(msg.date || '', msg.from || '', msg.subject || ''),
-    threadId: null,
-    from: { name: msg.from || '', email: msg.fromEmail || '' },
-    to: [],
-    cc: [],
-    subject: msg.subject || '',
-    bodyText: msg.preview || '',
-    date: msg.date || new Date().toISOString(),
-    isRead: !(msg.isUnread ?? false),
-    isUnread: msg.isUnread ?? false,
-    isPinned: msg.isPinned ?? false,
-    isFlagged: msg.isFlagged ?? false,
-    isReplied: msg.isReplied ?? false,
-    hasMeetingInvite: msg.hasMeetingInvite ?? false,
-    labels: [],
-    source: account.type,
-    syncedAt: new Date().toISOString()
-  }));
+  // Phase 2: Click into each conversation to get full body + thread messages
+  // Only fetch detail for messages we haven't already cached with full body
+  const existingMap = new Map(cache.messages.filter(m => m.externalId && m.bodyFull).map(m => [m.externalId, true]));
+  const messages = [];
+  let detailsFetched = 0;
+
+  for (let i = 0; i < extracted.length; i++) {
+    const msg = extracted[i];
+    const extId = makeExternalId(msg.date || '', msg.from || '', msg.subject || '');
+    io?.emit('messages:sync:progress', { accountId: account.id, current: i + 1, total: extracted.length });
+
+    // Skip detail fetch if we already have full body cached
+    if (existingMap.has(extId)) {
+      messages.push({
+        id: uuidv4(),
+        externalId: extId,
+        threadId: msg.threadKey || null,
+        from: { name: msg.from || '', email: msg.fromEmail || '' },
+        to: [], cc: [],
+        subject: msg.subject || '',
+        bodyText: msg.preview || '',
+        bodyFull: false, // will keep existing cached full body
+        date: msg.date || new Date().toISOString(),
+        isRead: !(msg.isUnread ?? false),
+        isUnread: msg.isUnread ?? false,
+        isPinned: msg.isPinned ?? false,
+        isFlagged: msg.isFlagged ?? false,
+        isReplied: msg.isReplied ?? false,
+        hasMeetingInvite: msg.hasMeetingInvite ?? false,
+        labels: [], source: account.type,
+        syncedAt: new Date().toISOString()
+      });
+      continue;
+    }
+
+    // Click into conversation to get full body + thread
+    if (account.type === 'outlook') {
+      const detail = await fetchOutlookConversationDetail(page, i);
+      if (detail && detail.length > 0) {
+        detailsFetched++;
+        // Thread key groups all messages in this conversation
+        const threadKey = `thread-${extId}`;
+        for (const threadMsg of detail) {
+          messages.push({
+            id: uuidv4(),
+            externalId: makeExternalId(threadMsg.date || msg.date || '', threadMsg.from || msg.from || '', msg.subject || ''),
+            threadId: threadKey,
+            from: { name: threadMsg.from || msg.from || '', email: threadMsg.fromEmail || msg.fromEmail || '' },
+            to: threadMsg.to || [],
+            cc: threadMsg.cc || [],
+            subject: msg.subject || '',
+            bodyText: threadMsg.body || msg.preview || '',
+            bodyFull: true,
+            date: threadMsg.date || msg.date || new Date().toISOString(),
+            isRead: !(msg.isUnread ?? false),
+            isUnread: msg.isUnread ?? false,
+            isPinned: msg.isPinned ?? false,
+            isFlagged: msg.isFlagged ?? false,
+            isReplied: msg.isReplied ?? false,
+            hasMeetingInvite: msg.hasMeetingInvite ?? false,
+            labels: [], source: account.type,
+            syncedAt: new Date().toISOString()
+          });
+        }
+      } else {
+        // Fallback: use list preview if detail extraction failed
+        messages.push({
+          id: uuidv4(),
+          externalId: extId,
+          threadId: null,
+          from: { name: msg.from || '', email: msg.fromEmail || '' },
+          to: [], cc: [],
+          subject: msg.subject || '',
+          bodyText: msg.preview || '',
+          bodyFull: false,
+          date: msg.date || new Date().toISOString(),
+          isRead: !(msg.isUnread ?? false),
+          isUnread: msg.isUnread ?? false,
+          isPinned: msg.isPinned ?? false,
+          isFlagged: msg.isFlagged ?? false,
+          isReplied: msg.isReplied ?? false,
+          hasMeetingInvite: msg.hasMeetingInvite ?? false,
+          labels: [], source: account.type,
+          syncedAt: new Date().toISOString()
+        });
+      }
+    } else {
+      // Non-outlook: use list preview as before
+      messages.push({
+        id: uuidv4(),
+        externalId: extId,
+        threadId: null,
+        from: { name: msg.from || '', email: msg.fromEmail || '' },
+        to: [], cc: [],
+        subject: msg.subject || '',
+        bodyText: msg.preview || '',
+        bodyFull: false,
+        date: msg.date || new Date().toISOString(),
+        isRead: !(msg.isUnread ?? false),
+        isUnread: msg.isUnread ?? false,
+        isPinned: msg.isPinned ?? false,
+        isFlagged: msg.isFlagged ?? false,
+        isReplied: msg.isReplied ?? false,
+        hasMeetingInvite: msg.hasMeetingInvite ?? false,
+        labels: [], source: account.type,
+        syncedAt: new Date().toISOString()
+      });
+    }
+  }
+
+  console.log(`📧 Fetched detail for ${detailsFetched}/${extracted.length} conversations`);
   return { messages, status: 'success' };
+}
+
+/**
+ * Click into an Outlook conversation row and extract the full body + all thread messages.
+ * Returns an array of { from, fromEmail, to, cc, date, body } for each message in the thread.
+ */
+async function fetchOutlookConversationDetail(page, rowIndex) {
+  // Click the row to open the conversation
+  const clickResult = await evaluateOnPage(page, `
+    (async function() {
+      const listbox = document.querySelector("[role='listbox']");
+      if (!listbox) return false;
+      const rows = listbox.querySelectorAll('[role="option"]');
+      const row = rows[${rowIndex}];
+      if (!row) return false;
+      row.click();
+      // Wait for reading pane to load
+      await new Promise(r => setTimeout(r, 1500));
+      return true;
+    })()
+  `);
+
+  if (!clickResult) return null;
+
+  // Extract all messages in the conversation from the reading pane
+  const threadMessages = await evaluateOnPage(page, `
+    (function() {
+      // Outlook reading pane: conversation view shows multiple messages
+      // Each message in the thread is in a div with role="document" or a message container
+      const results = [];
+
+      // Try conversation view: multiple message items
+      const msgContainers = document.querySelectorAll('[aria-label="Message body"], [role="document"]');
+
+      if (msgContainers.length > 0) {
+        for (const container of msgContainers) {
+          // Walk up to find the message wrapper with sender/date info
+          let wrapper = container.closest('[data-convid]') || container.closest('[tabindex]') || container.parentElement?.parentElement;
+
+          // Extract sender from header area
+          let from = '', fromEmail = '', date = '';
+          const to = [], cc = [];
+
+          // Look for sender info near this message body
+          const headerArea = wrapper || container.previousElementSibling || container.parentElement;
+          if (headerArea) {
+            // Sender name
+            const senderEl = headerArea.querySelector('span[aria-label*="From"]')
+              || headerArea.querySelector('button[aria-label*="email"]')
+              || headerArea.querySelector('span.lpc-hoverTarget');
+            from = senderEl?.textContent?.trim() || '';
+            fromEmail = senderEl?.getAttribute('aria-label')?.match(/[\\w.-]+@[\\w.-]+/)?.[0] || '';
+
+            // Date
+            const dateEl = headerArea.querySelector('time') || headerArea.querySelector('span[title*="/"]');
+            date = dateEl?.getAttribute('datetime') || dateEl?.getAttribute('title') || dateEl?.textContent?.trim() || '';
+
+            // To/CC
+            const toEls = headerArea.querySelectorAll('span[aria-label*="To"]');
+            toEls.forEach(el => {
+              const email = el.textContent?.trim();
+              if (email) to.push(email);
+            });
+          }
+
+          // Full body text
+          const body = container.innerText?.trim() || '';
+          if (body) {
+            results.push({ from, fromEmail, to, cc, date, body });
+          }
+        }
+      }
+
+      // Fallback: single message view — grab entire reading pane content
+      if (results.length === 0) {
+        const readingPane = document.querySelector('[aria-label="Reading Pane"]')
+          || document.querySelector('[role="main"]')
+          || document.querySelector('.customScrollBar');
+        if (readingPane) {
+          const body = readingPane.innerText?.trim() || '';
+          if (body) {
+            results.push({ from: '', fromEmail: '', to: [], cc: [], date: '', body });
+          }
+        }
+      }
+
+      return results;
+    })()
+  `);
+
+  return threadMessages;
 }
 
 function buildExtractionScript(type, sels, mode = 'unread') {
@@ -247,7 +429,7 @@ function buildExtractionScript(type, sels, mode = 'unread') {
             date = dateMatch?.[1] || '';
           }
 
-          return { from, fromEmail, subject, date, preview: preview.slice(0, 300), isUnread, isPinned, isFlagged, isReplied, hasMeetingInvite };
+          return { from, fromEmail, subject, date, preview, isUnread, isPinned, isFlagged, isReplied, hasMeetingInvite };
         }
 
         function scrapeVisible() {

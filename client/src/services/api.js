@@ -1628,6 +1628,7 @@ export const getMessageInbox = (params = {}) => {
   return request(`/messages/inbox${str ? `?${str}` : ''}`);
 };
 export const getMessageDetail = (accountId, messageId) => request(`/messages/${accountId}/${messageId}`);
+export const getMessageThread = (accountId, threadId) => request(`/messages/thread/${accountId}/${threadId}`);
 export const getMessageDrafts = (params = {}) => {
   const qs = new URLSearchParams();
   if (params.accountId) qs.set('accountId', params.accountId);

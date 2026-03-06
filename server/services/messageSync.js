@@ -96,6 +96,18 @@ export async function getMessage(accountId, messageId) {
   return { ...msg, accountId: msg.accountId || accountId };
 }
 
+/**
+ * Get all messages in a thread, sorted chronologically.
+ */
+export async function getThread(accountId, threadId) {
+  if (!threadId) return [];
+  const cache = await loadCache(accountId);
+  return cache.messages
+    .filter(m => m.threadId === threadId)
+    .map(m => ({ ...m, accountId: m.accountId || accountId }))
+    .sort((a, b) => safeDate(a.date) - safeDate(b.date));
+}
+
 export async function syncAccount(accountId, io, options = {}) {
   if (syncLocks.has(accountId)) return { error: 'Sync already in progress', status: 409 };
 
@@ -125,7 +137,7 @@ export async function syncAccount(accountId, io, options = {}) {
     const newMessages = Array.isArray(providerResult) ? providerResult : providerResult?.messages ?? [];
     const providerStatus = Array.isArray(providerResult) ? 'success' : providerResult?.status ?? 'success';
 
-    // Deduplicate by externalId; update flags on existing messages
+    // Deduplicate by externalId; update flags and body on existing messages
     const existingMap = new Map(cache.messages.filter(m => m.externalId).map(m => [m.externalId, m]));
     const uniqueNew = [];
     for (const msg of newMessages) {
@@ -140,6 +152,13 @@ export async function syncAccount(accountId, io, options = {}) {
         if (msg.isFlagged !== undefined) existing.isFlagged = msg.isFlagged;
         if (msg.isReplied !== undefined) existing.isReplied = msg.isReplied;
         if (msg.hasMeetingInvite !== undefined) existing.hasMeetingInvite = msg.hasMeetingInvite;
+        // Upgrade body if new sync fetched full content
+        if (msg.bodyFull && msg.bodyText) {
+          existing.bodyText = msg.bodyText;
+          existing.bodyFull = true;
+        }
+        // Set threadId if newly available
+        if (msg.threadId && !existing.threadId) existing.threadId = msg.threadId;
       }
     }
     cache.messages.push(...uniqueNew);

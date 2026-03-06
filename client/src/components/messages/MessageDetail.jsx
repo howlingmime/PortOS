@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ArrowLeft, Reply, Sparkles, Send } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Reply, Sparkles, Send, MessageSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as api from '../../services/api';
 
@@ -8,8 +8,20 @@ export default function MessageDetail({ message, accounts, onBack }) {
   const [replyBody, setReplyBody] = useState('');
   const [generating, setGenerating] = useState(false);
   const [generatedDraftId, setGeneratedDraftId] = useState(null);
+  const [threadMessages, setThreadMessages] = useState([]);
+  const [threadLoading, setThreadLoading] = useState(false);
 
   const account = accounts.find(a => a.id === message.accountId) || accounts[0];
+
+  // Load thread messages if this message is part of a thread
+  useEffect(() => {
+    if (!message.threadId || !message.accountId) return;
+    setThreadLoading(true);
+    api.getMessageThread(message.accountId, message.threadId)
+      .then(data => setThreadMessages(data?.messages || []))
+      .catch(() => setThreadMessages([]))
+      .finally(() => setThreadLoading(false));
+  }, [message.threadId, message.accountId]);
 
   const handleGenerateReply = async () => {
     if (!account) return toast.error('No account available');
@@ -50,6 +62,10 @@ export default function MessageDetail({ message, accounts, onBack }) {
     setGeneratedDraftId(null);
   };
 
+  // Show thread or single message
+  const hasThread = threadMessages.length > 1;
+  const displayMessages = hasThread ? threadMessages : [message];
+
   return (
     <div className="space-y-4">
       <button
@@ -59,23 +75,48 @@ export default function MessageDetail({ message, accounts, onBack }) {
         <ArrowLeft size={16} /> Back to inbox
       </button>
 
-      <div className="p-4 bg-port-card rounded-lg border border-port-border space-y-3">
+      <div className="p-4 bg-port-card rounded-lg border border-port-border">
         <h2 className="text-lg font-medium text-white">{message.subject || '(no subject)'}</h2>
-        <div className="flex items-center gap-4 text-sm">
-          <span className="text-gray-400">
-            From: <span className="text-white">{message.from?.name || message.from?.email || 'Unknown'}</span>
-          </span>
-          {message.date && (
-            <span className="text-gray-500">{new Date(message.date).toLocaleString()}</span>
-          )}
-        </div>
-        {message.to?.length > 0 && (
-          <div className="text-sm text-gray-500">To: {message.to.map(t => t.email || t).join(', ')}</div>
+        {hasThread && (
+          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+            <MessageSquare size={12} />
+            <span>{threadMessages.length} messages in conversation</span>
+          </div>
         )}
-        <div className="pt-3 border-t border-port-border text-sm text-gray-300 whitespace-pre-wrap">
-          {message.bodyText || '(no content)'}
-        </div>
       </div>
+
+      {threadLoading ? (
+        <div className="text-sm text-gray-500 animate-pulse">Loading conversation...</div>
+      ) : (
+        <div className="space-y-3">
+          {displayMessages.map((msg, i) => (
+            <div
+              key={msg.id || i}
+              className="p-4 bg-port-card rounded-lg border border-port-border space-y-2"
+            >
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-gray-400">
+                  From: <span className="text-white">{msg.from?.name || msg.from?.email || 'Unknown'}</span>
+                </span>
+                {msg.date && (
+                  <span className="text-gray-500">{new Date(msg.date).toLocaleString()}</span>
+                )}
+              </div>
+              {msg.to?.length > 0 && (
+                <div className="text-xs text-gray-500">
+                  To: {msg.to.map(t => typeof t === 'string' ? t : t.email || t).join(', ')}
+                </div>
+              )}
+              <div className="pt-2 border-t border-port-border text-sm text-gray-300 whitespace-pre-wrap">
+                {msg.bodyText || '(no content)'}
+              </div>
+              {!msg.bodyFull && msg.bodyText && (
+                <div className="text-xs text-gray-600 italic">Preview only — re-sync for full content</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <button
