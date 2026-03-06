@@ -30,7 +30,7 @@ export default function MessageDetail({ message, accounts, onBack }) {
 
   const handleCreateDraft = async () => {
     if (!account) return toast.error('No account available');
-    await api.createMessageDraft({
+    const result = await api.createMessageDraft({
       accountId: account.id,
       replyToMessageId: message.id,
       threadId: message.threadId,
@@ -39,7 +39,8 @@ export default function MessageDetail({ message, accounts, onBack }) {
       body: replyBody,
       generatedBy: 'manual',
       sendVia: account.provider
-    });
+    }).catch(() => null);
+    if (!result) return;
     toast.success('Draft saved');
     setShowReply(false);
     setReplyBody('');

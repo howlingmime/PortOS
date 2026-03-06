@@ -6,6 +6,17 @@ import { getAccount, updateSyncStatus } from './messageAccounts.js';
 const CACHE_DIR = join(PATHS.messages, 'cache');
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function filterBySearch(messages, search) {
+  if (!search) return messages;
+  const q = search.toLowerCase();
+  return messages.filter(m =>
+    m.subject?.toLowerCase().includes(q) ||
+    m.from?.name?.toLowerCase().includes(q) ||
+    m.from?.email?.toLowerCase().includes(q) ||
+    m.bodyText?.toLowerCase().includes(q)
+  );
+}
+
 async function loadCache(accountId) {
   if (!UUID_RE.test(accountId)) throw new Error(`Invalid accountId: ${accountId}`);
   await ensureDir(CACHE_DIR);
@@ -27,15 +38,7 @@ export async function getMessages(options = {}) {
   if (accountId) {
     const cache = await loadCache(accountId);
     let messages = cache.messages.map(m => ({ ...m, accountId: m.accountId || accountId }));
-    if (search) {
-      const q = search.toLowerCase();
-      messages = messages.filter(m =>
-        m.subject?.toLowerCase().includes(q) ||
-        m.from?.name?.toLowerCase().includes(q) ||
-        m.from?.email?.toLowerCase().includes(q) ||
-        m.bodyText?.toLowerCase().includes(q)
-      );
-    }
+    messages = filterBySearch(messages, search);
     return {
       messages: messages.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(offset, offset + limit),
       total: messages.length
@@ -53,15 +56,7 @@ export async function getMessages(options = {}) {
     const cache = await loadCache(fileAccountId);
     allMessages.push(...cache.messages.map(m => ({ ...m, accountId: m.accountId || fileAccountId })));
   }
-  if (search) {
-    const q = search.toLowerCase();
-    allMessages = allMessages.filter(m =>
-      m.subject?.toLowerCase().includes(q) ||
-      m.from?.name?.toLowerCase().includes(q) ||
-      m.from?.email?.toLowerCase().includes(q) ||
-      m.bodyText?.toLowerCase().includes(q)
-    );
-  }
+  allMessages = filterBySearch(allMessages, search);
   allMessages.sort((a, b) => new Date(b.date) - new Date(a.date));
   return {
     messages: allMessages.slice(offset, offset + limit),
@@ -90,10 +85,9 @@ export async function syncAccount(accountId, io) {
   console.log(`📧 Starting sync for ${account.name} (${account.type})`);
 
   const cache = await loadCache(accountId);
-  let newMessages = [];
 
-  let uniqueNew;
   const providerSync = async () => {
+    let newMessages = [];
     if (account.type === 'gmail') {
       const { syncGmail } = await import('./messageGmailSync.js');
       newMessages = await syncGmail(account, cache, io);
@@ -104,7 +98,7 @@ export async function syncAccount(accountId, io) {
 
     // Deduplicate by externalId (skip dedup for messages without externalId)
     const existingIds = new Set(cache.messages.map(m => m.externalId).filter(Boolean));
-    uniqueNew = newMessages.filter(m => !m.externalId || !existingIds.has(m.externalId));
+    const uniqueNew = newMessages.filter(m => !m.externalId || !existingIds.has(m.externalId));
     cache.messages.push(...uniqueNew);
 
     // Trim to maxMessages

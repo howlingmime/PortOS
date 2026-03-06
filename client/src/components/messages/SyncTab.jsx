@@ -30,15 +30,21 @@ export default function SyncTab({ accounts, onRefresh }) {
       setSyncing(prev => ({ ...prev, [accountId]: 'auth-required' }));
       toast('Login required -- open Browser page to authenticate', { icon: '\uD83D\uDD10' });
     };
+    const onSyncFailed = ({ accountId, error }) => {
+      setSyncing(prev => ({ ...prev, [accountId]: null }));
+      toast.error(`Sync failed: ${error ?? 'unknown error'}`);
+    };
 
     socket.on('messages:sync:started', onSyncStarted);
     socket.on('messages:sync:completed', onSyncCompleted);
     socket.on('messages:sync:auth-required', onAuthRequired);
+    socket.on('messages:sync:failed', onSyncFailed);
 
     return () => {
       socket.off('messages:sync:started', onSyncStarted);
       socket.off('messages:sync:completed', onSyncCompleted);
       socket.off('messages:sync:auth-required', onAuthRequired);
+      socket.off('messages:sync:failed', onSyncFailed);
     };
   }, [fetchSelectors, onRefresh]);
 
@@ -55,7 +61,8 @@ export default function SyncTab({ accounts, onRefresh }) {
   };
 
   const handleSaveSelectors = async (provider) => {
-    await api.updateMessageSelectors(provider, selectorForm);
+    const result = await api.updateMessageSelectors(provider, selectorForm).catch(() => null);
+    if (!result) return;
     toast.success(`${provider} selectors updated`);
     setEditingSelector(null);
     fetchSelectors();

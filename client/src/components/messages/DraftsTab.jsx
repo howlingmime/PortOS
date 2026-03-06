@@ -19,7 +19,8 @@ export default function DraftsTab({ accounts }) {
   }, [fetchDrafts]);
 
   const handleApprove = async (id) => {
-    await api.approveMessageDraft(id);
+    const result = await api.approveMessageDraft(id).catch(() => null);
+    if (!result) return;
     setDrafts(prev => prev.map(d => d.id === id ? { ...d, status: 'approved' } : d));
     toast.success('Draft approved');
   };
@@ -33,7 +34,8 @@ export default function DraftsTab({ accounts }) {
   };
 
   const handleDelete = async (id) => {
-    await api.deleteMessageDraft(id);
+    const ok = await api.deleteMessageDraft(id).then(() => true).catch(() => false);
+    if (!ok) return;
     setDrafts(prev => prev.filter(d => d.id !== id));
     toast.success('Draft deleted');
   };

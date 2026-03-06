@@ -23,7 +23,7 @@ const createAccountSchema = z.object({
 
 const updateAccountSchema = z.object({
   name: z.string().min(1).optional(),
-  email: z.string().email().optional(),
+  email: z.union([z.string().email(), z.literal('')]).optional(),
   enabled: z.boolean().optional(),
   syncConfig: z.object({
     maxAge: z.string().optional(),
@@ -103,6 +103,9 @@ router.delete('/accounts/:id', asyncHandler(async (req, res) => {
 
 // === Sync Routes ===
 router.post('/sync/:accountId', asyncHandler(async (req, res) => {
+  if (!z.string().uuid().safeParse(req.params.accountId).success) {
+    return res.status(400).json({ error: 'Invalid account ID format' });
+  }
   const io = req.app.get('io');
   const result = await messageSync.syncAccount(req.params.accountId, io);
   if (result.error) return res.status(404).json({ error: result.error });
@@ -110,6 +113,9 @@ router.post('/sync/:accountId', asyncHandler(async (req, res) => {
 }));
 
 router.get('/sync/:accountId/status', asyncHandler(async (req, res) => {
+  if (!z.string().uuid().safeParse(req.params.accountId).success) {
+    return res.status(400).json({ error: 'Invalid account ID format' });
+  }
   const status = await messageSync.getSyncStatus(req.params.accountId);
   if (!status) return res.status(404).json({ error: 'Account not found' });
   res.json(status);
@@ -174,6 +180,9 @@ router.post('/drafts/generate', asyncHandler(async (req, res) => {
 }));
 
 router.put('/drafts/:id', asyncHandler(async (req, res) => {
+  if (!z.string().uuid().safeParse(req.params.id).success) {
+    return res.status(400).json({ error: 'Invalid draft ID format' });
+  }
   const updates = updateDraftSchema.parse(req.body);
   const draft = await messageDrafts.updateDraft(req.params.id, updates);
   if (!draft) return res.status(404).json({ error: 'Draft not found' });
@@ -181,12 +190,18 @@ router.put('/drafts/:id', asyncHandler(async (req, res) => {
 }));
 
 router.post('/drafts/:id/approve', asyncHandler(async (req, res) => {
+  if (!z.string().uuid().safeParse(req.params.id).success) {
+    return res.status(400).json({ error: 'Invalid draft ID format' });
+  }
   const draft = await messageDrafts.approveDraft(req.params.id);
   if (!draft) return res.status(404).json({ error: 'Draft not found' });
   res.json(draft);
 }));
 
 router.post('/drafts/:id/send', asyncHandler(async (req, res) => {
+  if (!z.string().uuid().safeParse(req.params.id).success) {
+    return res.status(400).json({ error: 'Invalid draft ID format' });
+  }
   const io = req.app.get('io');
   const result = await messageSender.sendDraft(req.params.id, io);
   if (!result.success) {
@@ -197,6 +212,9 @@ router.post('/drafts/:id/send', asyncHandler(async (req, res) => {
 }));
 
 router.delete('/drafts/:id', asyncHandler(async (req, res) => {
+  if (!z.string().uuid().safeParse(req.params.id).success) {
+    return res.status(400).json({ error: 'Invalid draft ID format' });
+  }
   const deleted = await messageDrafts.deleteDraft(req.params.id);
   if (!deleted) return res.status(404).json({ error: 'Draft not found' });
   res.status(204).send();
@@ -218,6 +236,9 @@ router.get('/:accountId/:messageId', asyncHandler(async (req, res) => {
 
 // === Browser Launch Route ===
 router.post('/launch/:accountId', asyncHandler(async (req, res) => {
+  if (!z.string().uuid().safeParse(req.params.accountId).success) {
+    return res.status(400).json({ error: 'Invalid account ID format' });
+  }
   const account = await messageAccounts.getAccount(req.params.accountId);
   if (!account) return res.status(404).json({ error: 'Account not found' });
   if (account.type === 'gmail') return res.status(400).json({ error: 'Gmail uses MCP, not browser automation' });

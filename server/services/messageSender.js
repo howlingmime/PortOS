@@ -12,7 +12,6 @@ export async function sendDraft(draftId, io) {
   await updateDraft(draftId, { status: 'sending' });
   console.log(`📧 Sending draft "${draft.subject}" via ${draft.sendVia}`);
 
-  let result;
   const dispatch = async () => {
     if (draft.sendVia === 'mcp') {
       const { sendGmail } = await import('./messageGmailSync.js');
@@ -22,21 +21,21 @@ export async function sendDraft(draftId, io) {
     return sendPlaywright(account, draft);
   };
 
-  result = await dispatch().catch(async (error) => {
+  const result = await dispatch().catch(async (error) => {
     console.error(`📧 Draft send threw for "${draft.subject}": ${error.message}`);
-    await updateDraft(draftId, { status: 'failed' }).catch(() => {});
     return { success: false, error: error.message };
   });
 
-  if (result.success) {
+  if (result?.success) {
     await updateDraft(draftId, { status: 'sent' });
     io?.emit('messages:draft:sent', { draftId });
     io?.emit('messages:changed', {});
     console.log(`📧 Draft sent successfully: "${draft.subject}"`);
   } else {
     await updateDraft(draftId, { status: 'failed' }).catch(() => {});
-    console.log(`📧 Draft send failed: ${result.error || 'Unknown error'}`);
-    if (!result.error) result = { success: false, error: 'Unknown error sending draft' };
+    const errorMsg = result?.error ?? 'Unknown error sending draft';
+    console.log(`📧 Draft send failed: ${errorMsg}`);
+    return { success: false, error: errorMsg };
   }
 
   return result;
