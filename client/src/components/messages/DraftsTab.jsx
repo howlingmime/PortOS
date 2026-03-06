@@ -27,10 +27,7 @@ export default function DraftsTab({ accounts }) {
 
   const handleSend = async (id) => {
     const result = await api.sendMessageDraft(id).catch(() => null);
-    if (!result || result.success === false) {
-      toast.error(result?.error || 'Failed to send message');
-      return;
-    }
+    if (!result || result.success === false) return;
     setDrafts(prev => prev.map(d => d.id === id ? { ...d, status: 'sent' } : d));
     toast.success('Message sent');
   };

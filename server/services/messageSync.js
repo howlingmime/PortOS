@@ -3,7 +3,6 @@ import { join } from 'path';
 import { ensureDir, PATHS, safeJSONParse } from '../lib/fileUtils.js';
 import { getAccount, updateSyncStatus } from './messageAccounts.js';
 
-// TODO: Add unit tests for getMessages, syncAccount (cache, dedup, locking, status)
 const CACHE_DIR = join(PATHS.messages, 'cache');
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const syncLocks = new Map();
@@ -144,7 +143,7 @@ export async function syncAccount(accountId, io) {
     console.error(`📧 Sync failed for ${account.name} (${account.type}): ${error.message}`);
     await updateSyncStatus(accountId, 'error').catch(() => {});
     io?.emit('messages:sync:failed', { accountId, error: error.message });
-    throw error;
+    return { error: error.message, status: 502 };
   }).finally(() => {
     syncLocks.delete(accountId);
   });
