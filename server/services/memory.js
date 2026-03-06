@@ -253,9 +253,34 @@ export async function getMemories(options = {}) {
   memories.sort((a, b) => {
     const aRaw = a[sortBy];
     const bRaw = b[sortBy];
-    const aVal = typeof aRaw === 'string' ? aRaw : (aRaw ?? 0);
-    const bVal = typeof bRaw === 'string' ? bRaw : (bRaw ?? 0);
-    return sortOrder === 'desc' ? (bVal > aVal ? 1 : bVal < aVal ? -1 : 0) : (aVal > bVal ? 1 : aVal < bVal ? -1 : 0);
+
+    // Missing values sort last
+    const aMissing = aRaw === null || aRaw === undefined;
+    const bMissing = bRaw === null || bRaw === undefined;
+    if (aMissing && bMissing) return 0;
+    if (aMissing) return 1;
+    if (bMissing) return -1;
+
+    // Compare as dates if both parse as valid timestamps
+    const aTime = (typeof aRaw === 'string' || aRaw instanceof Date) ? Date.parse(aRaw) : NaN;
+    const bTime = (typeof bRaw === 'string' || bRaw instanceof Date) ? Date.parse(bRaw) : NaN;
+    if (!Number.isNaN(aTime) && !Number.isNaN(bTime)) {
+      const diff = aTime - bTime;
+      return sortOrder === 'desc' ? (diff === 0 ? 0 : diff < 0 ? 1 : -1) : (diff === 0 ? 0 : diff < 0 ? -1 : 1);
+    }
+
+    // Numeric comparison
+    if (typeof aRaw === 'number' && typeof bRaw === 'number') {
+      const diff = aRaw - bRaw;
+      return sortOrder === 'desc' ? (diff === 0 ? 0 : diff < 0 ? 1 : -1) : (diff === 0 ? 0 : diff < 0 ? -1 : 1);
+    }
+
+    // String fallback
+    const aStr = String(aRaw);
+    const bStr = String(bRaw);
+    if (aStr === bStr) return 0;
+    const cmp = aStr < bStr ? -1 : 1;
+    return sortOrder === 'desc' ? -cmp : cmp;
   });
 
   // Paginate

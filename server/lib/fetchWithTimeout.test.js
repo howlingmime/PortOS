@@ -1,22 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// Inline implementation to avoid complex module mocking
-async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  let signal = controller.signal;
-  if (options.signal) {
-    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function') {
-      signal = AbortSignal.any([controller.signal, options.signal]);
-    } else {
-      options.signal.addEventListener('abort', () => controller.abort(), { once: true });
-    }
-  }
-
-  return fetch(url, { ...options, signal })
-    .finally(() => clearTimeout(timeoutId));
-}
+import { fetchWithTimeout } from './fetchWithTimeout.js';
 
 describe('fetchWithTimeout', () => {
   beforeEach(() => {
