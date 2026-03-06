@@ -5,7 +5,7 @@ import * as messageAccounts from '../services/messageAccounts.js';
 import * as messageSync from '../services/messageSync.js';
 import * as messageDrafts from '../services/messageDrafts.js';
 import * as messageSender from '../services/messageSender.js';
-import { getSelectors, updateSelectors, testSelectors } from '../services/messagePlaywrightSync.js';
+import { getSelectors, updateSelectors, testSelectors, launchProvider } from '../services/messagePlaywrightSync.js';
 
 const router = express.Router();
 
@@ -214,6 +214,16 @@ router.get('/:accountId/:messageId', asyncHandler(async (req, res) => {
   const message = await messageSync.getMessage(parsed.data.accountId, parsed.data.messageId);
   if (!message) return res.status(404).json({ error: 'Message not found' });
   res.json(message);
+}));
+
+// === Browser Launch Route ===
+router.post('/launch/:accountId', asyncHandler(async (req, res) => {
+  const account = await messageAccounts.getAccount(req.params.accountId);
+  if (!account) return res.status(404).json({ error: 'Account not found' });
+  if (account.type === 'gmail') return res.status(400).json({ error: 'Gmail uses MCP, not browser automation' });
+  const result = await launchProvider(account.type);
+  if (!result.success) return res.status(503).json({ error: result.error });
+  res.json(result);
 }));
 
 // === Selector Routes ===

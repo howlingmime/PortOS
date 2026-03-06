@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Play, AlertCircle, Settings } from 'lucide-react';
+import { RefreshCw, Play, AlertCircle, Settings, Globe } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as api from '../../services/api';
 import socket from '../../services/socket';
@@ -41,6 +41,11 @@ export default function SyncTab({ accounts, onRefresh }) {
       socket.off('messages:sync:auth-required', onAuthRequired);
     };
   }, [fetchSelectors, onRefresh]);
+
+  const handleLaunch = async (accountId) => {
+    const result = await api.launchMessageBrowser(accountId).catch(() => null);
+    if (result?.success) toast.success('Browser tab opened — log in if needed, then sync');
+  };
 
   const handleSync = async (accountId) => {
     setSyncing(prev => ({ ...prev, [accountId]: 'syncing' }));
@@ -89,6 +94,15 @@ export default function SyncTab({ accounts, onRefresh }) {
                   <span className="flex items-center gap-1 text-xs text-port-warning">
                     <AlertCircle size={14} /> Auth required
                   </span>
+                )}
+                {account.provider === 'playwright' && (
+                  <button
+                    onClick={() => handleLaunch(account.id)}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-port-border text-gray-300 rounded text-sm hover:bg-port-border/80 transition-colors"
+                    title="Open in CDP browser for login"
+                  >
+                    <Globe size={14} /> Launch
+                  </button>
                 )}
                 {syncing[account.id] === 'syncing' ? (
                   <RefreshCw size={16} className="text-port-accent animate-spin" />

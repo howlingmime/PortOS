@@ -1643,6 +1643,7 @@ export const deleteMessageDraft = (id) => request(`/messages/drafts/${id}`, { me
 export const getMessageSelectors = () => request('/messages/selectors');
 export const updateMessageSelectors = (provider, selectors) => request(`/messages/selectors/${provider}`, { method: 'PUT', body: JSON.stringify({ selectors }) });
 export const testMessageSelectors = (provider) => request(`/messages/selectors/${provider}/test`, { method: 'POST' });
+export const launchMessageBrowser = (accountId) => request(`/messages/launch/${accountId}`, { method: 'POST' });
 
 // Default export for simplified imports
 export default {
