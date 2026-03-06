@@ -109,6 +109,9 @@ router.get('/sync/:accountId/status', asyncHandler(async (req, res) => {
 // === Inbox Routes ===
 router.get('/inbox', asyncHandler(async (req, res) => {
   const { accountId, search, limit, offset } = req.query;
+  if (accountId && !z.string().uuid().safeParse(accountId).success) {
+    return res.status(400).json({ error: 'Invalid accountId format' });
+  }
   let parsedLimit = limit !== undefined ? parseInt(limit, 10) : 50;
   if (Number.isNaN(parsedLimit) || parsedLimit <= 0) parsedLimit = 50;
   if (parsedLimit > 100) parsedLimit = 100;
@@ -123,8 +126,15 @@ router.get('/inbox', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
+const messageParamsSchema = z.object({
+  accountId: z.string().uuid(),
+  messageId: z.string().min(1)
+});
+
 router.get('/:accountId/:messageId', asyncHandler(async (req, res) => {
-  const message = await messageSync.getMessage(req.params.accountId, req.params.messageId);
+  const parsed = messageParamsSchema.safeParse(req.params);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid accountId or messageId format' });
+  const message = await messageSync.getMessage(parsed.data.accountId, parsed.data.messageId);
   if (!message) return res.status(404).json({ error: 'Message not found' });
   res.json(message);
 }));

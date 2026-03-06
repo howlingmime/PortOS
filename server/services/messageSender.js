@@ -33,9 +33,10 @@ export async function sendDraft(draftId, io) {
     io?.emit('messages:draft:sent', { draftId });
     io?.emit('messages:changed', {});
     console.log(`📧 Draft sent successfully: "${draft.subject}"`);
-  } else if (result.error) {
+  } else {
     await updateDraft(draftId, { status: 'failed' }).catch(() => {});
-    console.log(`📧 Draft send failed: ${result.error}`);
+    console.log(`📧 Draft send failed: ${result.error || 'Unknown error'}`);
+    if (!result.error) result = { success: false, error: 'Unknown error sending draft' };
   }
 
   return result;

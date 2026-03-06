@@ -4,8 +4,10 @@ import { ensureDir, PATHS, safeJSONParse } from '../lib/fileUtils.js';
 import { getAccount, updateSyncStatus } from './messageAccounts.js';
 
 const CACHE_DIR = join(PATHS.messages, 'cache');
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function loadCache(accountId) {
+  if (!UUID_RE.test(accountId)) throw new Error(`Invalid accountId: ${accountId}`);
   await ensureDir(CACHE_DIR);
   const filePath = join(CACHE_DIR, `${accountId}.json`);
   const content = await readFile(filePath, 'utf-8').catch(() => null);

@@ -26,9 +26,9 @@ export default function AccountsTab({ accounts, onRefresh }) {
 
   const handleDelete = async (id) => {
     setDeleting(id);
-    const result = await api.deleteMessageAccount(id).catch(() => null);
+    const ok = await api.deleteMessageAccount(id).then(() => true).catch(() => false);
     setDeleting(null);
-    if (result === null) return toast.error('Failed to delete account');
+    if (!ok) return toast.error('Failed to delete account');
     toast.success('Account deleted');
     onRefresh();
   };
