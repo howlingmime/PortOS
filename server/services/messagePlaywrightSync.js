@@ -297,25 +297,41 @@ async function fetchOutlookConversationDetail(page, subject, sender) {
   const clickResult = await evaluateOnPage(page, `
     (async function() {
       const listbox = document.querySelector("[role='listbox']");
-      if (!listbox) return false;
-      const rows = listbox.querySelectorAll('[role="option"]');
+      if (!listbox) return { found: false, hasListbox: false };
       const targetSubject = ${safeSubject}.toLowerCase();
       const targetSender = ${safeSender}.toLowerCase();
-      let matched = null;
-      for (const row of rows) {
-        const label = (row.getAttribute('aria-label') || '').toLowerCase();
-        const text = (row.innerText || '').toLowerCase();
-        // Match by subject (primary) and sender (secondary)
-        if (targetSubject && (label.includes(targetSubject) || text.includes(targetSubject))) {
-          if (!targetSender || label.includes(targetSender) || text.includes(targetSender)) {
-            matched = row;
-            break;
+      const scrollContainer = listbox.closest('[role="region"]') || listbox.parentElement;
+
+      function findMatch() {
+        const rows = listbox.querySelectorAll('[role="option"]');
+        let fallback = null;
+        for (const row of rows) {
+          const label = (row.getAttribute('aria-label') || '').toLowerCase();
+          const text = (row.innerText || '').toLowerCase();
+          if (targetSubject && (label.includes(targetSubject) || text.includes(targetSubject))) {
+            if (!targetSender || label.includes(targetSender) || text.includes(targetSender)) {
+              return row;
+            }
+            if (!fallback) fallback = row;
           }
-          // Subject matched but sender didn't — keep as fallback
-          if (!matched) matched = row;
+        }
+        return fallback;
+      }
+
+      // Check visible rows first, then scroll to find the message
+      let matched = findMatch();
+      if (!matched && scrollContainer) {
+        const maxScroll = 30;
+        for (let i = 0; i < maxScroll; i++) {
+          scrollContainer.scrollBy(0, 600);
+          await new Promise(r => setTimeout(r, 300));
+          matched = findMatch();
+          if (matched) break;
         }
       }
-      if (!matched) return false;
+      if (!matched) return { found: false, hasListbox: true };
+      matched.scrollIntoView({ block: 'center' });
+      await new Promise(r => setTimeout(r, 200));
       matched.click();
       // Wait for reading pane to load
       await new Promise(r => setTimeout(r, 2000));
@@ -323,8 +339,14 @@ async function fetchOutlookConversationDetail(page, subject, sender) {
     })()
   `);
 
-  console.log(`📧 Detail click result: ${JSON.stringify(clickResult)}`);
-  if (!clickResult) return null;
+  if (clickResult && typeof clickResult === 'object' && !clickResult.found) {
+    console.log(`📧 Detail click: message not found (listbox=${clickResult.hasListbox})`);
+    return null;
+  }
+  if (!clickResult) {
+    console.log(`📧 Detail click: evaluation failed`);
+    return null;
+  }
 
   // Extract all messages from the reading pane using Outlook's semantic structure
   const threadMessages = await evaluateOnPage(page, `

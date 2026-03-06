@@ -27,10 +27,7 @@ export default function MessageDetail({ message, accounts, onBack }) {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    const result = await api.refreshMessage(message.accountId, message.id).catch(err => {
-      toast.error(err?.message || 'Failed to refresh message');
-      return null;
-    });
+    const result = await api.refreshMessage(message.accountId, message.id).catch(() => null);
     setRefreshing(false);
     if (!result) return;
     if (result.error) return toast.error(result.error);
