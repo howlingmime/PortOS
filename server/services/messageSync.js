@@ -134,9 +134,8 @@ export async function syncAccount(accountId, io) {
     if (providerStatus === 'success') {
       io?.emit('messages:sync:completed', { accountId, newMessages: uniqueNew.length, status: providerStatus });
       io?.emit('messages:changed', {});
-    } else {
-      io?.emit('messages:sync:failed', { accountId, error: `Sync finished with status: ${providerStatus}`, status: providerStatus });
     }
+    // Non-success statuses (auth-required, no-browser, etc.) are emitted by the provider itself
     console.log(`📧 Sync complete for ${account.name}: ${uniqueNew.length} new, status=${providerStatus}`);
 
     return { newMessages: uniqueNew.length, total: cache.messages.length, status: providerStatus };

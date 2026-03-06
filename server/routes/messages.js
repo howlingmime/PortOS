@@ -145,6 +145,9 @@ router.get('/inbox', asyncHandler(async (req, res) => {
 // === Draft Routes ===
 router.get('/drafts', asyncHandler(async (req, res) => {
   const { accountId, status } = req.query;
+  if (accountId && !z.string().uuid().safeParse(accountId).success) {
+    return res.status(400).json({ error: 'Invalid accountId format' });
+  }
   const drafts = await messageDrafts.listDrafts({ accountId, status });
   res.json(drafts);
 }));
