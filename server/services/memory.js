@@ -201,17 +201,17 @@ export async function createMemory(data, embedding = null) {
  * Get a memory by ID
  */
 export async function getMemory(id) {
-  const memory = await loadMemory(id);
-  if (!memory) return null;
+  return withMemoryLock(async () => {
+    const memory = await loadMemory(id);
+    if (!memory) return null;
 
-  // Update access stats
-  await withMemoryLock(async () => {
+    // Update access stats
     memory.accessCount += 1;
     memory.lastAccessed = new Date().toISOString();
     await saveMemory(memory);
-  });
 
-  return memory;
+    return memory;
+  });
 }
 
 /**
@@ -251,9 +251,36 @@ export async function getMemories(options = {}) {
   const sortBy = options.sortBy || 'createdAt';
   const sortOrder = options.sortOrder || 'desc';
   memories.sort((a, b) => {
-    const aVal = a[sortBy] || 0;
-    const bVal = b[sortBy] || 0;
-    return sortOrder === 'desc' ? (bVal > aVal ? 1 : -1) : (aVal > bVal ? 1 : -1);
+    const aRaw = a[sortBy];
+    const bRaw = b[sortBy];
+
+    // Missing values sort last
+    const aMissing = aRaw === null || aRaw === undefined;
+    const bMissing = bRaw === null || bRaw === undefined;
+    if (aMissing && bMissing) return 0;
+    if (aMissing) return 1;
+    if (bMissing) return -1;
+
+    // Compare as dates if both parse as valid timestamps
+    const aTime = (typeof aRaw === 'string' || aRaw instanceof Date) ? Date.parse(aRaw) : NaN;
+    const bTime = (typeof bRaw === 'string' || bRaw instanceof Date) ? Date.parse(bRaw) : NaN;
+    if (!Number.isNaN(aTime) && !Number.isNaN(bTime)) {
+      const diff = aTime - bTime;
+      return sortOrder === 'desc' ? (diff === 0 ? 0 : diff < 0 ? 1 : -1) : (diff === 0 ? 0 : diff < 0 ? -1 : 1);
+    }
+
+    // Numeric comparison
+    if (typeof aRaw === 'number' && typeof bRaw === 'number') {
+      const diff = aRaw - bRaw;
+      return sortOrder === 'desc' ? (diff === 0 ? 0 : diff < 0 ? 1 : -1) : (diff === 0 ? 0 : diff < 0 ? -1 : 1);
+    }
+
+    // String fallback
+    const aStr = String(aRaw);
+    const bStr = String(bRaw);
+    if (aStr === bStr) return 0;
+    const cmp = aStr < bStr ? -1 : 1;
+    return sortOrder === 'desc' ? -cmp : cmp;
   });
 
   // Paginate
