@@ -32,8 +32,7 @@ async function cdpFetch(path, options = {}) {
   const url = `http://${host}:${port}${path}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeout || 10000);
-  const response = await fetch(url, { ...options, signal: controller.signal });
-  clearTimeout(timeout);
+  const response = await fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeout));
   return response;
 }
 
@@ -79,12 +78,12 @@ async function evaluateOnPage(page, expression) {
     });
 
     ws.on('message', (data) => {
-      const msg = JSON.parse(data.toString());
-      if (msg.id === 1) {
-        clearTimeout(timer);
-        ws.close();
-        resolve(msg.result?.result?.value ?? null);
-      }
+      const msg = safeJSONParse(data.toString(), null, { context: 'cdp-ws' });
+      if (!msg || msg.id !== 1) return;
+      clearTimeout(timer);
+      ws.close();
+      if (msg.error || msg.result?.exceptionDetails) return resolve(null);
+      resolve(msg.result?.result?.value ?? null);
     });
 
     ws.on('error', () => { clearTimeout(timer); ws.close(); resolve(null); });
@@ -151,13 +150,13 @@ export async function syncPlaywright(account, cache, io) {
   if (!extracted || !Array.isArray(extracted)) {
     console.log(`📧 No messages extracted from ${account.type} page`);
     io?.emit('messages:sync:progress', { accountId: account.id, current: 0, total: 0 });
-    return [];
+    return { messages: [], status: 'extraction-failed' };
   }
 
   io?.emit('messages:sync:progress', { accountId: account.id, current: extracted.length, total: extracted.length });
 
   // Convert extracted data to message format
-  return extracted.map(msg => ({
+  const messages = extracted.map(msg => ({
     id: uuidv4(),
     externalId: makeExternalId(msg.date || '', msg.from || '', msg.subject || ''),
     threadId: null,
@@ -172,6 +171,7 @@ export async function syncPlaywright(account, cache, io) {
     source: account.type,
     syncedAt: new Date().toISOString()
   }));
+  return { messages, status: 'success' };
 }
 
 function buildExtractionScript(type, sels) {
