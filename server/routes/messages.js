@@ -94,6 +94,9 @@ router.delete('/accounts/:id', asyncHandler(async (req, res) => {
   }
   const deleted = await messageAccounts.deleteAccount(req.params.id);
   if (!deleted) return res.status(404).json({ error: 'Account not found' });
+  // Clean up related data
+  await messageSync.deleteCache(req.params.id).catch(() => {});
+  await messageDrafts.deleteDraftsByAccountId(req.params.id).catch(() => {});
   req.app.get('io')?.emit('messages:changed', {});
   res.status(204).send();
 }));
@@ -141,9 +144,10 @@ router.get('/drafts', asyncHandler(async (req, res) => {
 
 router.post('/drafts', asyncHandler(async (req, res) => {
   const data = createDraftSchema.parse(req.body);
+  const account = await messageAccounts.getAccount(data.accountId);
+  if (!account) return res.status(404).json({ error: 'Account not found' });
   if (!data.sendVia) {
-    const account = await messageAccounts.getAccount(data.accountId);
-    data.sendVia = account?.provider || (account?.type === 'gmail' ? 'mcp' : 'playwright');
+    data.sendVia = account.provider || (account.type === 'gmail' ? 'mcp' : 'playwright');
   }
   const draft = await messageDrafts.createDraft(data);
   req.app.get('io')?.emit('messages:draft:created', { draftId: draft.id });

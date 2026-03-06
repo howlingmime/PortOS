@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Mail, Search, RefreshCw, ChevronRight } from 'lucide-react';
 import * as api from '../../services/api';
 import MessageDetail from './MessageDetail';
@@ -8,19 +8,27 @@ export default function InboxTab({ accounts }) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedAccount, setSelectedAccount] = useState('');
   const [selectedMessage, setSelectedMessage] = useState(null);
+  const debounceRef = useRef(null);
+
+  useEffect(() => {
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [search]);
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);
     const params = {};
     if (selectedAccount) params.accountId = selectedAccount;
-    if (search) params.search = search;
+    if (debouncedSearch) params.search = debouncedSearch;
     const result = await api.getMessageInbox(params).catch(() => ({ messages: [], total: 0 }));
     setMessages(result.messages || []);
     setTotal(result.total || 0);
     setLoading(false);
-  }, [selectedAccount, search]);
+  }, [selectedAccount, debouncedSearch]);
 
   useEffect(() => {
     fetchMessages();

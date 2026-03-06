@@ -69,6 +69,15 @@ export async function approveDraft(id) {
   return updateDraft(id, { status: 'approved' });
 }
 
+export async function deleteDraftsByAccountId(accountId) {
+  const drafts = await loadDrafts();
+  const remaining = drafts.filter(d => d.accountId !== accountId);
+  if (remaining.length < drafts.length) {
+    await saveDrafts(remaining);
+    console.log(`🗑️ Deleted ${drafts.length - remaining.length} drafts for account ${accountId}`);
+  }
+}
+
 export async function deleteDraft(id) {
   const drafts = await loadDrafts();
   const idx = drafts.findIndex(d => d.id === id);

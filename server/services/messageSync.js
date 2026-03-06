@@ -69,6 +69,14 @@ export async function getMessages(options = {}) {
   };
 }
 
+export async function deleteCache(accountId) {
+  if (!UUID_RE.test(accountId)) return;
+  const { unlink } = await import('fs/promises');
+  const filePath = join(CACHE_DIR, `${accountId}.json`);
+  await unlink(filePath).catch(() => {});
+  console.log(`🗑️ Message cache deleted for account ${accountId}`);
+}
+
 export async function getMessage(accountId, messageId) {
   const cache = await loadCache(accountId);
   return cache.messages.find(m => m.id === messageId) || null;
