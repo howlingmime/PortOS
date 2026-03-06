@@ -8,7 +8,9 @@ vi.mock('./cosEvents.js', () => ({
 vi.mock('../lib/fileUtils.js', () => ({
   readJSONFile: vi.fn(),
   ensureDir: vi.fn().mockResolvedValue(),
-  PATHS: { cos: '/mock/data/cos', digitalTwin: '/mock/data/digital-twin', data: '/mock/data' }
+  PATHS: { cos: '/mock/data/cos', digitalTwin: '/mock/data/digital-twin', data: '/mock/data' },
+  HOUR: 60 * 60 * 1000,
+  DAY: 24 * 60 * 60 * 1000
 }))
 
 vi.mock('fs/promises', () => ({

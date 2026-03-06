@@ -85,6 +85,7 @@ export async function checkHealth() {
     const { has_memories, has_links, has_sync } = result.rows[0];
     return { connected: true, hasSchema: has_memories && has_links && has_sync };
   } catch (err) {
+    console.error(`🗄️ Database health check failed: ${err.message}`);
     return { connected: false, hasSchema: false, error: err.message };
   }
 }

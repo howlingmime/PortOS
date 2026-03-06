@@ -3101,6 +3101,7 @@ export function isRunning() {
  * Add a new task to TASKS.md or COS-TASKS.md
  */
 export async function addTask(taskData, taskType = 'user') {
+  return withStateLock(async () => {
   const state = await loadState();
   const filePath = taskType === 'user'
     ? join(ROOT_DIR, state.config.userTasksFile)
@@ -3174,6 +3175,7 @@ export async function addTask(taskData, taskType = 'user') {
   }
 
   return newTask;
+  });
 }
 
 /**
@@ -3392,6 +3394,7 @@ const PRIORITY_VALUES = {
  * Update an existing task
  */
 export async function updateTask(taskId, updates, taskType = 'user') {
+  return withStateLock(async () => {
   const state = await loadState();
   const filePath = taskType === 'user'
     ? join(ROOT_DIR, state.config.userTasksFile)
@@ -3446,12 +3449,14 @@ export async function updateTask(taskId, updates, taskType = 'user') {
 
   cosEvents.emit('tasks:changed', { type: taskType, action: 'updated', task: updatedTask });
   return updatedTask;
+  });
 }
 
 /**
  * Delete a task
  */
 export async function deleteTask(taskId, taskType = 'user') {
+  return withStateLock(async () => {
   const state = await loadState();
   const filePath = taskType === 'user'
     ? join(ROOT_DIR, state.config.userTasksFile)
@@ -3478,12 +3483,14 @@ export async function deleteTask(taskId, taskType = 'user') {
 
   cosEvents.emit('tasks:changed', { type: taskType, action: 'deleted', taskId });
   return { success: true, taskId };
+  });
 }
 
 /**
  * Reorder user tasks based on an array of task IDs
  */
 export async function reorderTasks(taskIds) {
+  return withStateLock(async () => {
   const state = await loadState();
   const filePath = join(ROOT_DIR, state.config.userTasksFile);
 
@@ -3518,12 +3525,14 @@ export async function reorderTasks(taskIds) {
 
   cosEvents.emit('tasks:changed', { type: 'user', action: 'reordered' });
   return { success: true, order: reorderedTasks.map(t => t.id) };
+  });
 }
 
 /**
  * Approve a task that requires approval (marks it as auto-approved)
  */
 export async function approveTask(taskId) {
+  return withStateLock(async () => {
   const state = await loadState();
   const filePath = join(ROOT_DIR, state.config.cosTasksFile);
 
@@ -3560,6 +3569,7 @@ export async function approveTask(taskId) {
   setImmediate(() => dequeueNextTask());
 
   return tasks[taskIndex];
+  });
 }
 
 /**

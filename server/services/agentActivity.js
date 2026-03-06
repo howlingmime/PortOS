@@ -9,7 +9,7 @@ import { readFile, writeFile, readdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import EventEmitter from 'events';
-import { ensureDir, PATHS } from '../lib/fileUtils.js';
+import { ensureDir, getDateString, PATHS } from '../lib/fileUtils.js';
 
 const AGENTS_DIR = PATHS.agentPersonalities;
 const ACTIVITY_DIR = join(AGENTS_DIR, 'activity');
@@ -25,10 +25,6 @@ async function ensureActivityDir(agentId = null) {
   if (agentId) {
     await ensureDir(join(ACTIVITY_DIR, agentId));
   }
-}
-
-function getDateString(date = new Date()) {
-  return date.toISOString().split('T')[0];
 }
 
 function getActivityFilePath(agentId, date = new Date()) {

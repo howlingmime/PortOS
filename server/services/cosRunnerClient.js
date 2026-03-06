@@ -245,6 +245,9 @@ export async function executeCliRunViaRunner(options) {
     timeout
   } = options;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+
   const response = await fetch(`${COS_RUNNER_URL}/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -256,8 +259,9 @@ export async function executeCliRunViaRunner(options) {
       workspacePath,
       envVars,
       timeout
-    })
-  });
+    }),
+    signal: controller.signal
+  }).finally(() => clearTimeout(timeoutId));
 
   if (!response.ok) {
     const error = await response.json();

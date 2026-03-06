@@ -279,6 +279,23 @@ export async function readJSONLFile(filePath, { logErrors = false } = {}) {
 }
 
 /**
+ * Time constants in milliseconds.
+ * Single source of truth — import these instead of declaring inline.
+ */
+export const HOUR = 60 * 60 * 1000;
+export const DAY = 24 * HOUR;
+
+/**
+ * Format a date as YYYY-MM-DD string.
+ *
+ * @param {Date} [date=new Date()] - Date to format
+ * @returns {string} ISO date string (e.g., "2026-03-05")
+ */
+export function getDateString(date = new Date()) {
+  return date.toISOString().split('T')[0];
+}
+
+/**
  * Format a duration in milliseconds to a human-readable string.
  * Outputs the most appropriate unit (minutes, hours, days) based on size.
  *

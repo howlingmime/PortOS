@@ -120,7 +120,7 @@ export default function useTheme() {
           setThemeId(serverTheme);
         }
       })
-      .catch(() => {}); // Server unreachable — use localStorage fallback
+      .catch(() => console.log('⚠️ Theme fetch failed, using localStorage fallback'));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setTheme = useCallback((id) => {
@@ -133,7 +133,7 @@ export default function useTheme() {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ theme: id }),
-    }).catch(() => {});
+    }).catch(() => console.warn('⚠️ Theme sync to server failed'));
   }, []);
 
   return { themeId, theme: THEMES[themeId], themes: THEMES, setTheme };

@@ -82,11 +82,12 @@ export default function PromptManager() {
     const payload = { template: stageTemplate, ...stageConfig };
     // Explicitly null provider when in tier mode so server clears any previous value
     if (!payload.provider) payload.provider = null;
-    await fetch(`/api/prompts/${selectedStage}`, {
+    const res = await fetch(`/api/prompts/${selectedStage}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+    if (!res.ok) { toast.error('Failed to save stage: ' + await res.text()); setSaving(false); return; }
     setSaving(false);
     await loadData();
   };
@@ -96,8 +97,10 @@ export default function PromptManager() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ testData: {} })
-    }).then(r => r.json());
-    setPreview(res.preview);
+    });
+    if (!res.ok) { toast.error('Failed to preview: ' + await res.text()); return; }
+    const data = await res.json();
+    setPreview(data.preview);
   };
 
   const loadVariable = (key) => {
@@ -108,19 +111,14 @@ export default function PromptManager() {
 
   const saveVariable = async () => {
     setSaving(true);
-    if (selectedVar) {
-      await fetch(`/api/prompts/variables/${selectedVar}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(varForm)
-      });
-    } else {
-      await fetch('/api/prompts/variables', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(varForm)
-      });
-    }
+    const url = selectedVar ? `/api/prompts/variables/${selectedVar}` : '/api/prompts/variables';
+    const method = selectedVar ? 'PUT' : 'POST';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(varForm)
+    });
+    if (!res.ok) { toast.error('Failed to save variable: ' + await res.text()); setSaving(false); return; }
     setSaving(false);
     setSelectedVar(null);
     setVarForm({ key: '', name: '', category: '', content: '' });
@@ -128,7 +126,8 @@ export default function PromptManager() {
   };
 
   const deleteVariable = async (key) => {
-    await fetch(`/api/prompts/variables/${key}`, { method: 'DELETE' });
+    const res = await fetch(`/api/prompts/variables/${key}`, { method: 'DELETE' });
+    if (!res.ok) { toast.error('Failed to delete variable: ' + await res.text()); return; }
     await loadData();
   };
 

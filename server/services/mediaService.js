@@ -1,188 +1,192 @@
 import { spawn } from 'child_process';
 import { PassThrough } from 'stream';
 
-class MediaService {
-  constructor() {
-    this.videoProcess = null;
-    this.audioProcess = null;
-    this.videoStream = null;
-    this.audioStream = null;
-    this.devices = {
-      video: [],
-      audio: []
-    };
-  }
+let videoProcess = null;
+let audioProcess = null;
+let videoStream = null;
+let audioStream = null;
+let devices = { video: [], audio: [] };
 
-  async listDevices() {
-    return new Promise((resolve, reject) => {
-      const ffmpeg = spawn('ffmpeg', [
-        '-f', 'avfoundation',
-        '-list_devices', 'true',
-        '-i', ''
-      ]);
+async function listDevices() {
+  return new Promise((resolve, reject) => {
+    const ffmpeg = spawn('ffmpeg', [
+      '-f', 'avfoundation',
+      '-list_devices', 'true',
+      '-i', ''
+    ]);
 
-      let output = '';
+    let output = '';
 
-      ffmpeg.stderr.on('data', (data) => {
-        output += data.toString();
-      });
+    ffmpeg.stderr.on('data', (data) => {
+      output += data.toString();
+    });
 
-      ffmpeg.on('close', () => {
-        const videoDevices = [];
-        const audioDevices = [];
+    ffmpeg.on('close', () => {
+      const videoDevices = [];
+      const audioDevices = [];
 
-        const lines = output.split('\n');
-        let inVideoSection = false;
-        let inAudioSection = false;
+      const lines = output.split('\n');
+      let inVideoSection = false;
+      let inAudioSection = false;
 
-        for (const line of lines) {
-          if (line.includes('AVFoundation video devices:')) {
-            inVideoSection = true;
-            inAudioSection = false;
-            continue;
-          }
-          if (line.includes('AVFoundation audio devices:')) {
-            inVideoSection = false;
-            inAudioSection = true;
-            continue;
-          }
-
-          const match = line.match(/\[(\d+)\] (.+)/);
-          if (match) {
-            const [, id, name] = match;
-            if (inVideoSection && !name.includes('Capture screen')) {
-              videoDevices.push({ id, name: name.trim() });
-            } else if (inAudioSection) {
-              audioDevices.push({ id, name: name.trim() });
-            }
-          }
+      for (const line of lines) {
+        if (line.includes('AVFoundation video devices:')) {
+          inVideoSection = true;
+          inAudioSection = false;
+          continue;
+        }
+        if (line.includes('AVFoundation audio devices:')) {
+          inVideoSection = false;
+          inAudioSection = true;
+          continue;
         }
 
-        this.devices = { video: videoDevices, audio: audioDevices };
-        resolve(this.devices);
-      });
-
-      ffmpeg.on('error', reject);
-    });
-  }
-
-  startVideoStream(deviceId = '0') {
-    if (!/^\d+$/.test(deviceId)) throw new Error('Invalid device ID');
-    if (this.videoProcess) {
-      this.stopVideoStream();
-    }
-
-    this.videoStream = new PassThrough();
-
-    // Use MJPEG format for compatibility and low latency
-    this.videoProcess = spawn('ffmpeg', [
-      '-f', 'avfoundation',
-      '-video_size', '1280x720',
-      '-framerate', '30',
-      '-i', `${deviceId}:none`,
-      '-f', 'mjpeg',
-      '-q:v', '5',
-      '-'
-    ]);
-
-    this.videoProcess.stdout.pipe(this.videoStream);
-
-    this.videoProcess.stderr.on('data', (data) => {
-      const msg = data.toString();
-      if (!msg.includes('frame=') && !msg.includes('fps=')) {
-        console.log(`📹 FFmpeg video: ${msg.trim()}`);
+        const match = line.match(/\[(\d+)\] (.+)/);
+        if (match) {
+          const [, id, name] = match;
+          if (inVideoSection && !name.includes('Capture screen')) {
+            videoDevices.push({ id, name: name.trim() });
+          } else if (inAudioSection) {
+            audioDevices.push({ id, name: name.trim() });
+          }
+        }
       }
+
+      devices = { video: videoDevices, audio: audioDevices };
+      resolve(devices);
     });
 
-    this.videoProcess.on('error', (err) => {
-      console.error(`❌ Video stream error: ${err.message}`);
-    });
+    ffmpeg.on('error', reject);
+  });
+}
 
-    this.videoProcess.on('close', () => {
-      console.log('📹 Video stream stopped');
-      this.videoStream = null;
-    });
-
-    return this.videoStream;
+function startVideoStream(deviceId = '0') {
+  if (!/^\d+$/.test(deviceId)) throw new Error('Invalid device ID');
+  if (videoProcess) {
+    stopVideoStream();
   }
 
-  startAudioStream(deviceId = '0') {
-    if (!/^\d+$/.test(deviceId)) throw new Error('Invalid device ID');
-    if (this.audioProcess) {
-      this.stopAudioStream();
+  videoStream = new PassThrough();
+
+  // Use MJPEG format for compatibility and low latency
+  videoProcess = spawn('ffmpeg', [
+    '-f', 'avfoundation',
+    '-video_size', '1280x720',
+    '-framerate', '30',
+    '-i', `${deviceId}:none`,
+    '-f', 'mjpeg',
+    '-q:v', '5',
+    '-'
+  ]);
+
+  videoProcess.stdout.pipe(videoStream);
+
+  videoProcess.stderr.on('data', (data) => {
+    const msg = data.toString();
+    if (!msg.includes('frame=') && !msg.includes('fps=')) {
+      console.log(`📹 FFmpeg video: ${msg.trim()}`);
     }
+  });
 
-    this.audioStream = new PassThrough();
+  videoProcess.on('error', (err) => {
+    console.error(`❌ Video stream error: ${err.message}`);
+  });
 
-    // Use WebM format with Opus codec for web compatibility
-    this.audioProcess = spawn('ffmpeg', [
-      '-f', 'avfoundation',
-      '-i', `:${deviceId}`,
-      '-f', 'webm',
-      '-acodec', 'libopus',
-      '-ac', '1',
-      '-ar', '48000',
-      '-b:a', '128k',
-      '-'
-    ]);
+  videoProcess.on('close', () => {
+    console.log('📹 Video stream stopped');
+    videoStream = null;
+  });
 
-    this.audioProcess.stdout.pipe(this.audioStream);
+  return videoStream;
+}
 
-    this.audioProcess.stderr.on('data', (data) => {
-      const msg = data.toString();
-      if (!msg.includes('frame=') && !msg.includes('size=')) {
-        console.log(`🎤 FFmpeg audio: ${msg.trim()}`);
-      }
-    });
-
-    this.audioProcess.on('error', (err) => {
-      console.error(`❌ Audio stream error: ${err.message}`);
-    });
-
-    this.audioProcess.on('close', () => {
-      console.log('🎤 Audio stream stopped');
-      this.audioStream = null;
-    });
-
-    return this.audioStream;
+function startAudioStream(deviceId = '0') {
+  if (!/^\d+$/.test(deviceId)) throw new Error('Invalid device ID');
+  if (audioProcess) {
+    stopAudioStream();
   }
 
-  stopVideoStream() {
-    if (this.videoProcess) {
-      this.videoProcess.kill('SIGTERM');
-      this.videoProcess = null;
-      this.videoStream = null;
+  audioStream = new PassThrough();
+
+  // Use WebM format with Opus codec for web compatibility
+  audioProcess = spawn('ffmpeg', [
+    '-f', 'avfoundation',
+    '-i', `:${deviceId}`,
+    '-f', 'webm',
+    '-acodec', 'libopus',
+    '-ac', '1',
+    '-ar', '48000',
+    '-b:a', '128k',
+    '-'
+  ]);
+
+  audioProcess.stdout.pipe(audioStream);
+
+  audioProcess.stderr.on('data', (data) => {
+    const msg = data.toString();
+    if (!msg.includes('frame=') && !msg.includes('size=')) {
+      console.log(`🎤 FFmpeg audio: ${msg.trim()}`);
     }
-  }
+  });
 
-  stopAudioStream() {
-    if (this.audioProcess) {
-      this.audioProcess.kill('SIGTERM');
-      this.audioProcess = null;
-      this.audioStream = null;
-    }
-  }
+  audioProcess.on('error', (err) => {
+    console.error(`❌ Audio stream error: ${err.message}`);
+  });
 
-  stopAll() {
-    this.stopVideoStream();
-    this.stopAudioStream();
-  }
+  audioProcess.on('close', () => {
+    console.log('🎤 Audio stream stopped');
+    audioStream = null;
+  });
 
-  isVideoStreaming() {
-    return this.videoProcess !== null && this.videoStream !== null;
-  }
+  return audioStream;
+}
 
-  isAudioStreaming() {
-    return this.audioProcess !== null && this.audioStream !== null;
-  }
-
-  getVideoStream() {
-    return this.videoStream;
-  }
-
-  getAudioStream() {
-    return this.audioStream;
+function stopVideoStream() {
+  if (videoProcess) {
+    videoProcess.kill('SIGTERM');
+    videoProcess = null;
+    videoStream = null;
   }
 }
 
-export default new MediaService();
+function stopAudioStream() {
+  if (audioProcess) {
+    audioProcess.kill('SIGTERM');
+    audioProcess = null;
+    audioStream = null;
+  }
+}
+
+function stopAll() {
+  stopVideoStream();
+  stopAudioStream();
+}
+
+function isVideoStreaming() {
+  return videoProcess !== null && videoStream !== null;
+}
+
+function isAudioStreaming() {
+  return audioProcess !== null && audioStream !== null;
+}
+
+function getVideoStream() {
+  return videoStream;
+}
+
+function getAudioStream() {
+  return audioStream;
+}
+
+export default {
+  listDevices,
+  startVideoStream,
+  startAudioStream,
+  stopVideoStream,
+  stopAudioStream,
+  stopAll,
+  isVideoStreaming,
+  isAudioStreaming,
+  getVideoStream,
+  getAudioStream,
+};
