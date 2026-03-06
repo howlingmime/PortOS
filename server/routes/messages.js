@@ -13,7 +13,7 @@ const router = express.Router();
 const createAccountSchema = z.object({
   name: z.string().min(1),
   type: z.enum(['gmail', 'outlook', 'teams']),
-  email: z.string().email().optional().default(''),
+  email: z.union([z.string().email(), z.literal('')]).optional().default(''),
   syncConfig: z.object({
     maxAge: z.string().optional(),
     maxMessages: z.number().int().positive().optional(),
@@ -41,7 +41,7 @@ const createDraftSchema = z.object({
   subject: z.string().optional().default(''),
   body: z.string().optional().default(''),
   generatedBy: z.enum(['ai', 'manual']).optional().default('manual'),
-  sendVia: z.enum(['mcp', 'playwright']).optional().default('mcp')
+  sendVia: z.enum(['mcp', 'playwright']).optional()
 });
 
 const updateDraftSchema = z.object({
@@ -78,6 +78,9 @@ router.post('/accounts', asyncHandler(async (req, res) => {
 }));
 
 router.put('/accounts/:id', asyncHandler(async (req, res) => {
+  if (!z.string().uuid().safeParse(req.params.id).success) {
+    return res.status(400).json({ error: 'Invalid account ID format' });
+  }
   const updates = updateAccountSchema.parse(req.body);
   const account = await messageAccounts.updateAccount(req.params.id, updates);
   if (!account) return res.status(404).json({ error: 'Account not found' });
@@ -86,6 +89,9 @@ router.put('/accounts/:id', asyncHandler(async (req, res) => {
 }));
 
 router.delete('/accounts/:id', asyncHandler(async (req, res) => {
+  if (!z.string().uuid().safeParse(req.params.id).success) {
+    return res.status(400).json({ error: 'Invalid account ID format' });
+  }
   const deleted = await messageAccounts.deleteAccount(req.params.id);
   if (!deleted) return res.status(404).json({ error: 'Account not found' });
   req.app.get('io')?.emit('messages:changed', {});
@@ -126,19 +132,6 @@ router.get('/inbox', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
-const messageParamsSchema = z.object({
-  accountId: z.string().uuid(),
-  messageId: z.string().min(1)
-});
-
-router.get('/:accountId/:messageId', asyncHandler(async (req, res) => {
-  const parsed = messageParamsSchema.safeParse(req.params);
-  if (!parsed.success) return res.status(400).json({ error: 'Invalid accountId or messageId format' });
-  const message = await messageSync.getMessage(parsed.data.accountId, parsed.data.messageId);
-  if (!message) return res.status(404).json({ error: 'Message not found' });
-  res.json(message);
-}));
-
 // === Draft Routes ===
 router.get('/drafts', asyncHandler(async (req, res) => {
   const { accountId, status } = req.query;
@@ -148,6 +141,10 @@ router.get('/drafts', asyncHandler(async (req, res) => {
 
 router.post('/drafts', asyncHandler(async (req, res) => {
   const data = createDraftSchema.parse(req.body);
+  if (!data.sendVia) {
+    const account = await messageAccounts.getAccount(data.accountId);
+    data.sendVia = account?.provider || (account?.type === 'gmail' ? 'mcp' : 'playwright');
+  }
   const draft = await messageDrafts.createDraft(data);
   req.app.get('io')?.emit('messages:draft:created', { draftId: draft.id });
   res.status(201).json(draft);
@@ -201,19 +198,41 @@ router.delete('/drafts/:id', asyncHandler(async (req, res) => {
   res.status(204).send();
 }));
 
+// === Message Detail Route (after drafts to avoid route collision) ===
+const messageParamsSchema = z.object({
+  accountId: z.string().uuid(),
+  messageId: z.string().min(1)
+});
+
+router.get('/:accountId/:messageId', asyncHandler(async (req, res) => {
+  const parsed = messageParamsSchema.safeParse(req.params);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid accountId or messageId format' });
+  const message = await messageSync.getMessage(parsed.data.accountId, parsed.data.messageId);
+  if (!message) return res.status(404).json({ error: 'Message not found' });
+  res.json(message);
+}));
+
 // === Selector Routes ===
 router.get('/selectors', asyncHandler(async (req, res) => {
   const selectors = await getSelectors();
   res.json(selectors);
 }));
 
+const ALLOWED_PROVIDERS = ['outlook', 'teams'];
+
 router.put('/selectors/:provider', asyncHandler(async (req, res) => {
+  if (!ALLOWED_PROVIDERS.includes(req.params.provider)) {
+    return res.status(400).json({ error: 'Invalid provider' });
+  }
   const { selectors } = updateSelectorsSchema.parse(req.body);
   const updated = await updateSelectors(req.params.provider, selectors);
   res.json(updated);
 }));
 
 router.post('/selectors/:provider/test', asyncHandler(async (req, res) => {
+  if (!ALLOWED_PROVIDERS.includes(req.params.provider)) {
+    return res.status(400).json({ error: 'Invalid provider' });
+  }
   const result = await testSelectors(req.params.provider);
   res.json(result);
 }));

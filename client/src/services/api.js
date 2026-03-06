@@ -1623,14 +1623,16 @@ export const getMessageInbox = (params = {}) => {
   if (params.search) qs.set('search', params.search);
   if (params.limit) qs.set('limit', params.limit);
   if (params.offset) qs.set('offset', params.offset);
-  return request(`/messages/inbox?${qs}`);
+  const str = qs.toString();
+  return request(`/messages/inbox${str ? `?${str}` : ''}`);
 };
 export const getMessageDetail = (accountId, messageId) => request(`/messages/${accountId}/${messageId}`);
 export const getMessageDrafts = (params = {}) => {
   const qs = new URLSearchParams();
   if (params.accountId) qs.set('accountId', params.accountId);
   if (params.status) qs.set('status', params.status);
-  return request(`/messages/drafts?${qs}`);
+  const str = qs.toString();
+  return request(`/messages/drafts${str ? `?${str}` : ''}`);
 };
 export const createMessageDraft = (data) => request('/messages/drafts', { method: 'POST', body: JSON.stringify(data) });
 export const generateMessageDraft = (data) => request('/messages/drafts/generate', { method: 'POST', body: JSON.stringify(data) });
