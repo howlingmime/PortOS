@@ -1610,6 +1610,38 @@ export const setGitHubSecret = (name, value) =>
 export const syncGitHubSecret = (name) =>
   request(`/github/secrets/${encodeURIComponent(name)}/sync`, { method: 'POST' });
 
+// Messages
+export const getMessageAccounts = () => request('/messages/accounts');
+export const createMessageAccount = (data) => request('/messages/accounts', { method: 'POST', body: JSON.stringify(data) });
+export const updateMessageAccount = (id, data) => request(`/messages/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteMessageAccount = (id) => request(`/messages/accounts/${id}`, { method: 'DELETE' });
+export const syncMessageAccount = (accountId) => request(`/messages/sync/${accountId}`, { method: 'POST' });
+export const getSyncStatus = (accountId) => request(`/messages/sync/${accountId}/status`);
+export const getMessageInbox = (params = {}) => {
+  const qs = new URLSearchParams();
+  if (params.accountId) qs.set('accountId', params.accountId);
+  if (params.search) qs.set('search', params.search);
+  if (params.limit) qs.set('limit', params.limit);
+  if (params.offset) qs.set('offset', params.offset);
+  return request(`/messages/inbox?${qs}`);
+};
+export const getMessageDetail = (accountId, messageId) => request(`/messages/${accountId}/${messageId}`);
+export const getMessageDrafts = (params = {}) => {
+  const qs = new URLSearchParams();
+  if (params.accountId) qs.set('accountId', params.accountId);
+  if (params.status) qs.set('status', params.status);
+  return request(`/messages/drafts?${qs}`);
+};
+export const createMessageDraft = (data) => request('/messages/drafts', { method: 'POST', body: JSON.stringify(data) });
+export const generateMessageDraft = (data) => request('/messages/drafts/generate', { method: 'POST', body: JSON.stringify(data) });
+export const updateMessageDraft = (id, data) => request(`/messages/drafts/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const approveMessageDraft = (id) => request(`/messages/drafts/${id}/approve`, { method: 'POST' });
+export const sendMessageDraft = (id) => request(`/messages/drafts/${id}/send`, { method: 'POST' });
+export const deleteMessageDraft = (id) => request(`/messages/drafts/${id}`, { method: 'DELETE' });
+export const getMessageSelectors = () => request('/messages/selectors');
+export const updateMessageSelectors = (provider, selectors) => request(`/messages/selectors/${provider}`, { method: 'PUT', body: JSON.stringify({ selectors }) });
+export const testMessageSelectors = (provider) => request(`/messages/selectors/${provider}/test`, { method: 'POST' });
+
 // Default export for simplified imports
 export default {
   get: (endpoint, options) => request(endpoint, { method: 'GET', ...options }),

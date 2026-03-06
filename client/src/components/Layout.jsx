@@ -57,7 +57,8 @@ import {
   Database,
   Shield,
   Wand2,
-  Zap
+  Zap,
+  Mail
 } from 'lucide-react';
 /* global __APP_VERSION__ */
 import Logo from './Logo';
@@ -171,6 +172,7 @@ const navItems = [
       { to: '/meatspace/post', label: 'POST', icon: Zap }
     ]
   },
+  { to: '/messages/inbox', label: 'Messages', icon: Mail, single: true },
   { to: '/security', label: 'Security', icon: Camera, single: true },
   { to: '/settings', label: 'Settings', icon: Settings, single: true },
   { to: '/shell', label: 'Shell', icon: SquareTerminal, single: true },
@@ -604,6 +606,7 @@ export default function Layout() {
             location.pathname.startsWith('/feature-agents') ||
             location.pathname.startsWith('/insights') ||
             location.pathname.startsWith('/meatspace') ||
+            location.pathname.startsWith('/messages') ||
             location.pathname.startsWith('/agents') ||
             location.pathname === '/shell' ||
             location.pathname.startsWith('/city') ||

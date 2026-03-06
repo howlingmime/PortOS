@@ -51,6 +51,7 @@ const CyberCity = lazyWithReload(() => import('./pages/CyberCity'));
 const AppDetail = lazyWithReload(() => import('./pages/AppDetail'));
 const FeatureAgents = lazyWithReload(() => import('./pages/FeatureAgents'));
 const FeatureAgentDetail = lazyWithReload(() => import('./pages/FeatureAgentDetail'));
+const Messages = lazyWithReload(() => import('./pages/Messages'));
 
 // Loading fallback for lazy-loaded pages
 const PageLoader = () => (
@@ -106,6 +107,8 @@ export default function App() {
           <Route path="instances" element={<Instances />} />
           <Route path="meatspace" element={<Navigate to="/meatspace/overview" replace />} />
           <Route path="meatspace/:tab" element={<MeatSpace />} />
+          <Route path="messages" element={<Navigate to="/messages/inbox" replace />} />
+          <Route path="messages/:tab" element={<Messages />} />
           <Route path="jira" element={<Navigate to="/devtools/jira" replace />} />
           <Route path="devtools/jira" element={<Jira />} />
           <Route path="city" element={<CyberCity />} />
