@@ -41,9 +41,7 @@ import { applyRemoteChanges as applyMemoryChanges } from './memorySync.js';
 import { instanceEvents } from './instanceEvents.js';
 import { syncWithPeer, syncAllPeers, initSyncOrchestrator, stopSyncOrchestrator } from './syncOrchestrator.js';
 
-// Mock global fetch
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 describe('syncOrchestrator', () => {
   const mockPeer = {
@@ -59,11 +57,13 @@ describe('syncOrchestrator', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     mockFetch.mockReset();
+    vi.stubGlobal('fetch', mockFetch);
   });
 
   afterEach(() => {
     stopSyncOrchestrator();
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   describe('syncWithPeer', () => {
