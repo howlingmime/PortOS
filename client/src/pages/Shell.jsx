@@ -71,14 +71,14 @@ export default function Shell() {
   // Fetch app folders from the managed apps list
   useEffect(() => {
     fetch('/api/apps')
-      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(res => res.ok ? res.json() : Promise.reject(new Error(`${res.status} ${res.statusText}`)))
       .then(apps => setAppFolders(
         (apps || [])
           .filter(a => a.repoPath)
           .map(a => ({ name: a.name, path: a.repoPath }))
           .sort((a, b) => a.name.localeCompare(b.name))
       ))
-      .catch(err => console.warn('fetch app folders:', err.message));
+      .catch(err => console.warn('fetch app folders:', err?.message ?? String(err)));
   }, []);
 
   // Close dropdown on outside click

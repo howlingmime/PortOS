@@ -84,7 +84,7 @@ export default function BrowserPage() {
       getBrowserConfig().then(c => {
         setConfig(c);
         setConfigDraft(c);
-      }).catch(err => console.warn('load browser config:', err.message));
+      }).catch(err => console.warn('load browser config:', err?.message ?? String(err)));
     }
   }, [showConfig, config]);
 

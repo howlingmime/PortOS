@@ -103,7 +103,7 @@ export default function TaskAddForm({ providers, apps, onTaskAdded, compact = fa
       setTemplateNameInput('');
       api.getCosPopularTemplates(8)
         .then(data => setTemplates(data.templates || []))
-        .catch(err => console.warn('refresh templates:', err.message));
+        .catch(err => console.warn('refresh templates:', err?.message ?? String(err)));
     }
   }, [newTask, templateNameInput, showTemplateSave]);
 

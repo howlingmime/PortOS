@@ -45,7 +45,7 @@ export default function HealthCategorySection({ category, from, to, expanded, on
       if (emptyMetrics.length > 0) {
         api.getLatestHealthMetrics(emptyMetrics)
           .then(latest => { if (!cancelled) setLatestValues(prev => ({ ...prev, ...latest })); })
-          .catch(err => console.warn('fetch latest health metrics:', err.message));
+          .catch(err => console.warn('fetch latest health metrics:', err?.message ?? String(err)));
       }
     });
 
