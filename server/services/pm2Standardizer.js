@@ -501,7 +501,7 @@ export function getStandardTemplate() {
 // Port definitions as single source of truth
 const PORTS = {
   API: 3001,       // Express API server (also serves prod UI build)
-  WEB: 3000        // Vite dev server (development only)
+  UI: 3000         // Vite dev server (development only)
 };
 
 module.exports = {
@@ -523,7 +523,7 @@ module.exports = {
       name: 'myapp-client',
       cwd: './client',
       script: 'npx',
-      args: 'vite --host --port ' + PORTS.WEB,
+      args: 'vite --host --port ' + PORTS.UI,
       watch: false,
       env: {
         NODE_ENV: 'development',

@@ -273,7 +273,8 @@ export function parseEcosystemConfig(content) {
     }
 
     // Check if this process uses vite (need to check vite.config in cwd)
-    const usesVite = /\bvite\b/i.test(appBlock);
+    // Match explicit "vite" command OR VITE_PORT in env config
+    const usesVite = /\bvite\b/i.test(appBlock) || /VITE_PORT/i.test(appBlock);
 
     processes.push({ name: processName, port, ports, cwd, usesVite, isViteProcess: usesVite });
     lastIndex = endPos;

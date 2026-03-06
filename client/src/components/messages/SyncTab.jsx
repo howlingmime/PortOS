@@ -36,7 +36,8 @@ export default function SyncTab({ accounts, onRefresh }) {
     const onSyncStarted = ({ accountId }) => {
       setSyncing(prev => ({ ...prev, [accountId]: 'syncing' }));
     };
-    const onSyncCompleted = ({ accountId, newMessages }) => {
+    const onSyncCompleted = ({ accountId, newMessages, status }) => {
+      if (status && status !== 'success') return; // non-success handled by specific event (e.g. sync:auth-required)
       setSyncing(prev => ({ ...prev, [accountId]: null }));
       toast.success(`Sync complete: ${newMessages} new messages`);
       onRefresh();
