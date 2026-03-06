@@ -280,6 +280,14 @@ export async function syncPlaywright(account, cache, io, options = {}) {
 
 /**
  * Click into an Outlook conversation row and extract the full body + all thread messages.
+ * Uses Outlook's DOM structure:
+ *   main[aria-label="Reading Pane"]
+ *     > [aria-label="Email message"]   (one per thread message)
+ *       > [role="document"]            ("Message body" — the actual email content)
+ *       > h3[aria-label^="From:"]      (sender)
+ *       > h3 with date text            (date)
+ *       > h3[aria-label^="To:"]        (recipients)
+ *       > h3[aria-label^="Cc:"]        (cc)
  * Returns an array of { from, fromEmail, to, cc, date, body } for each message in the thread.
  */
 async function fetchOutlookConversationDetail(page, rowIndex) {
@@ -293,72 +301,84 @@ async function fetchOutlookConversationDetail(page, rowIndex) {
       if (!row) return false;
       row.click();
       // Wait for reading pane to load
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 2000));
       return true;
     })()
   `);
 
   if (!clickResult) return null;
 
-  // Extract all messages in the conversation from the reading pane
+  // Extract all messages from the reading pane using Outlook's semantic structure
   const threadMessages = await evaluateOnPage(page, `
     (function() {
-      // Outlook reading pane: conversation view shows multiple messages
-      // Each message in the thread is in a div with role="document" or a message container
+      const readingPane = document.querySelector('main[aria-label="Reading Pane"]');
+      if (!readingPane) return [];
+
+      // Each email in the conversation is an [aria-label="Email message"] container
+      const emailContainers = readingPane.querySelectorAll('[aria-label="Email message"]');
       const results = [];
 
-      // Try conversation view: multiple message items
-      const msgContainers = document.querySelectorAll('[aria-label="Message body"], [role="document"]');
+      for (const container of emailContainers) {
+        // Body: role="document" is the "Message body"
+        const bodyDoc = container.querySelector('[role="document"]');
+        const body = bodyDoc?.innerText?.trim() || '';
+        if (!body) continue;
 
-      if (msgContainers.length > 0) {
-        for (const container of msgContainers) {
-          // Walk up to find the message wrapper with sender/date info
-          let wrapper = container.closest('[data-convid]') || container.closest('[tabindex]') || container.parentElement?.parentElement;
+        // Sender: h3 with aria-label starting with "From:"
+        let from = '', fromEmail = '';
+        const fromH3 = container.querySelector('h3[aria-label^="From:"]');
+        if (fromH3) {
+          const fromBtn = fromH3.querySelector('button');
+          const fromText = fromBtn?.textContent?.trim() || fromH3.textContent?.replace(/^From:\\s*/, '').trim() || '';
+          // Extract email from the text (format: "Name<email>" or just "Name")
+          const emailMatch = fromText.match(/[\\w.+-]+@[\\w.-]+/);
+          fromEmail = emailMatch?.[0] || '';
+          from = fromText.replace(/<[^>]+>/, '').replace(emailMatch?.[0] || '', '').trim() || fromText;
+        }
 
-          // Extract sender from header area
-          let from = '', fromEmail = '', date = '';
-          const to = [], cc = [];
-
-          // Look for sender info near this message body
-          const headerArea = wrapper || container.previousElementSibling || container.parentElement;
-          if (headerArea) {
-            // Sender name
-            const senderEl = headerArea.querySelector('span[aria-label*="From"]')
-              || headerArea.querySelector('button[aria-label*="email"]')
-              || headerArea.querySelector('span.lpc-hoverTarget');
-            from = senderEl?.textContent?.trim() || '';
-            fromEmail = senderEl?.getAttribute('aria-label')?.match(/[\\w.-]+@[\\w.-]+/)?.[0] || '';
-
-            // Date
-            const dateEl = headerArea.querySelector('time') || headerArea.querySelector('span[title*="/"]');
-            date = dateEl?.getAttribute('datetime') || dateEl?.getAttribute('title') || dateEl?.textContent?.trim() || '';
-
-            // To/CC
-            const toEls = headerArea.querySelectorAll('span[aria-label*="To"]');
-            toEls.forEach(el => {
-              const email = el.textContent?.trim();
-              if (email) to.push(email);
-            });
-          }
-
-          // Full body text
-          const body = container.innerText?.trim() || '';
-          if (body) {
-            results.push({ from, fromEmail, to, cc, date, body });
+        // Date: h3 elements — look for one with a date pattern
+        let date = '';
+        const h3s = container.querySelectorAll('h3');
+        for (const h3 of h3s) {
+          const text = h3.textContent?.trim() || '';
+          // Match date patterns like "Wed 3/4/2026 10:46 AM" or "3/4/2026"
+          if (/\\d{1,2}\\/\\d{1,2}\\/\\d{2,4}/.test(text) && !text.startsWith('From') && !text.startsWith('To') && !text.startsWith('Cc')) {
+            date = text;
+            break;
           }
         }
+
+        // To: h3 with aria-label starting with "To:"
+        const to = [];
+        const toH3 = container.querySelector('h3[aria-label^="To:"]');
+        if (toH3) {
+          const btns = toH3.querySelectorAll('button');
+          btns.forEach(btn => {
+            const t = btn.textContent?.trim();
+            if (t) to.push(t);
+          });
+        }
+
+        // Cc: h3 with aria-label starting with "Cc:"
+        const cc = [];
+        const ccH3 = container.querySelector('h3[aria-label^="Cc:"]');
+        if (ccH3) {
+          const btns = ccH3.querySelectorAll('button');
+          btns.forEach(btn => {
+            const t = btn.textContent?.trim();
+            if (t) cc.push(t);
+          });
+        }
+
+        results.push({ from, fromEmail, to, cc, date, body });
       }
 
-      // Fallback: single message view — grab entire reading pane content
+      // Fallback: no Email message containers found — try grabbing role="document" directly
       if (results.length === 0) {
-        const readingPane = document.querySelector('[aria-label="Reading Pane"]')
-          || document.querySelector('[role="main"]')
-          || document.querySelector('.customScrollBar');
-        if (readingPane) {
-          const body = readingPane.innerText?.trim() || '';
-          if (body) {
-            results.push({ from: '', fromEmail: '', to: [], cc: [], date: '', body });
-          }
+        const docs = readingPane.querySelectorAll('[role="document"]');
+        for (const doc of docs) {
+          const body = doc.innerText?.trim() || '';
+          if (body) results.push({ from: '', fromEmail: '', to: [], cc: [], date: '', body });
         }
       }
 
