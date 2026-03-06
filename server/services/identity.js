@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { PATHS, ensureDir, safeJSONParse } from '../lib/fileUtils.js';
+import { ServerError } from '../lib/errorHandler.js';
 import { getGenomeSummary } from './genome.js';
 import { getTasteProfile } from './taste-questionnaire.js';
 
@@ -694,7 +695,7 @@ export async function createGoal({ title, description, horizon, category, parent
 
   // Validate parentId references an existing goal
   if (parentId && !goals.goals.find(g => g.id === parentId)) {
-    throw new Error('Parent goal not found');
+    throw new ServerError('Parent goal not found', { status: 400, code: 'INVALID_PARENT' });
   }
 
   const id = `goal-${uuidv4()}`;
@@ -749,10 +750,10 @@ export async function updateGoal(goalId, updates) {
   // Validate parentId doesn't create a cycle
   if (updates.parentId !== undefined && updates.parentId !== null) {
     if (!goals.goals.find(g => g.id === updates.parentId)) {
-      throw new Error('Parent goal not found');
+      throw new ServerError('Parent goal not found', { status: 400, code: 'INVALID_PARENT' });
     }
     if (hasAncestorCycle(goals.goals, goalId, updates.parentId)) {
-      throw new Error('Cannot set parent: would create a cycle');
+      throw new ServerError('Cannot set parent: would create a cycle', { status: 400, code: 'CYCLE_DETECTED' });
     }
   }
 
