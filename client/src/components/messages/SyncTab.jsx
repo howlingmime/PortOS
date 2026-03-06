@@ -4,15 +4,30 @@ import toast from 'react-hot-toast';
 import * as api from '../../services/api';
 import socket from '../../services/socket';
 
+// Default selectors for supported providers — ensures editor cards always render,
+// even on fresh installs before selectors.json exists.
+const DEFAULT_SELECTORS = {
+  outlook: { messageRow: "[role='listitem']" },
+  teams: { messageItem: "[role='listitem']" },
+};
+
 export default function SyncTab({ accounts, onRefresh }) {
   const [syncing, setSyncing] = useState({});
-  const [selectors, setSelectors] = useState({});
+  const [rawSelectors, setRawSelectors] = useState({});
   const [editingSelector, setEditingSelector] = useState(null);
   const [selectorForm, setSelectorForm] = useState({});
 
+  // Merge fetched selectors with defaults so every supported provider always appears
+  const selectors = Object.fromEntries(
+    Object.entries(DEFAULT_SELECTORS).map(([provider, defaults]) => [
+      provider,
+      { ...defaults, ...(rawSelectors[provider] || {}) },
+    ])
+  );
+
   const fetchSelectors = useCallback(async () => {
     const data = await api.getMessageSelectors().catch(() => ({}));
-    setSelectors(data || {});
+    setRawSelectors(data || {});
   }, []);
 
   useEffect(() => {
