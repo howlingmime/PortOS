@@ -11,7 +11,7 @@ function urgencyIndicator(urgency) {
   return <div className={`w-2 h-2 rounded-full ${color}`} title={`${Math.round(urgency * 100)}% urgency`} />;
 }
 
-function GoalRow({ goal, depth, expandedIds, onToggle, onSelect, selectedId, allGoals, onAddChild }) {
+function GoalRow({ goal, depth, expandedIds, onToggle, onSelect, selectedId, onAddChild }) {
   const cat = CATEGORY_CONFIG[goal.category] || CATEGORY_CONFIG.mastery;
   const CatIcon = cat.icon;
   const expanded = expandedIds.has(goal.id);
@@ -84,7 +84,6 @@ function GoalRow({ goal, depth, expandedIds, onToggle, onSelect, selectedId, all
           onToggle={onToggle}
           onSelect={onSelect}
           selectedId={selectedId}
-          allGoals={allGoals}
           onAddChild={onAddChild}
         />
       ))}

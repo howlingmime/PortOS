@@ -53,7 +53,7 @@ export const createGoalInputSchema = z.object({
   description: z.string().max(2000).optional(),
   horizon: goalHorizonEnum.optional().default('5-year'),
   category: goalCategoryEnum.optional().default('mastery'),
-  parentId: z.string().nullable().optional().default(null),
+  parentId: z.string().min(1).nullable().optional().default(null),
   tags: z.array(z.string().min(1).max(50)).max(20).optional().default([])
 });
 
@@ -63,7 +63,7 @@ export const updateGoalInputSchema = z.object({
   horizon: goalHorizonEnum.optional(),
   category: goalCategoryEnum.optional(),
   status: goalStatusEnum.optional(),
-  parentId: z.string().nullable().optional(),
+  parentId: z.string().min(1).nullable().optional(),
   tags: z.array(z.string().min(1).max(50)).max(20).optional()
 });
 

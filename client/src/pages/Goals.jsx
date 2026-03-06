@@ -10,8 +10,11 @@ const TABS = [
   { id: 'list', label: 'List', icon: List }
 ];
 
+const VALID_TABS = new Set(TABS.map(t => t.id));
+
 export default function Goals() {
-  const { tab = 'tree' } = useParams();
+  const { tab: rawTab } = useParams();
+  const tab = VALID_TABS.has(rawTab) ? rawTab : 'tree';
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -34,7 +37,7 @@ export default function Goals() {
       <div className="flex items-center justify-between px-6 py-4 border-b border-port-border bg-port-card">
         <div className="flex items-center gap-3">
           <Target className="w-6 h-6 text-port-accent" />
-          <h1 className="text-xl font-semibold text-white">Goal Tree</h1>
+          <h1 className="text-xl font-semibold text-white">Goals</h1>
           {data && (
             <span className="text-sm text-gray-500">
               {data.flat?.length || 0} goals

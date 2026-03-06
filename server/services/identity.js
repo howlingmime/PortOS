@@ -706,7 +706,7 @@ export async function createGoal({ title, description, horizon, category, parent
     horizon: horizon || '5-year',
     category: category || 'mastery',
     parentId: parentId || null,
-    tags: tags || [],
+    tags: [...new Set((tags || []).map(t => t.trim()).filter(Boolean))],
     urgency: null,
     status: 'active',
     milestones: [],
@@ -785,9 +785,11 @@ export async function deleteGoal(goalId) {
 
   const deletedGoal = goals.goals[idx];
   // Orphan children: reparent to deleted goal's parent (or root)
+  const now = new Date().toISOString();
   for (const goal of goals.goals) {
     if (goal.parentId === goalId) {
       goal.parentId = deletedGoal.parentId || null;
+      goal.updatedAt = now;
     }
   }
 
