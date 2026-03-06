@@ -42,7 +42,7 @@ export default function Messages() {
       case 'inbox':
         return <InboxTab accounts={accounts} />;
       case 'accounts':
-        return <AccountsTab accounts={accounts} onRefresh={fetchAccounts} />;
+        return <AccountsTab accounts={accounts} setAccounts={setAccounts} />;
       case 'drafts':
         return <DraftsTab accounts={accounts} />;
       case 'sync':

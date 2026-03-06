@@ -6,7 +6,7 @@ import * as api from '../../services/api';
 const TYPE_ICONS = { gmail: Mail, outlook: Globe, teams: MessageSquare };
 const TYPE_LABELS = { gmail: 'Gmail (MCP)', outlook: 'Outlook (Playwright)', teams: 'Teams (Playwright)' };
 
-export default function AccountsTab({ accounts, onRefresh }) {
+export default function AccountsTab({ accounts, setAccounts, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', type: 'gmail', email: '' });
   const [saving, setSaving] = useState(false);
@@ -21,7 +21,7 @@ export default function AccountsTab({ accounts, onRefresh }) {
     setShowForm(false);
     setForm({ name: '', type: 'gmail', email: '' });
     toast.success('Account created');
-    onRefresh();
+    setAccounts(prev => [...prev, result]);
   };
 
   const handleDelete = async (id) => {
@@ -30,14 +30,14 @@ export default function AccountsTab({ accounts, onRefresh }) {
     setDeleting(null);
     if (!ok) return toast.error('Failed to delete account');
     toast.success('Account deleted');
-    onRefresh();
+    setAccounts(prev => prev.filter(a => a.id !== id));
   };
 
   const handleToggle = async (account) => {
     const result = await api.updateMessageAccount(account.id, { enabled: !account.enabled }).catch(() => null);
     if (!result) return toast.error('Failed to update account');
     toast.success(account.enabled ? 'Account disabled' : 'Account enabled');
-    onRefresh();
+    setAccounts(prev => prev.map(a => a.id === account.id ? { ...a, enabled: !a.enabled } : a));
   };
 
   return (
