@@ -7,6 +7,7 @@ import * as messageSync from '../services/messageSync.js';
 import * as messageDrafts from '../services/messageDrafts.js';
 import * as messageSender from '../services/messageSender.js';
 import { getSelectors, updateSelectors, testSelectors, launchProvider } from '../services/messagePlaywrightSync.js';
+import { evaluateMessages, generateReplyBody } from '../services/messageEvaluator.js';
 
 const router = express.Router();
 
@@ -35,8 +36,8 @@ const updateAccountSchema = z.object({
 
 const createDraftSchema = z.object({
   accountId: z.string().uuid(),
-  replyToMessageId: z.string().optional(),
-  threadId: z.string().optional(),
+  replyToMessageId: z.string().nullish(),
+  threadId: z.string().nullish(),
   to: z.array(z.string()).optional().default([]),
   cc: z.array(z.string()).optional().default([]),
   subject: z.string().optional().default(''),
@@ -55,8 +56,8 @@ const updateDraftSchema = z.object({
 
 const generateDraftSchema = z.object({
   accountId: z.string().uuid(),
-  replyToMessageId: z.string().optional(),
-  threadId: z.string().optional(),
+  replyToMessageId: z.string().nullish(),
+  threadId: z.string().nullish(),
   context: z.string().optional().default(''),
   instructions: z.string().optional().default('')
 });
@@ -143,6 +144,30 @@ router.get('/inbox', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
+// === Evaluate Route ===
+router.post('/evaluate', asyncHandler(async (req, res) => {
+  const { accountId, messageIds } = req.body || {};
+  // Get messages to evaluate
+  let messages;
+  if (messageIds && Array.isArray(messageIds)) {
+    // Evaluate specific messages
+    const allResult = await messageSync.getMessages({ accountId, limit: 100 });
+    messages = allResult.messages.filter(m => messageIds.includes(m.id));
+  } else {
+    // Evaluate all unevaluated messages (up to 20)
+    const allResult = await messageSync.getMessages({ accountId, limit: 50 });
+    messages = allResult.messages.filter(m => !m.evaluation).slice(0, 20);
+  }
+  if (!messages.length) return res.json({ evaluations: {} });
+
+  const result = await evaluateMessages(messages);
+
+  // Store evaluations back on cached messages
+  await messageSync.updateMessageEvaluations(result.evaluations);
+
+  res.json(result);
+}));
+
 // === Draft Routes ===
 router.get('/drafts', asyncHandler(async (req, res) => {
   const { accountId, status } = req.query;
@@ -171,14 +196,29 @@ router.post('/drafts/generate', asyncHandler(async (req, res) => {
   const data = validateRequest(generateDraftSchema, req.body);
   const account = await messageAccounts.getAccount(data.accountId);
   if (!account) return res.status(404).json({ error: 'Account not found' });
-  // AI draft generation - stub for now
-  // TODO: Use portos-ai-toolkit for provider selection and model tiers
+
+  // Fetch the original message to build AI reply
+  let replyBody = '';
+  if (data.replyToMessageId) {
+    const originalMsg = await messageSync.getMessage(data.accountId, data.replyToMessageId);
+    if (originalMsg) {
+      const aiResult = await generateReplyBody(originalMsg, data.instructions).catch(err => {
+        console.log(`📧 AI reply generation failed, using placeholder: ${err.message}`);
+        return null;
+      });
+      replyBody = aiResult?.body || `[AI generation failed — configure provider in Messages > Config]\n\nContext: ${data.context}`;
+    }
+  }
+  if (!replyBody) {
+    replyBody = `[No original message found]\n\nContext: ${data.context}\nInstructions: ${data.instructions}`;
+  }
+
   const draft = await messageDrafts.createDraft({
     accountId: data.accountId,
     replyToMessageId: data.replyToMessageId,
     threadId: data.threadId,
     subject: '',
-    body: `[AI-generated reply placeholder]\n\nContext: ${data.context}\nInstructions: ${data.instructions}`,
+    body: replyBody,
     generatedBy: 'ai',
     sendVia: account.provider || (account.type === 'gmail' ? 'mcp' : 'playwright')
   });

@@ -174,6 +174,26 @@ export async function syncAccount(accountId, io, options = {}) {
   return result;
 }
 
+export async function updateMessageEvaluations(evaluations) {
+  await ensureDir(CACHE_DIR);
+  const { readdir } = await import('fs/promises');
+  const files = await readdir(CACHE_DIR).catch(() => []);
+  for (const file of files) {
+    if (!file.endsWith('.json')) continue;
+    const accountId = file.replace('.json', '');
+    if (!UUID_RE.test(accountId)) continue;
+    const cache = await loadCache(accountId);
+    let changed = false;
+    for (const msg of cache.messages) {
+      if (evaluations[msg.id]) {
+        msg.evaluation = evaluations[msg.id];
+        changed = true;
+      }
+    }
+    if (changed) await saveCache(accountId, cache);
+  }
+}
+
 export async function getSyncStatus(accountId) {
   const account = await getAccount(accountId);
   if (!account) return null;
