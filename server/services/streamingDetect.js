@@ -359,6 +359,7 @@ export async function streamDetection(socket, dirPath) {
     uiPort: null,
     devUiPort: null,
     apiPort: null,
+    buildCommand: null,
     startCommands: [],
     pm2ProcessNames: [],
     pm2Status: null,
@@ -413,10 +414,11 @@ export async function streamDetection(socket, dirPath) {
         else if (deps.express || deps.fastify || deps.koa) result.type = 'single-node-server';
         else if (deps.next) result.type = 'nextjs';
 
-        // Get start commands
+        // Get start commands and build command
         const scripts = pkg.scripts || {};
         if (scripts.dev) result.startCommands.push('npm run dev');
         if (scripts.start && !scripts.dev) result.startCommands.push('npm start');
+        if (scripts.build) result.buildCommand = 'npm run build';
 
         emit('package', 'done', {
           message: `Found: ${result.name}`,

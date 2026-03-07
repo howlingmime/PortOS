@@ -625,6 +625,16 @@ router.post('/:id/refresh-config', loadApp, asyncHandler(async (req, res) => {
   // Update app with new process data
   const updates = {};
 
+  // Detect buildCommand from package.json if not already set
+  if (!app.buildCommand) {
+    const pkgPath = join(app.repoPath, 'package.json');
+    const pkgContent = await readFile(pkgPath, 'utf-8').catch(() => null);
+    if (pkgContent) {
+      const pkg = JSON.parse(pkgContent);
+      if (pkg.scripts?.build) updates.buildCommand = 'npm run build';
+    }
+  }
+
   // Update pm2Home if detected and different from current
   if (pm2Home && pm2Home !== app.pm2Home) {
     updates.pm2Home = pm2Home;
@@ -634,10 +644,20 @@ router.post('/:id/refresh-config', loadApp, asyncHandler(async (req, res) => {
     updates.processes = processes;
     updates.pm2ProcessNames = processes.map(p => p.name);
 
-    // Update apiPort if we found one and it's different
-    const processWithPort = processes.find(p => p.port);
-    if (processWithPort && processWithPort.port !== app.apiPort) {
-      updates.apiPort = processWithPort.port;
+    // Derive ports from parsed process labels (same logic as streamDetection)
+    const apiProc = processes.find(p => p.ports?.api);
+    if (apiProc) updates.apiPort = apiProc.ports.api;
+
+    const uiProc = processes.find(p => p.ports?.ui);
+    if (uiProc) updates.uiPort = uiProc.ports.ui;
+
+    const devUiProc = processes.find(p => p.ports?.devUi);
+    if (devUiProc) updates.devUiPort = devUiProc.ports.devUi;
+
+    // When app has API + Vite dev but no dedicated UI port,
+    // the prod UI is served by the API server
+    if (!updates.uiPort && updates.apiPort && (updates.devUiPort || app.devUiPort)) {
+      updates.uiPort = updates.apiPort;
     }
   }
 
