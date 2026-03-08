@@ -39,16 +39,15 @@ function computeEventWeeks(birthDate, grid, stats, lifeEvents) {
   const currentAge = Math.floor(stats.age.years);
   const now = new Date();
 
-  // Mark birthday weeks for remaining years
+  // Helper: compute week offset within an age-year (server uses birth time as yearStart)
+  const weekInAgeYear = (eventDate, yearStart) => {
+    const ms = eventDate.getTime() - yearStart.getTime();
+    return Math.floor(ms / (7 * 86400000));
+  };
+
+  // Mark birthday weeks for all years (birthday is always week 0 by definition)
   for (const row of grid) {
-    if (row.age <= currentAge) continue;
-    const yearStart = new Date(birth);
-    yearStart.setFullYear(birth.getFullYear() + row.age);
-    const bday = new Date(yearStart.getFullYear(), birthMonth, birthDay);
-    const weekOfYear = Math.floor((bday - yearStart) / (7 * 86400000));
-    if (weekOfYear >= 0 && weekOfYear < 52) {
-      events.set(`${row.age}-${weekOfYear}`, { type: 'birthday', name: 'Birthday' });
-    }
+    events.set(`${row.age}-0`, { type: 'birthday', name: 'Birthday' });
   }
 
   // Add life events from server
@@ -60,9 +59,12 @@ function computeEventWeeks(birthDate, grid, stats, lifeEvents) {
         for (const row of grid) {
           const yearStart = new Date(birth);
           yearStart.setFullYear(birth.getFullYear() + row.age);
-          const eventDate = new Date(yearStart.getFullYear(), event.month, event.day);
-          if (eventDate <= now) continue;
-          const weekOfYear = Math.floor((eventDate - yearStart) / (7 * 86400000));
+          // Event may fall in this calendar year or next (if before birthday)
+          let eventDate = new Date(yearStart.getFullYear(), event.month, event.day);
+          if (eventDate < yearStart) {
+            eventDate = new Date(yearStart.getFullYear() + 1, event.month, event.day);
+          }
+          const weekOfYear = weekInAgeYear(eventDate, yearStart);
           if (weekOfYear >= 0 && weekOfYear < 52) {
             const key = `${row.age}-${weekOfYear}`;
             if (!events.has(key)) {
@@ -72,12 +74,11 @@ function computeEventWeeks(birthDate, grid, stats, lifeEvents) {
         }
       } else if (event.recurrence === 'once' && event.date) {
         const eventDate = new Date(event.date);
-        if (eventDate <= now) continue;
         const ageMs = eventDate - birth;
         const age = Math.floor(ageMs / (365.25 * 86400000));
         const yearStart = new Date(birth);
         yearStart.setFullYear(birth.getFullYear() + age);
-        const weekOfYear = Math.floor((eventDate - yearStart) / (7 * 86400000));
+        const weekOfYear = weekInAgeYear(eventDate, yearStart);
         if (weekOfYear >= 0 && weekOfYear < 52) {
           const key = `${age}-${weekOfYear}`;
           if (!events.has(key)) {
@@ -175,8 +176,9 @@ function computeMonthGrid(birthDate, deathDate) {
     else status = 'r';
     const age = Math.floor(i / 12);
     const mo = i % 12;
-    const isBirthday = cursor.getMonth() === birthMonth;
-    cells.push({ index: i, age, month: mo, label: `Age ${age}, Month ${mo + 1}`, status, isBirthday });
+    const calMonth = cursor.getMonth();
+    const isBirthday = calMonth === birthMonth;
+    cells.push({ index: i, age, month: mo, calMonth, label: `Age ${age}, Month ${mo + 1}`, status, isBirthday });
     cursor.setMonth(cursor.getMonth() + 1);
     i++;
   }
@@ -249,7 +251,7 @@ function cellClasses(status, isCurrent, isBirthday, showEvents) {
 
 // === Year Grid ===
 
-function YearGridView({ birthDate, deathDate, hideSpent, showEvents }) {
+function YearGridView({ birthDate, deathDate, hideSpent }) {
   const cells = useMemo(() => computeYearGrid(birthDate, deathDate), [birthDate, deathDate]);
   const currentAge = Math.floor((Date.now() - new Date(birthDate).getTime()) / (365.25 * MS_PER_DAY));
   const filtered = hideSpent ? cells.filter(c => c.status === 'c' || c.status === 'r') : cells;
@@ -277,7 +279,7 @@ function YearGridView({ birthDate, deathDate, hideSpent, showEvents }) {
             {row.map((cell) => (
               <span
                 key={cell.index}
-                className={`rounded-sm ${cellClasses(cell.status, cell.index === currentAge, cell.isBirthday, showEvents)}`}
+                className={`rounded-sm ${cellClasses(cell.status, cell.index === currentAge, false, false)}`}
                 style={{ aspectRatio: '1', width: '100%' }}
                 title={cell.label}
               />
@@ -294,11 +296,24 @@ function YearGridView({ birthDate, deathDate, hideSpent, showEvents }) {
 
 // === Month Grid ===
 
-function MonthGridView({ birthDate, deathDate, hideSpent, showEvents }) {
+function MonthGridView({ birthDate, deathDate, hideSpent, showEvents, lifeEvents }) {
   const cells = useMemo(() => computeMonthGrid(birthDate, deathDate), [birthDate, deathDate]);
   const currentAge = Math.floor((Date.now() - new Date(birthDate).getTime()) / (365.25 * MS_PER_DAY));
   const filtered = hideSpent ? cells.filter(c => c.status === 'c' || c.status === 'r') : cells;
   const [containerRef, containerWidth] = useContainerWidth();
+
+  // Build a set of calendar months that have yearly events
+  const eventMonths = useMemo(() => {
+    if (!showEvents || !lifeEvents?.length) return new Map();
+    const map = new Map();
+    for (const event of lifeEvents) {
+      if (!event.enabled || event.recurrence !== 'yearly' || event.month == null) continue;
+      if (!map.has(event.month)) {
+        map.set(event.month, { type: event.type, name: event.name });
+      }
+    }
+    return map;
+  }, [showEvents, lifeEvents]);
 
   // Responsive: fit cells to container width
   // Each row is N years × 12 months. Pick years-per-row based on width.
@@ -332,14 +347,36 @@ function MonthGridView({ birthDate, deathDate, hideSpent, showEvents }) {
             {row.label}–{row.endAge}
           </span>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: `${gap}px`, marginTop: '1px' }}>
-            {row.cells.map((cell) => (
-              <span
-                key={cell.index}
-                className={`rounded-[1px] ${cellClasses(cell.status, cell.age === currentAge, cell.isBirthday, showEvents)}`}
-                style={{ width: `${cellSize}px`, height: `${cellSize}px` }}
-                title={cell.label}
-              />
-            ))}
+            {row.cells.map((cell) => {
+              const eventInfo = showEvents ? eventMonths.get(cell.calMonth) : null;
+              const eventStyle = eventInfo ? EVENT_TYPE_STYLES[eventInfo.type] : null;
+
+              let cls;
+              if (cell.status === 'c') {
+                cls = 'bg-port-accent shadow-[0_0_4px_rgba(59,130,246,0.5)]';
+              } else if (cell.isBirthday && showEvents) {
+                cls = cell.status === 's'
+                  ? `${cell.age === currentAge ? 'bg-gray-500' : 'bg-gray-700'} ring-1 ring-pink-500/50`
+                  : 'bg-pink-500 ring-1 ring-pink-500/50';
+              } else if (eventStyle) {
+                cls = cell.status === 's'
+                  ? `${cell.age === currentAge ? 'bg-gray-500' : 'bg-gray-700'} ${eventStyle.ring}`
+                  : `${eventStyle.bg} ${eventStyle.ring}`;
+              } else if (cell.status === 's') {
+                cls = cell.age === currentAge ? 'bg-gray-500' : 'bg-gray-700';
+              } else {
+                cls = 'bg-port-success/20';
+              }
+
+              return (
+                <span
+                  key={cell.index}
+                  className={`rounded-[1px] ${cls}`}
+                  style={{ width: `${cellSize}px`, height: `${cellSize}px` }}
+                  title={`${cell.label}${eventInfo ? ` — ${eventInfo.name}` : ''}`}
+                />
+              );
+            })}
           </div>
         </div>
       ))}
@@ -536,20 +573,19 @@ function WeekGridView({ grid, stats, birthDate, cellCfg, weekLayout, hideSpent, 
               const eventStyle = eventInfo ? EVENT_TYPE_STYLES[eventInfo.type] : null;
 
               let bgClass;
-              if (eventStyle && cell.status === 'r') {
-                bgClass = eventStyle.bg;
-              } else if (cell.status === 'c') {
+              if (cell.status === 'c') {
                 bgClass = 'bg-port-accent shadow-[0_0_4px_rgba(59,130,246,0.5)]';
+              } else if (eventStyle && cell.status === 'r') {
+                bgClass = eventStyle.bg;
               } else if (cell.status === 's') {
                 bgClass = cell.age === currentAge ? 'bg-gray-500' : 'bg-gray-700';
               } else {
                 bgClass = 'bg-port-success/20';
               }
-
               return (
                 <span
                   key={wi}
-                  className={`shrink-0 rounded-[1px] ${bgClass} ${eventStyle ? eventStyle.ring : ''}`}
+                  className={`shrink-0 rounded-[1px] ${bgClass} ${eventStyle?.ring ?? ''}`}
                   style={{ width: `${responsiveCell.size}px`, height: `${responsiveCell.size}px` }}
                   title={`Age ${cell.age}, Week ${cell.week + 1}${eventInfo ? ` — ${eventInfo.name}` : ''}`}
                 />
@@ -667,7 +703,7 @@ function LifeGrid({ grid, stats, birthDate, deathDate, lifeEvents }) {
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-gray-600" /> Spent</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-port-accent" /> Now</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-port-success/30" /> Remaining</span>
-        {showEvents && (
+        {showEvents && unit !== 'years' && (
           <>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-pink-500" /> Birthday</span>
             {activeEventTypes.map(type => {
@@ -684,10 +720,10 @@ function LifeGrid({ grid, stats, birthDate, deathDate, lifeEvents }) {
 
       {/* Grid */}
       {unit === 'years' && (
-        <YearGridView birthDate={birthDate} deathDate={deathDate} hideSpent={hideSpent} showEvents={showEvents} />
+        <YearGridView birthDate={birthDate} deathDate={deathDate} hideSpent={hideSpent} />
       )}
       {unit === 'months' && (
-        <MonthGridView birthDate={birthDate} deathDate={deathDate} hideSpent={hideSpent} showEvents={showEvents} />
+        <MonthGridView birthDate={birthDate} deathDate={deathDate} hideSpent={hideSpent} showEvents={showEvents} lifeEvents={lifeEvents} />
       )}
       {unit === 'weeks' && (
         <WeekGridView grid={grid} stats={stats} birthDate={birthDate} cellCfg={cellCfg} weekLayout={weekLayout} hideSpent={hideSpent} showEvents={showEvents} lifeEvents={lifeEvents} />

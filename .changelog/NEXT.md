@@ -10,6 +10,9 @@
 - Months view shows decade-per-row with flex-wrap (no horizontal scrolling)
 
 ## Fixed
+- Life Calendar: birthdays and holidays now visible on Week view (fixed time-of-day offset bug and cross-birthday-boundary event mapping)
+- Life Calendar: holidays now shown on Month view with event type coloring
+- Life Calendar: Year view no longer applies birthday/holiday coloring since every cell contains both
 - Update scripts (update.sh/update.ps1) now build UI assets before restarting PM2, ensuring production serves the latest client build
 - App refresh-config now correctly derives uiPort, devUiPort, and apiPort from ecosystem process labels (fixes apps showing dev UI port as Launch)
 - App refresh-config and detection now auto-detect buildCommand from package.json, enabling Build button for apps with production builds
