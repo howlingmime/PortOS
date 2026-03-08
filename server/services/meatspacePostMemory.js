@@ -168,17 +168,28 @@ export async function createMemoryItem(data) {
   const items = await loadMemoryItems();
   const now = new Date().toISOString();
 
+  const rawLines = (data.lines || []).map(l => ({
+    text: l.text || l,
+    ...(l.elements ? { elements: l.elements } : {})
+  }));
+
+  // Auto-chunk uses all lines (including blanks for boundary detection)
+  const chunks = data.chunks || autoChunk(rawLines);
+
+  // Store only non-empty lines for practice
+  const contentLines = rawLines.filter(l => l.text.trim().length > 0);
+
+  // Remap chunk lineRanges to match filtered line indices
+  const remappedChunks = remapChunksAfterFilter(rawLines, contentLines, chunks);
+
   const item = {
     id: randomUUID(),
     title: data.title,
     type: data.type || 'text',
     builtin: false,
     content: {
-      lines: (data.lines || []).map(l => ({
-        text: l.text || l,
-        ...(l.elements ? { elements: l.elements } : {})
-      })),
-      chunks: data.chunks || autoChunk(data.lines || []),
+      lines: contentLines,
+      chunks: remappedChunks,
     },
     mastery: { overallPct: 0, chunks: {}, elements: {} },
     createdAt: now,
@@ -187,7 +198,7 @@ export async function createMemoryItem(data) {
 
   items.push(item);
   await saveMemoryItems(items);
-  console.log(`🧠 Memory item created: "${item.title}"`);
+  console.log(`🧠 Memory item created: "${item.title}" (${contentLines.length} lines, ${remappedChunks.length} chunks)`);
   return item;
 }
 
@@ -315,6 +326,7 @@ export async function getTrainingLog(memoryItemId, limit = 50) {
  * Generate a memory drill for a POST session.
  * Picks the memory item with the lowest mastery (or user-configured item)
  * and creates a fill-in-the-blank or sequence recall exercise.
+ * Uses spaced repetition: focuses on lowest-mastery chunks.
  */
 export async function generateMemoryDrill(config = {}) {
   const items = await loadMemoryItems();
@@ -342,6 +354,27 @@ export async function generateMemoryDrill(config = {}) {
     default:
       return generateFillBlank(item, count);
   }
+}
+
+/**
+ * Get chunk mastery stats for spaced repetition.
+ * Returns chunks sorted by mastery (lowest first) with hint level.
+ */
+export function getChunkMasteryOrder(item) {
+  const chunks = item.content?.chunks || [];
+  return chunks.map(chunk => {
+    const stats = item.mastery?.chunks?.[chunk.id];
+    const accuracy = stats?.attempts > 0 ? stats.correct / stats.attempts : 0;
+    // Hint level: 0 = full hints, 1 = partial, 2 = minimal, 3 = no hints
+    const hintLevel = accuracy >= 0.9 ? 3 : accuracy >= 0.7 ? 2 : accuracy >= 0.4 ? 1 : 0;
+    return {
+      ...chunk,
+      accuracy: Math.round(accuracy * 100),
+      attempts: stats?.attempts || 0,
+      lastPracticed: stats?.lastPracticed || null,
+      hintLevel,
+    };
+  }).sort((a, b) => a.accuracy - b.accuracy);
 }
 
 function generateFillBlank(item, count) {
@@ -489,9 +522,40 @@ function findElementForWord(word, elementMap) {
 }
 
 /**
- * Auto-chunk content into groups of ~4 lines
+ * Auto-chunk content into learnable segments.
+ * Splits on blank lines first (verse/stanza boundaries).
+ * Falls back to groups of ~4 lines if no blank lines.
  */
 function autoChunk(lines) {
+  const texts = lines.map(l => (typeof l === 'string' ? l : l.text) || '');
+
+  // Check for blank-line boundaries
+  const groups = [];
+  let current = [];
+  let startIdx = 0;
+  for (let i = 0; i < texts.length; i++) {
+    if (texts[i].trim() === '' && current.length > 0) {
+      groups.push({ start: startIdx, end: i - 1 });
+      current = [];
+      startIdx = i + 1;
+    } else if (texts[i].trim() !== '') {
+      current.push(i);
+    }
+  }
+  if (current.length > 0) {
+    groups.push({ start: startIdx, end: texts.length - 1 });
+  }
+
+  // If blank-line splitting produced reasonable chunks (2+), use them
+  if (groups.length >= 2) {
+    return groups.map((g, i) => ({
+      id: `chunk-${i + 1}`,
+      lineRange: [g.start, g.end],
+      label: `Part ${i + 1}`,
+    }));
+  }
+
+  // Fallback: fixed-size groups of ~4 lines
   const chunkSize = 4;
   const chunks = [];
   for (let i = 0; i < lines.length; i += chunkSize) {
@@ -503,6 +567,38 @@ function autoChunk(lines) {
     });
   }
   return chunks;
+}
+
+/**
+ * Remap chunk lineRanges after blank lines are filtered out.
+ * Maps original indices to new indices in the filtered array.
+ */
+function remapChunksAfterFilter(rawLines, filteredLines, chunks) {
+  // Build mapping: original index → filtered index
+  const indexMap = new Map();
+  let filteredIdx = 0;
+  for (let i = 0; i < rawLines.length; i++) {
+    const text = typeof rawLines[i] === 'string' ? rawLines[i] : rawLines[i].text;
+    if (text.trim().length > 0) {
+      indexMap.set(i, filteredIdx);
+      filteredIdx++;
+    }
+  }
+
+  return chunks.map(chunk => {
+    const [origStart, origEnd] = chunk.lineRange;
+    // Find first and last non-empty lines in this chunk's range
+    let newStart = null;
+    let newEnd = null;
+    for (let i = origStart; i <= origEnd; i++) {
+      if (indexMap.has(i)) {
+        if (newStart === null) newStart = indexMap.get(i);
+        newEnd = indexMap.get(i);
+      }
+    }
+    if (newStart === null) return null; // Empty chunk
+    return { ...chunk, lineRange: [newStart, newEnd] };
+  }).filter(Boolean);
 }
 
 export { ELEMENTS_SONG };

@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, Play, Check, X, SkipForward, RotateCcw } from 'lucide-react';
-import { submitMemoryPractice } from '../../../services/api';
+import { ChevronLeft, Play, Check, X, SkipForward, RotateCcw, Target, ChevronDown } from 'lucide-react';
+import { submitMemoryPractice, getChunkMastery } from '../../../services/api';
 
 const MODES = [
   { id: 'learn', label: 'Learn', desc: 'Progressive reveal — read and absorb line by line' },
   { id: 'fill-blank', label: 'Fill in the Blank', desc: 'Fill missing words in partially shown lines' },
   { id: 'sequence', label: 'Sequence Recall', desc: 'Given a line, type what comes next' },
   { id: 'speed-run', label: 'Speed Run', desc: 'Recite the full sequence as fast as possible' },
+  { id: 'spaced', label: 'Spaced Repetition', desc: 'Focus on your weakest chunks with graduated hints' },
 ];
 
 export default function MemoryPractice({ item, onBack, onComplete }) {
@@ -19,11 +20,26 @@ export default function MemoryPractice({ item, onBack, onComplete }) {
   const [startTime] = useState(Date.now());
   const inputRef = useRef(null);
 
+  // Spaced repetition state
+  const [chunkMastery, setChunkMastery] = useState(null);
+  const [spacedChunkIdx, setSpacedChunkIdx] = useState(0);
+  const [spacedLineIdx, setSpacedLineIdx] = useState(0);
+
   const lines = item.content?.lines || [];
+  const chunks = item.content?.chunks || [];
 
   useEffect(() => {
     if (mode && inputRef.current) inputRef.current.focus();
-  }, [mode, currentIdx]);
+  }, [mode, currentIdx, spacedLineIdx]);
+
+  // Load chunk mastery when entering spaced mode
+  useEffect(() => {
+    if (mode === 'spaced') {
+      getChunkMastery(item.id).then(data => {
+        setChunkMastery(data || []);
+      }).catch(() => setChunkMastery([]));
+    }
+  }, [mode, item.id]);
 
   if (!mode) {
     return (
@@ -44,11 +60,19 @@ export default function MemoryPractice({ item, onBack, onComplete }) {
               onClick={() => setMode(m.id)}
               className="w-full bg-port-card border border-port-border rounded-lg p-4 text-left hover:border-port-accent/50 transition-colors"
             >
-              <div className="text-white font-medium">{m.label}</div>
+              <div className="flex items-center gap-2">
+                <div className="text-white font-medium">{m.label}</div>
+                {m.id === 'spaced' && <Target size={14} className="text-port-accent" />}
+              </div>
               <div className="text-gray-500 text-sm mt-1">{m.desc}</div>
             </button>
           ))}
         </div>
+
+        {/* Chunk mastery overview */}
+        {chunks.length > 0 && (
+          <ChunkMasteryOverview item={item} />
+        )}
       </div>
     );
   }
@@ -92,7 +116,7 @@ export default function MemoryPractice({ item, onBack, onComplete }) {
 
         <div className="flex gap-3">
           <button
-            onClick={() => { setMode(null); setResults([]); setCurrentIdx(0); setDone(false); setShowResult(null); }}
+            onClick={() => { setMode(null); setResults([]); setCurrentIdx(0); setDone(false); setShowResult(null); setSpacedChunkIdx(0); setSpacedLineIdx(0); }}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-port-card border border-port-border rounded-lg text-gray-300 hover:text-white transition-colors"
           >
             <RotateCcw size={16} />
@@ -104,6 +128,151 @@ export default function MemoryPractice({ item, onBack, onComplete }) {
           >
             Done
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // SPACED REPETITION mode — focus on weakest chunks with graduated hints
+  if (mode === 'spaced') {
+    if (!chunkMastery) {
+      return (
+        <div className="space-y-6 max-w-2xl">
+          <div className="text-gray-400 text-sm">Loading chunk mastery...</div>
+        </div>
+      );
+    }
+
+    if (chunkMastery.length === 0) {
+      return (
+        <div className="space-y-6 max-w-2xl">
+          <div className="flex items-center gap-3">
+            <button onClick={onBack} className="text-gray-400 hover:text-white transition-colors">
+              <ChevronLeft size={20} />
+            </button>
+            <h2 className="text-lg font-bold text-white">Spaced Repetition — {item.title}</h2>
+          </div>
+          <div className="bg-port-card border border-port-border rounded-lg p-6 text-center text-gray-500">
+            No chunks available for spaced practice.
+          </div>
+        </div>
+      );
+    }
+
+    const currentChunk = chunkMastery[spacedChunkIdx];
+    if (!currentChunk) {
+      // All chunks done
+      savePractice('spaced', results);
+      setDone(true);
+      return null;
+    }
+
+    const [chunkStart, chunkEnd] = currentChunk.lineRange;
+    const chunkLines = lines.slice(chunkStart, chunkEnd + 1).filter(l => l.text.trim());
+    const currentLine = chunkLines[spacedLineIdx];
+
+    if (!currentLine) {
+      // Move to next chunk
+      setSpacedChunkIdx(prev => prev + 1);
+      setSpacedLineIdx(0);
+      setAnswer('');
+      setShowResult(null);
+      return null;
+    }
+
+    // Graduated hints based on hintLevel:
+    // 0 = show first letter of each word, 1 = show first letters of some, 2 = show word count only, 3 = no hints
+    const hintLevel = currentChunk.hintLevel;
+    const hintText = generateHint(currentLine.text, hintLevel);
+
+    return (
+      <div className="space-y-6 max-w-2xl">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="text-gray-400 hover:text-white transition-colors">
+            <ChevronLeft size={20} />
+          </button>
+          <h2 className="text-lg font-bold text-white">Spaced — {item.title}</h2>
+          <span className="text-gray-500 text-sm ml-auto">
+            Chunk {spacedChunkIdx + 1}/{chunkMastery.length} • Line {spacedLineIdx + 1}/{chunkLines.length}
+          </span>
+        </div>
+
+        <ProgressBar current={spacedChunkIdx * 10 + spacedLineIdx + 1} total={chunkMastery.length * 10} />
+
+        {/* Chunk info */}
+        <div className="flex items-center gap-3 text-xs">
+          <span className="text-gray-500">{currentChunk.label}</span>
+          <span className={`font-mono ${currentChunk.accuracy >= 80 ? 'text-port-success' : currentChunk.accuracy >= 40 ? 'text-port-warning' : 'text-gray-500'}`}>
+            {currentChunk.accuracy}% mastery
+          </span>
+          <span className="text-gray-600">
+            Hint level: {['Full', 'Partial', 'Minimal', 'None'][hintLevel]}
+          </span>
+        </div>
+
+        <div className="bg-port-card border border-port-border rounded-lg p-6">
+          {/* Show previous lines in chunk as context */}
+          {spacedLineIdx > 0 && (
+            <div className="mb-4 space-y-1">
+              {chunkLines.slice(0, spacedLineIdx).map((l, i) => (
+                <div key={i} className="text-gray-500 text-sm">{l.text}</div>
+              ))}
+            </div>
+          )}
+
+          <div className="text-gray-400 text-xs mb-2 uppercase tracking-wide">Recall this line:</div>
+          {hintText && <div className="text-gray-600 text-sm font-mono mb-3">{hintText}</div>}
+
+          {showResult ? (
+            <div className="space-y-2">
+              <div className={`text-sm p-3 rounded ${showResult === 'correct' ? 'bg-port-success/10 text-port-success' : 'bg-port-error/10 text-port-error'}`}>
+                {showResult === 'correct' ? 'Correct!' : `Your answer: ${answer}`}
+              </div>
+              {showResult === 'wrong' && (
+                <div className="text-sm p-3 rounded bg-port-success/10 text-port-success">
+                  Expected: {currentLine.text}
+                </div>
+              )}
+            </div>
+          ) : (
+            <textarea
+              ref={inputRef}
+              value={answer}
+              onChange={e => setAnswer(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); checkSpacedAnswer(currentLine.text, currentChunk.id); } }}
+              placeholder="Type the line..."
+              className="w-full bg-port-bg border border-port-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:border-port-accent focus:outline-none resize-none"
+              rows={2}
+            />
+          )}
+        </div>
+
+        <div className="flex gap-3">
+          {showResult ? (
+            <button
+              onClick={advanceSpaced}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-port-accent hover:bg-port-accent/80 text-white rounded-lg transition-colors"
+            >
+              Next
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => checkSpacedAnswer(currentLine.text, currentChunk.id)}
+                disabled={!answer.trim()}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-port-accent hover:bg-port-accent/80 disabled:opacity-50 text-white rounded-lg transition-colors"
+              >
+                <Check size={16} />
+                Check
+              </button>
+              <button
+                onClick={() => { setAnswer(''); checkSpacedAnswer(currentLine.text, currentChunk.id, true); }}
+                className="px-4 py-2.5 bg-port-card border border-port-border rounded-lg text-gray-400 hover:text-white transition-colors"
+              >
+                <SkipForward size={16} />
+              </button>
+            </>
+          )}
         </div>
       </div>
     );
@@ -420,6 +589,46 @@ export default function MemoryPractice({ item, onBack, onComplete }) {
     }
   }
 
+  function checkSpacedAnswer(expected, chunkId, skipped = false) {
+    const isCorrect = !skipped && fuzzyMatch(answer, expected);
+    setResults(prev => [...prev, { correct: isCorrect, expected, answered: skipped ? '' : answer, chunkId }]);
+    setShowResult(isCorrect ? 'correct' : 'wrong');
+  }
+
+  function advanceSpaced() {
+    const currentChunk = chunkMastery[spacedChunkIdx];
+    const [chunkStart, chunkEnd] = currentChunk.lineRange;
+    const chunkLines = lines.slice(chunkStart, chunkEnd + 1).filter(l => l.text.trim());
+
+    if (spacedLineIdx + 1 < chunkLines.length) {
+      setSpacedLineIdx(prev => prev + 1);
+    } else {
+      // Save practice for this chunk, move to next
+      const chunkResults = results.filter(r => r.chunkId === currentChunk.id);
+      if (chunkResults.length > 0) {
+        submitMemoryPractice(item.id, {
+          mode: 'sequence',
+          chunkId: currentChunk.id,
+          results: chunkResults.map(r => ({
+            correct: r.correct,
+            expected: r.expected,
+            answered: r.answered,
+          })),
+          totalMs: Date.now() - startTime,
+        }).catch(() => {});
+      }
+
+      if (spacedChunkIdx + 1 < chunkMastery.length) {
+        setSpacedChunkIdx(prev => prev + 1);
+        setSpacedLineIdx(0);
+      } else {
+        setDone(true);
+      }
+    }
+    setAnswer('');
+    setShowResult(null);
+  }
+
   async function savePractice(practiceMode, practiceResults) {
     const chunkId = findChunkForLine(item, currentIdx);
     await submitMemoryPractice(item.id, {
@@ -435,6 +644,79 @@ export default function MemoryPractice({ item, onBack, onComplete }) {
       totalMs: Date.now() - startTime,
     }).catch(() => {});
   }
+}
+
+/**
+ * Generate graduated hints based on mastery level.
+ * hintLevel 0: show first letter of each word + word length
+ * hintLevel 1: show first letter of every other word
+ * hintLevel 2: show word count only
+ * hintLevel 3: no hints
+ */
+function generateHint(text, hintLevel) {
+  if (hintLevel >= 3) return null;
+
+  const words = text.split(/\s+/);
+
+  if (hintLevel === 0) {
+    // Full hints: first letter + underscores for length
+    return words.map(w => {
+      const clean = w.replace(/[,.\-!?'"]/g, '');
+      if (clean.length <= 1) return w;
+      return w[0] + '_'.repeat(clean.length - 1) + w.slice(clean.length);
+    }).join(' ');
+  }
+
+  if (hintLevel === 1) {
+    // Partial: first letter of every other word
+    return words.map((w, i) => {
+      if (i % 2 === 0) {
+        const clean = w.replace(/[,.\-!?'"]/g, '');
+        return clean.length > 1 ? w[0] + '___' : w;
+      }
+      return '____';
+    }).join(' ');
+  }
+
+  // Minimal: word count only
+  return `(${words.length} words)`;
+}
+
+function ChunkMasteryOverview({ item }) {
+  const [expanded, setExpanded] = useState(false);
+  const chunks = item.content?.chunks || [];
+  if (!chunks.length) return null;
+
+  return (
+    <div className="bg-port-card border border-port-border rounded-lg overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between p-3 text-left hover:bg-port-bg/50 transition-colors"
+      >
+        <span className="text-gray-400 text-xs font-medium">Chunk Mastery</span>
+        <ChevronDown size={14} className={`text-gray-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+      {expanded && (
+        <div className="px-3 pb-3 space-y-1.5">
+          {chunks.map(chunk => {
+            const stats = item.mastery?.chunks?.[chunk.id];
+            const accuracy = stats?.attempts > 0 ? Math.round((stats.correct / stats.attempts) * 100) : 0;
+            const barColor = accuracy >= 80 ? 'bg-port-success' : accuracy >= 40 ? 'bg-port-warning' : 'bg-gray-600';
+
+            return (
+              <div key={chunk.id} className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 w-16 truncate">{chunk.label}</span>
+                <div className="flex-1 h-1.5 bg-port-border rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${barColor}`} style={{ width: `${accuracy}%` }} />
+                </div>
+                <span className="text-xs font-mono text-gray-500 w-10 text-right">{accuracy}%</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function SpeedRunLine({ line, index, onResult }) {

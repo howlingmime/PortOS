@@ -590,6 +590,16 @@ router.get('/post/memory-items/:id/mastery', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * GET /api/meatspace/post/memory-items/:id/chunk-mastery
+ * Get chunk mastery order for spaced repetition practice
+ */
+router.get('/post/memory-items/:id/chunk-mastery', asyncHandler(async (req, res) => {
+  const item = await memoryService.getMemoryItem(req.params.id);
+  if (!item) throw new ServerError('Memory item not found', { status: 404, code: 'NOT_FOUND' });
+  res.json(memoryService.getChunkMasteryOrder(item));
+}));
+
+/**
  * POST /api/meatspace/post/memory-drill
  * Generate a memory drill for a POST session
  */
