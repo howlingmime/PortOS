@@ -318,6 +318,48 @@ export function computeLifeExpectancy(longevityMarkers, cardiovascularMarkers, b
   };
 }
 
+/**
+ * Compute time feasibility for a goal based on its linked activities.
+ * Returns { feasible, hoursPerWeek, weeksNeeded, weeksAvailable } or null if no links.
+ */
+export function computeGoalFeasibility(goal, timeHorizons, activities) {
+  if (!goal.linkedActivities?.length || !timeHorizons) return null;
+
+  const horizonMap = {
+    '1-year': 1, '3-year': 3, '5-year': 5,
+    '10-year': 10, '20-year': 20, 'lifetime': timeHorizons.yearsRemaining
+  };
+  const horizonYears = horizonMap[goal.horizon] ?? 5;
+  const weeksAvailable = Math.floor(Math.min(horizonYears, timeHorizons.yearsRemaining) * 52);
+
+  let totalPerWeek = 0;
+  const links = [];
+  for (const link of goal.linkedActivities) {
+    const activity = activities.find(a => a.name === link.activityName);
+    if (!activity) continue;
+    const freq = link.requiredFrequency ?? activity.frequency;
+    // Normalize to per-week
+    let perWeek;
+    switch (activity.cadence) {
+      case 'day': perWeek = freq * 7; break;
+      case 'week': perWeek = freq; break;
+      case 'month': perWeek = freq / 4.35; break;
+      case 'year': perWeek = freq / 52; break;
+      default: perWeek = 0;
+    }
+    totalPerWeek += perWeek;
+    const totalOverHorizon = Math.floor(perWeek * weeksAvailable);
+    links.push({ activityName: link.activityName, perWeek: Math.round(perWeek * 10) / 10, totalOverHorizon });
+  }
+
+  return {
+    feasible: weeksAvailable > 0,
+    weeksAvailable,
+    totalPerWeek: Math.round(totalPerWeek * 10) / 10,
+    links
+  };
+}
+
 export function computeGoalUrgency(goal, timeHorizons) {
   if (!timeHorizons || !goal.horizon) return null;
 
@@ -655,11 +697,12 @@ export async function deriveLongevity(birthDate) {
 
 export async function getGoals() {
   const data = await loadJSON(GOALS_FILE, DEFAULT_GOALS);
-  // Lazy migration: backfill parentId and tags on goals missing them
+  // Lazy migration: backfill parentId, tags, linkedActivities on goals missing them
   let needsSave = false;
   for (const goal of data.goals) {
     if (goal.parentId === undefined) { goal.parentId = null; needsSave = true; }
     if (!Array.isArray(goal.tags)) { goal.tags = []; needsSave = true; }
+    if (!Array.isArray(goal.linkedActivities)) { goal.linkedActivities = []; needsSave = true; }
   }
   if (needsSave) await saveJSON(GOALS_FILE, data);
   return data;
@@ -711,6 +754,7 @@ export async function createGoal({ title, description, horizon, category, parent
     category: category || 'mastery',
     parentId: parentId || null,
     tags: [...new Set((tags || []).map(t => t.trim()).filter(Boolean))],
+    linkedActivities: [],
     urgency: null,
     status: 'active',
     milestones: [],
@@ -761,7 +805,7 @@ export async function updateGoal(goalId, updates) {
     }
   }
 
-  const allowed = ['title', 'description', 'horizon', 'category', 'status', 'parentId', 'tags'];
+  const allowed = ['title', 'description', 'horizon', 'category', 'status', 'parentId', 'tags', 'linkedActivities'];
   for (const key of allowed) {
     if (updates[key] !== undefined) goal[key] = updates[key];
   }
@@ -806,13 +850,17 @@ export async function deleteGoal(goalId) {
 export async function getGoalsTree() {
   const goals = await getGoals();
   const longevity = await loadJSON(LONGEVITY_FILE, DEFAULT_LONGEVITY);
+  const { getActivities } = await import('./meatspaceCalendar.js');
+  const activities = await getActivities();
 
-  // Enrich goals with urgency (shallow copies to avoid mutating persisted objects)
+  // Enrich goals with urgency and feasibility (shallow copies to avoid mutating persisted objects)
   const enriched = goals.goals.map(goal => {
+    const enrichedGoal = { ...goal };
     if (goal.status === 'active' && longevity.timeHorizons) {
-      return { ...goal, urgency: computeGoalUrgency(goal, longevity.timeHorizons) };
+      enrichedGoal.urgency = computeGoalUrgency(goal, longevity.timeHorizons);
+      enrichedGoal.feasibility = computeGoalFeasibility(goal, longevity.timeHorizons, activities);
     }
-    return { ...goal };
+    return enrichedGoal;
   });
 
   // Build hierarchical tree
@@ -843,6 +891,47 @@ export async function getGoalsTree() {
     lifeExpectancy: longevity.lifeExpectancy || goals.lifeExpectancy,
     timeHorizons: longevity.timeHorizons || goals.timeHorizons
   };
+}
+
+export async function linkActivity(goalId, { activityName, requiredFrequency, note }) {
+  const goals = await getGoals();
+  const goal = goals.goals.find(g => g.id === goalId);
+  if (!goal) return null;
+
+  // Prevent duplicates
+  if (goal.linkedActivities.some(l => l.activityName === activityName)) {
+    // Update existing link
+    const link = goal.linkedActivities.find(l => l.activityName === activityName);
+    if (requiredFrequency !== undefined) link.requiredFrequency = requiredFrequency;
+    if (note !== undefined) link.note = note;
+  } else {
+    goal.linkedActivities.push({
+      activityName,
+      requiredFrequency: requiredFrequency || null,
+      note: note || ''
+    });
+  }
+  goal.updatedAt = new Date().toISOString();
+  goals.updatedAt = new Date().toISOString();
+  await saveJSON(GOALS_FILE, goals);
+  console.log(`🔗 Activity "${activityName}" linked to goal "${goal.title}"`);
+  return goal;
+}
+
+export async function unlinkActivity(goalId, activityName) {
+  const goals = await getGoals();
+  const goal = goals.goals.find(g => g.id === goalId);
+  if (!goal) return null;
+
+  const idx = goal.linkedActivities.findIndex(l => l.activityName === activityName);
+  if (idx === -1) return goal;
+
+  goal.linkedActivities.splice(idx, 1);
+  goal.updatedAt = new Date().toISOString();
+  goals.updatedAt = new Date().toISOString();
+  await saveJSON(GOALS_FILE, goals);
+  console.log(`🔗 Activity "${activityName}" unlinked from goal "${goal.title}"`);
+  return goal;
 }
 
 export async function addMilestone(goalId, { title, targetDate }) {

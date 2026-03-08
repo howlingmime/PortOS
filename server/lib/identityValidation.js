@@ -71,3 +71,11 @@ export const addMilestoneInputSchema = z.object({
   title: z.string().min(1).max(200),
   targetDate: validCalendarDate.optional()
 });
+
+// --- Goal-Activity Link Schemas ---
+
+export const linkActivityInputSchema = z.object({
+  activityName: z.string().min(1).max(200),
+  requiredFrequency: z.number().positive().optional(),
+  note: z.string().max(500).optional().default('')
+});

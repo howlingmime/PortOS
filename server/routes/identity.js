@@ -7,7 +7,8 @@ import {
   birthDateInputSchema,
   createGoalInputSchema,
   updateGoalInputSchema,
-  addMilestoneInputSchema
+  addMilestoneInputSchema,
+  linkActivityInputSchema
 } from '../lib/identityValidation.js';
 
 const router = Router();
@@ -127,6 +128,25 @@ router.put('/goals/:id/milestones/:milestoneId/complete', asyncHandler(async (re
     throw new ServerError('Goal or milestone not found', { status: 404, code: 'NOT_FOUND' });
   }
   res.json(milestone);
+}));
+
+// POST /api/digital-twin/identity/goals/:id/activities — Link activity to goal
+router.post('/goals/:id/activities', asyncHandler(async (req, res) => {
+  const data = validateRequest(linkActivityInputSchema, req.body);
+  const goal = await identityService.linkActivity(req.params.id, data);
+  if (!goal) {
+    throw new ServerError('Goal not found', { status: 404, code: 'NOT_FOUND' });
+  }
+  res.json(goal);
+}));
+
+// DELETE /api/digital-twin/identity/goals/:id/activities/:activityName — Unlink activity from goal
+router.delete('/goals/:id/activities/:activityName', asyncHandler(async (req, res) => {
+  const goal = await identityService.unlinkActivity(req.params.id, decodeURIComponent(req.params.activityName));
+  if (!goal) {
+    throw new ServerError('Goal not found', { status: 404, code: 'NOT_FOUND' });
+  }
+  res.json(goal);
 }));
 
 export default router;

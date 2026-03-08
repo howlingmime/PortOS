@@ -97,7 +97,7 @@ pm2 logs
   - [x] P4b: Life Calendar multi-unit views — renamed "Life in Weeks" to "Life Calendar" with Years/Months/Weeks/Days toggle. Year grid (10 cols), Month grid (12 cols/year), Week grid (existing layouts), Day grid (calendar-style per-year with navigation).
   - [x] P5: Additional event types — holidays, vacations, milestones, health, custom events with color coding (amber/cyan/purple/red/emerald) on the life grid, collapsible events panel with CRUD, enable/disable toggle, yearly/one-time recurrence, default US holidays
   - [x] P6: Mobile responsive cell size auto-detection
-  - [ ] P7: Goal Tree integration — connect activities to goals, time feasibility analysis ("Can I finish this goal with my remaining time budget?")
+  - [x] P7: Goal Tree integration — connect activities to goals, time feasibility analysis ("Can I finish this goal with my remaining time budget?")
 
 ### Planned
 

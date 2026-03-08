@@ -1388,6 +1388,12 @@ export const addGoalMilestone = (goalId, data) => request(`/digital-twin/identit
 });
 export const completeGoalMilestone = (goalId, milestoneId) =>
   request(`/digital-twin/identity/goals/${goalId}/milestones/${milestoneId}/complete`, { method: 'PUT' });
+export const linkGoalActivity = (goalId, data) => request(`/digital-twin/identity/goals/${goalId}/activities`, {
+  method: 'POST',
+  body: JSON.stringify(data)
+});
+export const unlinkGoalActivity = (goalId, activityName) =>
+  request(`/digital-twin/identity/goals/${goalId}/activities/${encodeURIComponent(activityName)}`, { method: 'DELETE' });
 
 // Feature Agents
 export const getFeatureAgents = () => request('/feature-agents');

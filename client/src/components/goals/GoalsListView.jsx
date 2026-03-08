@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import {
-  ChevronRight, ChevronDown, Plus, GripVertical, Search, Tag
+  ChevronRight, ChevronDown, Plus, GripVertical, Search, Tag, Link2
 } from 'lucide-react';
 import * as api from '../../services/api';
 import GoalDetailPanel, { CATEGORY_CONFIG, HORIZON_OPTIONS } from './GoalDetailPanel';
@@ -51,6 +51,13 @@ function GoalRow({ goal, depth, expandedIds, onToggle, onSelect, selectedId, onA
         </span>
 
         {urgencyIndicator(goal.urgency)}
+
+        {goal.linkedActivities?.length > 0 && (
+          <span className="flex items-center gap-0.5 text-xs text-gray-500 shrink-0" title={`${goal.linkedActivities.length} linked ${goal.linkedActivities.length === 1 ? 'activity' : 'activities'}`}>
+            <Link2 className="w-3 h-3" />
+            {goal.linkedActivities.length}
+          </span>
+        )}
 
         {goal.tags?.length > 0 && (
           <div className="flex items-center gap-1 shrink-0">
