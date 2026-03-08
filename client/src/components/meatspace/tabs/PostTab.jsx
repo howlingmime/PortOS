@@ -7,6 +7,7 @@ import PostLlmDrillRunner from '../post/PostLlmDrillRunner';
 import PostSessionResults from '../post/PostSessionResults';
 import PostHistory from '../post/PostHistory';
 import PostDrillConfig from '../post/PostDrillConfig';
+import MemoryBuilder from '../post/MemoryBuilder';
 import { LLM_DRILL_TYPES } from '../post/constants';
 
 export default function PostTab() {
@@ -51,6 +52,10 @@ export default function PostTab() {
 
   function handleViewConfig() {
     setView('config');
+  }
+
+  function handleViewMemory() {
+    setView('memory');
   }
 
   function handleConfigSaved(newConfig) {
@@ -121,6 +126,12 @@ export default function PostTab() {
           onBack={() => setView('launcher')}
         />
       );
+    case 'memory':
+      return (
+        <MemoryBuilder
+          onBack={() => setView('launcher')}
+        />
+      );
     default:
       return (
         <PostSessionLauncher
@@ -129,6 +140,7 @@ export default function PostTab() {
           onStart={handleStart}
           onViewHistory={handleViewHistory}
           onViewConfig={handleViewConfig}
+          onViewMemory={handleViewMemory}
         />
       );
   }

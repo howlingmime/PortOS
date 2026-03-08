@@ -1513,6 +1513,30 @@ export const scorePostLlmDrill = (type, drillData, responses, timeLimitMs, provi
     body: JSON.stringify({ type, drillData, responses, timeLimitMs, ...(providerId && { providerId }), ...(model && { model }) })
   });
 
+// MeatSpace - POST Memory Builder
+export const getMemoryItems = () => request('/meatspace/post/memory-items');
+export const getMemoryItem = (id) => request(`/meatspace/post/memory-items/${id}`);
+export const createMemoryItem = (data) => request('/meatspace/post/memory-items', {
+  method: 'POST',
+  body: JSON.stringify(data)
+});
+export const updateMemoryItem = (id, data) => request(`/meatspace/post/memory-items/${id}`, {
+  method: 'PUT',
+  body: JSON.stringify(data)
+});
+export const deleteMemoryItem = (id) => request(`/meatspace/post/memory-items/${id}`, {
+  method: 'DELETE'
+});
+export const submitMemoryPractice = (id, data) => request(`/meatspace/post/memory-items/${id}/practice`, {
+  method: 'POST',
+  body: JSON.stringify(data)
+});
+export const getMemoryMastery = (id) => request(`/meatspace/post/memory-items/${id}/mastery`);
+export const generateMemoryDrill = (data) => request('/meatspace/post/memory-drill', {
+  method: 'POST',
+  body: JSON.stringify(data)
+});
+
 // Life Calendar
 export const getLifeCalendar = () => request('/meatspace/calendar');
 export const getActivities = () => request('/meatspace/activities');

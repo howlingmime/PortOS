@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Zap, History, Settings, Play, Brain } from 'lucide-react';
+import { Zap, History, Settings, Play, Brain, BookOpen } from 'lucide-react';
 import { getProviders } from '../../../services/api';
 
 const DRILL_LABELS = {
@@ -12,10 +12,13 @@ const DRILL_LABELS = {
   'story-recall': 'Story Recall',
   'verbal-fluency': 'Verbal Fluency',
   'wit-comeback': 'Wit & Comeback',
-  'pun-wordplay': 'Pun & Wordplay'
+  'pun-wordplay': 'Pun & Wordplay',
+  'memory-fill-blank': 'Memory Fill Blank',
+  'memory-sequence': 'Memory Sequence',
+  'memory-element-flash': 'Element Flash'
 };
 
-export default function PostSessionLauncher({ config, recentSessions, onStart, onViewHistory, onViewConfig }) {
+export default function PostSessionLauncher({ config, recentSessions, onStart, onViewHistory, onViewConfig, onViewMemory }) {
   const [tags, setTags] = useState({ sleep: '', caffeine: '', stress: '' });
   const [providers, setProviders] = useState([]);
 
@@ -84,6 +87,13 @@ export default function PostSessionLauncher({ config, recentSessions, onStart, o
           <h2 className="text-xl font-bold text-white">Power On Self Test</h2>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={onViewMemory}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-400 hover:text-white bg-port-card border border-port-border rounded-lg transition-colors"
+          >
+            <BookOpen size={14} />
+            Memory
+          </button>
           <button
             onClick={onViewHistory}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-400 hover:text-white bg-port-card border border-port-border rounded-lg transition-colors"

@@ -22,12 +22,18 @@ import {
   postConfigUpdateSchema,
   postDrillRequestSchema,
   postLlmScoreRequestSchema,
+  memoryItemCreateSchema,
+  memoryItemUpdateSchema,
+  memoryPracticeSchema,
+  memoryDrillRequestSchema,
   LLM_DRILL_TYPES,
+  MEMORY_DRILL_TYPES,
 } from '../lib/postValidation.js';
 import * as meatspaceService from '../services/meatspace.js';
 import * as alcoholService from '../services/meatspaceAlcohol.js';
 import * as healthService from '../services/meatspaceHealth.js';
 import * as postService from '../services/meatspacePost.js';
+import * as memoryService from '../services/meatspacePostMemory.js';
 import { generateLlmDrill, scoreLlmDrill } from '../services/meatspacePostLlm.js';
 import * as calendarService from '../services/meatspaceCalendar.js';
 
@@ -442,6 +448,15 @@ router.post('/post/drill', asyncHandler(async (req, res) => {
     return res.json(drill);
   }
 
+  if (MEMORY_DRILL_TYPES.includes(data.type)) {
+    const mode = data.type.replace('memory-', '');
+    const drill = await memoryService.generateMemoryDrill({ mode, count: data.config?.count, memoryItemId: data.config?.memoryItemId });
+    if (!drill) {
+      throw new ServerError('Failed to generate memory drill', { status: 500, code: 'MEMORY_DRILL_FAILED' });
+    }
+    return res.json(drill);
+  }
+
   const drill = postService.generateDrill(data.type, data.config);
   if (!drill) {
     throw new ServerError('Unknown drill type', { status: 400, code: 'INVALID_DRILL_TYPE' });
@@ -460,6 +475,92 @@ router.post('/post/score-llm', asyncHandler(async (req, res) => {
     data.timeLimitMs, data.providerId, data.model
   );
   res.json(result);
+}));
+
+// =============================================================================
+// POST - Memory Builder
+// =============================================================================
+
+/**
+ * GET /api/meatspace/post/memory-items
+ * List all memory items (includes built-in Elements Song)
+ */
+router.get('/post/memory-items', asyncHandler(async (req, res) => {
+  const items = await memoryService.getMemoryItems();
+  res.json(items);
+}));
+
+/**
+ * GET /api/meatspace/post/memory-items/:id
+ * Get a single memory item
+ */
+router.get('/post/memory-items/:id', asyncHandler(async (req, res) => {
+  const item = await memoryService.getMemoryItem(req.params.id);
+  if (!item) throw new ServerError('Memory item not found', { status: 404, code: 'NOT_FOUND' });
+  res.json(item);
+}));
+
+/**
+ * POST /api/meatspace/post/memory-items
+ * Create a custom memory item
+ */
+router.post('/post/memory-items', asyncHandler(async (req, res) => {
+  const data = validateRequest(memoryItemCreateSchema, req.body);
+  const item = await memoryService.createMemoryItem(data);
+  res.status(201).json(item);
+}));
+
+/**
+ * PUT /api/meatspace/post/memory-items/:id
+ * Update a memory item (built-in items: mastery only)
+ */
+router.put('/post/memory-items/:id', asyncHandler(async (req, res) => {
+  const data = validateRequest(memoryItemUpdateSchema, req.body);
+  const item = await memoryService.updateMemoryItem(req.params.id, data);
+  if (!item) throw new ServerError('Memory item not found', { status: 404, code: 'NOT_FOUND' });
+  res.json(item);
+}));
+
+/**
+ * DELETE /api/meatspace/post/memory-items/:id
+ * Delete a custom memory item (built-in items cannot be deleted)
+ */
+router.delete('/post/memory-items/:id', asyncHandler(async (req, res) => {
+  const removed = await memoryService.deleteMemoryItem(req.params.id);
+  if (!removed) throw new ServerError('Cannot delete item (not found or built-in)', { status: 400, code: 'DELETE_FAILED' });
+  res.json(removed);
+}));
+
+/**
+ * POST /api/meatspace/post/memory-items/:id/practice
+ * Submit practice results and update mastery
+ */
+router.post('/post/memory-items/:id/practice', asyncHandler(async (req, res) => {
+  const data = validateRequest(memoryPracticeSchema, req.body);
+  const result = await memoryService.submitPractice(req.params.id, data);
+  if (!result) throw new ServerError('Memory item not found', { status: 404, code: 'NOT_FOUND' });
+  res.json(result);
+}));
+
+/**
+ * GET /api/meatspace/post/memory-items/:id/mastery
+ * Get mastery breakdown for a memory item
+ */
+router.get('/post/memory-items/:id/mastery', asyncHandler(async (req, res) => {
+  const mastery = await memoryService.getMastery(req.params.id);
+  if (!mastery) throw new ServerError('Memory item not found', { status: 404, code: 'NOT_FOUND' });
+  res.json(mastery);
+}));
+
+/**
+ * POST /api/meatspace/post/memory-drill
+ * Generate a memory drill for a POST session
+ */
+router.post('/post/memory-drill', asyncHandler(async (req, res) => {
+  const data = validateRequest(memoryDrillRequestSchema, req.body);
+  const drill = await memoryService.generateMemoryDrill(data);
+  if (!drill) throw new ServerError('No memory items available', { status: 400, code: 'NO_MEMORY_ITEMS' });
+  res.json(drill);
 }));
 
 // ============================================================
