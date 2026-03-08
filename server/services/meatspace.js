@@ -21,6 +21,7 @@ const GOALS_FILE = join(PATHS.digitalTwin, 'goals.json');
 const SSA_BASELINE = 78.5;
 
 const DEFAULT_CONFIG = {
+  birthDate: null,
   sex: null,
   sexSource: null,
   lifestyle: {
@@ -218,16 +219,54 @@ export async function updateLifestyle(updates) {
   return config;
 }
 
+// === Birth Date (canonical source: meatspace/config.json) ===
+
+async function migrateBirthDateFromGoals(config) {
+  if (config.birthDate) return config;
+  const goals = await readJSONFile(GOALS_FILE, null);
+  if (!goals?.birthDate) return config;
+  config.birthDate = goals.birthDate;
+  config.updatedAt = new Date().toISOString();
+  await saveConfig(config);
+  console.log(`📅 Migrated birthDate from goals.json to meatspace config`);
+  return config;
+}
+
+export async function getBirthDate() {
+  const config = await loadConfig();
+  const migrated = await migrateBirthDateFromGoals(config);
+  return { birthDate: migrated.birthDate };
+}
+
+export async function updateBirthDate(birthDate, { syncGoals = true } = {}) {
+  const config = await loadConfig();
+  config.birthDate = birthDate;
+  config.updatedAt = new Date().toISOString();
+  await saveConfig(config);
+
+  // Keep goals.json in sync for backward compatibility
+  if (syncGoals) {
+    const goals = await readJSONFile(GOALS_FILE, null);
+    if (goals) {
+      goals.birthDate = birthDate;
+      goals.updatedAt = new Date().toISOString();
+      await writeFile(join(PATHS.digitalTwin, 'goals.json'), JSON.stringify(goals, null, 2));
+    }
+  }
+
+  return { birthDate };
+}
+
 export async function getDeathClock() {
-  const [config, longevity, goals] = await Promise.all([
+  const [config, longevity] = await Promise.all([
     loadConfig(),
-    readJSONFile(LONGEVITY_FILE, null),
-    readJSONFile(GOALS_FILE, null)
+    readJSONFile(LONGEVITY_FILE, null)
   ]);
 
-  const birthDate = goals?.birthDate;
+  const migrated = await migrateBirthDateFromGoals(config);
+  const birthDate = migrated.birthDate;
   if (!birthDate) {
-    return { error: 'Birth date not set. Set it in Digital Twin > Goals.' };
+    return { error: 'Birth date not set. Go to MeatSpace > Age to set it.' };
   }
 
   const genomeAdjusted = longevity?.lifeExpectancy?.adjusted ?? null;
@@ -237,17 +276,17 @@ export async function getDeathClock() {
 }
 
 export async function getLEV() {
-  const [longevity, goals, config] = await Promise.all([
+  const [longevity, config] = await Promise.all([
     readJSONFile(LONGEVITY_FILE, null),
-    readJSONFile(GOALS_FILE, null),
     loadConfig()
   ]);
 
+  const migrated = await migrateBirthDateFromGoals(config);
   const genomeAdjusted = longevity?.lifeExpectancy?.adjusted ?? SSA_BASELINE;
-  const lifestyleAdj = computeLifestyleAdjustment(config.lifestyle);
+  const lifestyleAdj = computeLifestyleAdjustment(migrated.lifestyle);
   const totalLE = genomeAdjusted + lifestyleAdj;
 
-  return computeLEV(goals?.birthDate, totalLE);
+  return computeLEV(migrated.birthDate, totalLE);
 }
 
 export async function getOverview() {

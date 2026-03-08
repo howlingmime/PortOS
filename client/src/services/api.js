@@ -1420,6 +1420,11 @@ export const updateMeatspaceLifestyle = (data) => request('/meatspace/lifestyle'
   method: 'PUT',
   body: JSON.stringify(data)
 });
+export const getMeatspaceBirthDate = () => request('/meatspace/birth-date');
+export const setMeatspaceBirthDate = (birthDate) => request('/meatspace/birth-date', {
+  method: 'PUT',
+  body: JSON.stringify({ birthDate })
+});
 export const getDeathClock = () => request('/meatspace/death-clock');
 export const getLEV = () => request('/meatspace/lev');
 export const getAlcoholSummary = () => request('/meatspace/alcohol');

@@ -16,6 +16,7 @@ import {
   activitySchema,
   activityUpdateSchema,
 } from '../lib/meatspaceValidation.js';
+import { birthDateInputSchema } from '../lib/identityValidation.js';
 import {
   postSessionSubmitSchema,
   postConfigUpdateSchema,
@@ -76,6 +77,29 @@ router.put('/lifestyle', asyncHandler(async (req, res) => {
   const data = validateRequest(lifestyleUpdateSchema, req.body);
   const config = await meatspaceService.updateLifestyle(data);
   res.json(config);
+}));
+
+// =============================================================================
+// BIRTH DATE
+// =============================================================================
+
+/**
+ * GET /api/meatspace/birth-date
+ * Get birth date (migrates from goals.json on first read)
+ */
+router.get('/birth-date', asyncHandler(async (req, res) => {
+  const result = await meatspaceService.getBirthDate();
+  res.json(result);
+}));
+
+/**
+ * PUT /api/meatspace/birth-date
+ * Set or update birth date
+ */
+router.put('/birth-date', asyncHandler(async (req, res) => {
+  const { birthDate } = validateRequest(birthDateInputSchema, req.body);
+  const result = await meatspaceService.updateBirthDate(birthDate);
+  res.json(result);
 }));
 
 // =============================================================================

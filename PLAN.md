@@ -86,7 +86,8 @@ pm2 logs
 
 - [ ] **M54**: MeatSpace Life Calendar — "4000 Weeks" mortality-aware time mapping
   - [x] P1-P3: Core calendar engine, Calendar tab UI, Overview integration (life grid, time stats, activity budgets, view modes, birthday highlights, hide-spent toggle, nav link)
-  - [ ] P4: Birthdate management — Move birthDate from `digital-twin/goals.json` to `meatspace/config.json`. Add birthdate display + inline edit to AgeTab (top of page, before epigenetic section). Add `GET/PUT /api/meatspace/birth-date` endpoints. Calendar error state should link to `/meatspace/age` to set birthdate. Migrate existing birthDate on first read.
+  - [x] P4: Birthdate management — birthDate canonical source moved to `meatspace/config.json` with auto-migration from `goals.json`. `GET/PUT /api/meatspace/birth-date` endpoints. AgeTab shows birthdate display + inline edit. Calendar error links to `/meatspace/age`. Identity setBirthDate syncs to both stores.
+  - [x] P4b: Life Calendar multi-unit views — renamed "Life in Weeks" to "Life Calendar" with Years/Months/Weeks/Days toggle. Year grid (10 cols), Month grid (12 cols/year), Week grid (existing layouts), Day grid (calendar-style per-year with navigation).
   - [ ] P5: Additional event types — holidays, vacations, custom recurring events with color coding on the life grid
   - [ ] P6: Mobile responsive cell size auto-detection
   - [ ] P7: Goal Tree integration — connect activities to goals, time feasibility analysis ("Can I finish this goal with my remaining time budget?")

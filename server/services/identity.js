@@ -671,6 +671,10 @@ export async function setBirthDate(birthDate) {
   goals.updatedAt = new Date().toISOString();
   await saveJSON(GOALS_FILE, goals);
 
+  // Sync to meatspace config (canonical source), skip goals sync since we just wrote it
+  const { updateBirthDate } = await import('./meatspace.js');
+  await updateBirthDate(birthDate, { syncGoals: false });
+
   // Re-derive longevity with new birth date
   const longevity = await deriveLongevity(birthDate);
 

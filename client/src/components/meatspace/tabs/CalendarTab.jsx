@@ -4,6 +4,7 @@ import {
   Cake, Plane, Plus, Trash2, Circle, Sun, Moon, TreePine, Snowflake,
   Flower2, CloudSun, Settings2
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import * as api from '../../../services/api';
 import BrailleSpinner from '../../BrailleSpinner';
@@ -62,11 +63,18 @@ function computeEventWeeks(birthDate, grid, stats) {
 
 // === View Mode Config ===
 
-const VIEW_MODES = [
-  { id: 'year', label: 'Year (52 weeks/row)', weeksPerRow: 52 },
-  { id: 'half', label: 'Half Year (26 weeks/row)', weeksPerRow: 26 },
-  { id: 'quarter', label: 'Quarter (13 weeks/row)', weeksPerRow: 13 },
-  { id: 'auto', label: 'Auto-fit', weeksPerRow: null },
+const UNIT_MODES = [
+  { id: 'years', label: 'Years' },
+  { id: 'months', label: 'Months' },
+  { id: 'weeks', label: 'Weeks' },
+  { id: 'days', label: 'Days' },
+];
+
+const WEEK_LAYOUTS = [
+  { id: 'year', label: '1Y', weeksPerRow: 52 },
+  { id: 'half', label: '6M', weeksPerRow: 26 },
+  { id: 'quarter', label: '3M', weeksPerRow: 13 },
+  { id: 'auto', label: 'Auto', weeksPerRow: null },
 ];
 
 const CELL_SIZES = [
@@ -76,20 +84,253 @@ const CELL_SIZES = [
   { id: 'lg', label: 'L', size: 12, gap: 2 },
 ];
 
-// === Life Grid ===
+const MS_PER_DAY = 86400000;
 
-function LifeGrid({ grid, stats, birthDate }) {
-  const [viewMode, setViewMode] = useState('auto');
-  const [cellSizeId, setCellSizeId] = useState('sm');
-  const [showEvents, setShowEvents] = useState(true);
-  const [hideSpent, setHideSpent] = useState(false);
-  const [showConfig, setShowConfig] = useState(false);
+// === Grid computation helpers ===
 
+function computeYearGrid(birthDate, deathDate) {
+  const birth = new Date(birthDate);
+  const death = new Date(deathDate);
+  const now = new Date();
+  const totalYears = Math.ceil((death - birth) / (365.25 * MS_PER_DAY));
+  const cells = [];
+  for (let y = 0; y < totalYears; y++) {
+    const yearStart = new Date(birth);
+    yearStart.setFullYear(birth.getFullYear() + y);
+    const yearEnd = new Date(yearStart);
+    yearEnd.setFullYear(yearEnd.getFullYear() + 1);
+    let status;
+    if (yearEnd <= now) status = 's';
+    else if (yearStart <= now && now < yearEnd) status = 'c';
+    else if (yearStart > death) break;
+    else status = 'r';
+    cells.push({ index: y, label: `Age ${y}`, status });
+  }
+  return cells;
+}
+
+function computeMonthGrid(birthDate, deathDate) {
+  const birth = new Date(birthDate);
+  const death = new Date(deathDate);
+  const now = new Date();
+  const cells = [];
+  const cursor = new Date(birth);
+  let i = 0;
+  while (cursor < death) {
+    const monthStart = new Date(cursor);
+    const monthEnd = new Date(cursor);
+    monthEnd.setMonth(monthEnd.getMonth() + 1);
+    let status;
+    if (monthEnd <= now) status = 's';
+    else if (monthStart <= now && now < monthEnd) status = 'c';
+    else status = 'r';
+    const age = Math.floor(i / 12);
+    const mo = i % 12;
+    cells.push({ index: i, age, month: mo, label: `Age ${age}, Month ${mo + 1}`, status });
+    cursor.setMonth(cursor.getMonth() + 1);
+    i++;
+  }
+  return cells;
+}
+
+function computeDayGrid(birthDate, deathDate, selectedYear) {
+  const birth = new Date(birthDate);
+  const yearStart = new Date(birth);
+  yearStart.setFullYear(birth.getFullYear() + selectedYear);
+  const yearEnd = new Date(yearStart);
+  yearEnd.setFullYear(yearEnd.getFullYear() + 1);
+  const death = new Date(deathDate);
+  const now = new Date();
+  const cells = [];
+  const cursor = new Date(yearStart);
+  let dayIdx = 0;
+  while (cursor < yearEnd && cursor < death) {
+    const dayStart = new Date(cursor);
+    const dayEnd = new Date(cursor.getTime() + MS_PER_DAY);
+    let status;
+    if (dayEnd <= now) status = 's';
+    else if (dayStart <= now && now < dayEnd) status = 'c';
+    else status = 'r';
+    cells.push({ index: dayIdx, dayOfWeek: cursor.getDay(), label: cursor.toLocaleDateString(), status });
+    cursor.setDate(cursor.getDate() + 1);
+    dayIdx++;
+  }
+  return cells;
+}
+
+function cellBgClass(status, isCurrent) {
+  if (status === 'c') return 'bg-port-accent shadow-[0_0_4px_rgba(59,130,246,0.5)]';
+  if (status === 's') return isCurrent ? 'bg-gray-500' : 'bg-gray-700';
+  return 'bg-port-success/20';
+}
+
+// === Year Grid ===
+
+function YearGridView({ birthDate, deathDate, cellCfg, hideSpent }) {
+  const cells = useMemo(() => computeYearGrid(birthDate, deathDate), [birthDate, deathDate]);
+  const currentAge = Math.floor((Date.now() - new Date(birthDate).getTime()) / (365.25 * MS_PER_DAY));
+  const filtered = hideSpent ? cells.filter(c => c.status === 'c' || c.status === 'r') : cells;
+  const cols = 10;
+
+  const rows = useMemo(() => {
+    const result = [];
+    for (let i = 0; i < filtered.length; i += cols) {
+      result.push(filtered.slice(i, i + cols));
+    }
+    return result;
+  }, [filtered]);
+
+  return (
+    <div className="overflow-x-auto">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: `${cellCfg.gap + 1}px` }}>
+        {rows.map((row, ri) => (
+          <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: `${cellCfg.gap + 1}px` }}>
+            <span className="text-right shrink-0 text-gray-500" style={{ width: '28px', fontSize: '9px' }}>
+              {row[0]?.index ?? ''}
+            </span>
+            {row.map((cell) => (
+              <span
+                key={cell.index}
+                className={`shrink-0 rounded-sm ${cellBgClass(cell.status, cell.index === currentAge)}`}
+                style={{ width: `${cellCfg.size + 6}px`, height: `${cellCfg.size + 6}px` }}
+                title={cell.label}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// === Month Grid ===
+
+function MonthGridView({ birthDate, deathDate, cellCfg, hideSpent }) {
+  const cells = useMemo(() => computeMonthGrid(birthDate, deathDate), [birthDate, deathDate]);
+  const currentAge = Math.floor((Date.now() - new Date(birthDate).getTime()) / (365.25 * MS_PER_DAY));
+  const filtered = hideSpent ? cells.filter(c => c.status === 'c' || c.status === 'r') : cells;
+
+  const rows = useMemo(() => {
+    const result = [];
+    for (let i = 0; i < filtered.length; i += 12) {
+      const row = filtered.slice(i, i + 12);
+      result.push({ label: row[0]?.age, cells: row });
+    }
+    return result;
+  }, [filtered]);
+
+  const shouldLabel = (age) => age != null && age % 10 === 0;
+
+  return (
+    <div className="overflow-x-auto">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: `${cellCfg.gap}px` }}>
+        {rows.map((row, ri) => (
+          <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: `${cellCfg.gap}px` }}>
+            <span
+              className={`text-right shrink-0 ${shouldLabel(row.label) ? 'text-gray-400 font-medium' : 'text-transparent'}`}
+              style={{ width: '24px', fontSize: '9px' }}
+            >
+              {shouldLabel(row.label) ? row.label : '.'}
+            </span>
+            {row.cells.map((cell) => (
+              <span
+                key={cell.index}
+                className={`shrink-0 rounded-[1px] ${cellBgClass(cell.status, cell.age === currentAge)}`}
+                style={{ width: `${cellCfg.size + 2}px`, height: `${cellCfg.size + 2}px` }}
+                title={cell.label}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// === Day Grid (single year) ===
+
+function DayGridView({ birthDate, deathDate, cellCfg, stats }) {
   const currentAge = Math.floor(stats.age.years);
-  const cellCfg = CELL_SIZES.find(c => c.id === cellSizeId) || CELL_SIZES[1];
-  const viewCfg = VIEW_MODES.find(v => v.id === viewMode) || VIEW_MODES[0];
+  const totalYears = Math.ceil((new Date(deathDate) - new Date(birthDate)) / (365.25 * MS_PER_DAY));
+  const [selectedYear, setSelectedYear] = useState(currentAge);
 
-  // Flatten all weeks into a single array with metadata
+  const cells = useMemo(() => computeDayGrid(birthDate, deathDate, selectedYear), [birthDate, deathDate, selectedYear]);
+
+  // Group into rows of 7 (week rows)
+  const rows = useMemo(() => {
+    const result = [];
+    // Pad start to align with day of week
+    const firstDow = cells[0]?.dayOfWeek ?? 0;
+    const padded = [...Array(firstDow).fill(null), ...cells];
+    for (let i = 0; i < padded.length; i += 7) {
+      result.push(padded.slice(i, i + 7));
+    }
+    return result;
+  }, [cells]);
+
+  const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-3">
+        <button
+          onClick={() => setSelectedYear(Math.max(0, selectedYear - 1))}
+          className="px-2 py-0.5 text-xs text-gray-400 hover:text-white rounded bg-port-bg border border-port-border"
+        >
+          &larr;
+        </button>
+        <span className="text-sm text-white font-medium">Age {selectedYear}</span>
+        <button
+          onClick={() => setSelectedYear(Math.min(totalYears - 1, selectedYear + 1))}
+          className="px-2 py-0.5 text-xs text-gray-400 hover:text-white rounded bg-port-bg border border-port-border"
+        >
+          &rarr;
+        </button>
+        {selectedYear !== currentAge && (
+          <button
+            onClick={() => setSelectedYear(currentAge)}
+            className="px-2 py-0.5 text-xs text-port-accent hover:text-white"
+          >
+            Current
+          </button>
+        )}
+      </div>
+      <div className="overflow-x-auto">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: `${cellCfg.gap}px` }}>
+          {/* Day-of-week header */}
+          <div style={{ display: 'flex', gap: `${cellCfg.gap}px`, marginLeft: '0px' }}>
+            {dayLabels.map((d, i) => (
+              <span key={i} className="text-center text-gray-600 shrink-0" style={{ width: `${cellCfg.size}px`, fontSize: '8px' }}>
+                {d}
+              </span>
+            ))}
+          </div>
+          {rows.map((row, ri) => (
+            <div key={ri} style={{ display: 'flex', gap: `${cellCfg.gap}px` }}>
+              {row.map((cell, ci) => cell ? (
+                <span
+                  key={ci}
+                  className={`shrink-0 rounded-[1px] ${cellBgClass(cell.status, false)}`}
+                  style={{ width: `${cellCfg.size}px`, height: `${cellCfg.size}px` }}
+                  title={cell.label}
+                />
+              ) : (
+                <span key={ci} className="shrink-0" style={{ width: `${cellCfg.size}px`, height: `${cellCfg.size}px` }} />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// === Week Grid (original) ===
+
+function WeekGridView({ grid, stats, birthDate, cellCfg, weekLayout, hideSpent, showEvents }) {
+  const currentAge = Math.floor(stats.age.years);
+  const layoutCfg = WEEK_LAYOUTS.find(v => v.id === weekLayout) || WEEK_LAYOUTS[0];
+
   const allWeeks = useMemo(() => {
     const weeks = [];
     for (const row of grid) {
@@ -100,60 +341,124 @@ function LifeGrid({ grid, stats, birthDate }) {
     return weeks;
   }, [grid]);
 
-  // Compute event markers
   const eventWeeks = useMemo(
     () => showEvents ? computeEventWeeks(birthDate, grid, stats) : new Map(),
     [birthDate, grid, stats, showEvents]
   );
 
-  // Determine weeks per row
-  const weeksPerRow = viewCfg.weeksPerRow || 104; // auto = ~2 years per row for wide screens
+  const weeksPerRow = layoutCfg.weeksPerRow || 104;
 
-  // Filter grid when hiding spent
   const filteredGrid = useMemo(() => {
     if (!hideSpent) return grid;
     return grid.filter(row => row.weeks.some(s => s === 'c' || s === 'r'));
   }, [grid, hideSpent]);
 
-  // Group weeks into rows
   const rows = useMemo(() => {
-    if (viewMode !== 'auto' && viewCfg.weeksPerRow) {
-      // Year-aligned: use grid rows directly, but split/merge as needed
-      if (viewCfg.weeksPerRow === 52) {
+    if (weekLayout !== 'auto' && layoutCfg.weeksPerRow) {
+      if (layoutCfg.weeksPerRow === 52) {
         return filteredGrid.map(row => ({ label: row.age, weeks: row.weeks.map((s, w) => ({ age: row.age, week: w, status: s })) }));
       }
-      // Sub-year: split each year row
       const result = [];
       for (const row of filteredGrid) {
-        for (let start = 0; start < row.weeks.length; start += viewCfg.weeksPerRow) {
-          const slice = row.weeks.slice(start, start + viewCfg.weeksPerRow);
+        for (let start = 0; start < row.weeks.length; start += layoutCfg.weeksPerRow) {
+          const slice = row.weeks.slice(start, start + layoutCfg.weeksPerRow);
           const label = start === 0 ? row.age : null;
           result.push({ label, weeks: slice.map((s, i) => ({ age: row.age, week: start + i, status: s })) });
         }
       }
       return result;
     }
-    // Auto-fit: pack all weeks into rows of weeksPerRow
     const result = [];
     for (let i = 0; i < allWeeks.length; i += weeksPerRow) {
       const slice = allWeeks.slice(i, i + weeksPerRow);
       const firstAge = slice[0]?.age;
-      const label = i === 0 || firstAge !== allWeeks[Math.max(0, i - 1)]?.age ? firstAge : null;
       result.push({ label: firstAge, weeks: slice });
     }
     return result;
-  }, [filteredGrid, allWeeks, viewMode, viewCfg, weeksPerRow, hideSpent]);
+  }, [filteredGrid, allWeeks, weekLayout, layoutCfg, weeksPerRow, hideSpent]);
 
-  // Decade/5-year labels
   const shouldLabel = (age) => age != null && age % 10 === 0;
+
+  return (
+    <div className="overflow-x-auto">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: `${cellCfg.gap}px` }}>
+        {rows.map((row, ri) => (
+          <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: `${cellCfg.gap}px` }}>
+            <span
+              className={`text-right shrink-0 ${shouldLabel(row.label) ? 'text-gray-400 font-medium' : 'text-transparent'}`}
+              style={{ width: '24px', fontSize: '9px' }}
+            >
+              {shouldLabel(row.label) ? row.label : '.'}
+            </span>
+            {row.weeks.map((cell, wi) => {
+              const eventId = eventWeeks.get(`${cell.age}-${cell.week}`);
+              const eventCfg = eventId ? EVENT_COLORS.find(e => e.id === eventId) : null;
+
+              let bgClass;
+              if (eventCfg && cell.status === 'r') {
+                bgClass = eventCfg.color;
+              } else if (cell.status === 'c') {
+                bgClass = 'bg-port-accent shadow-[0_0_4px_rgba(59,130,246,0.5)]';
+              } else if (cell.status === 's') {
+                bgClass = cell.age === currentAge ? 'bg-gray-500' : 'bg-gray-700';
+              } else {
+                bgClass = 'bg-port-success/20';
+              }
+
+              return (
+                <span
+                  key={wi}
+                  className={`shrink-0 rounded-[1px] ${bgClass} ${eventCfg ? `ring-1 ${eventCfg.ring}` : ''}`}
+                  style={{ width: `${cellCfg.size}px`, height: `${cellCfg.size}px` }}
+                  title={`Age ${cell.age}, Week ${cell.week + 1}${eventCfg ? ` — ${eventCfg.label}` : ''}`}
+                />
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// === Life Grid (main component) ===
+
+function LifeGrid({ grid, stats, birthDate, deathDate }) {
+  const [unit, setUnit] = useState('weeks');
+  const [weekLayout, setWeekLayout] = useState('year');
+  const [cellSizeId, setCellSizeId] = useState('sm');
+  const [showEvents, setShowEvents] = useState(true);
+  const [hideSpent, setHideSpent] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
+
+  const cellCfg = CELL_SIZES.find(c => c.id === cellSizeId) || CELL_SIZES[1];
+
+  const unitLabel = {
+    years: `Year ${Math.floor(stats.age.years)} of ${Math.ceil(stats.remaining.years + stats.age.years)}`,
+    months: `Month ${Math.floor(stats.age.years * 12)} of ${Math.floor((stats.remaining.years + stats.age.years) * 12)}`,
+    weeks: `Week ${stats.age.weeks.toLocaleString()} of ${stats.total.weeks.toLocaleString()}`,
+    days: `Day ${stats.age.days.toLocaleString()} of ${Math.floor((stats.remaining.days || 0) + stats.age.days).toLocaleString()}`,
+  };
 
   return (
     <div className="bg-port-card border border-port-border rounded-lg p-4">
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <Calendar size={16} className="text-port-accent" />
-        <h3 className="text-sm font-medium text-white">Life in Weeks</h3>
+        <h3 className="text-sm font-medium text-white">Life Calendar</h3>
+        {/* Unit toggle */}
+        <div className="flex items-center gap-0.5 ml-2 bg-port-bg rounded-md p-0.5 border border-port-border">
+          {UNIT_MODES.map(u => (
+            <button
+              key={u.id}
+              onClick={() => setUnit(u.id)}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${unit === u.id ? 'bg-port-accent/20 text-port-accent font-medium' : 'text-gray-400 hover:text-white'}`}
+            >
+              {u.label}
+            </button>
+          ))}
+        </div>
         <span className="text-xs text-gray-500 ml-auto">
-          Week {stats.age.weeks.toLocaleString()} of {stats.total.weeks.toLocaleString()}
+          {unitLabel[unit]}
         </span>
         <button
           onClick={() => setShowConfig(v => !v)}
@@ -167,18 +472,20 @@ function LifeGrid({ grid, stats, birthDate }) {
       {/* Config panel */}
       {showConfig && (
         <div className="flex flex-wrap items-center gap-4 mb-3 p-2 bg-port-bg rounded-lg border border-port-border">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Layout:</span>
-            {VIEW_MODES.map(v => (
-              <button
-                key={v.id}
-                onClick={() => setViewMode(v.id)}
-                className={`px-2 py-0.5 text-xs rounded ${viewMode === v.id ? 'bg-port-accent/20 text-port-accent' : 'text-gray-400 hover:text-white'}`}
-              >
-                {v.id === 'auto' ? 'Auto' : v.id === 'year' ? '1Y' : v.id === 'half' ? '6M' : '3M'}
-              </button>
-            ))}
-          </div>
+          {unit === 'weeks' && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Layout:</span>
+              {WEEK_LAYOUTS.map(v => (
+                <button
+                  key={v.id}
+                  onClick={() => setWeekLayout(v.id)}
+                  className={`px-2 py-0.5 text-xs rounded ${weekLayout === v.id ? 'bg-port-accent/20 text-port-accent' : 'text-gray-400 hover:text-white'}`}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500">Size:</span>
             {CELL_SIZES.map(c => (
@@ -191,14 +498,18 @@ function LifeGrid({ grid, stats, birthDate }) {
               </button>
             ))}
           </div>
-          <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer">
-            <input type="checkbox" checked={showEvents} onChange={(e) => setShowEvents(e.target.checked)} className="rounded border-port-border" />
-            Birthdays
-          </label>
-          <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer">
-            <input type="checkbox" checked={hideSpent} onChange={(e) => setHideSpent(e.target.checked)} className="rounded border-port-border" />
-            Hide spent
-          </label>
+          {unit === 'weeks' && (
+            <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer">
+              <input type="checkbox" checked={showEvents} onChange={(e) => setShowEvents(e.target.checked)} className="rounded border-port-border" />
+              Birthdays
+            </label>
+          )}
+          {unit !== 'days' && (
+            <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer">
+              <input type="checkbox" checked={hideSpent} onChange={(e) => setHideSpent(e.target.checked)} className="rounded border-port-border" />
+              Hide spent
+            </label>
+          )}
         </div>
       )}
 
@@ -207,57 +518,26 @@ function LifeGrid({ grid, stats, birthDate }) {
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-gray-600" /> Spent</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-port-accent" /> Now</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-port-success/30" /> Remaining</span>
-        {showEvents && (
-          <>
-            {EVENT_COLORS.filter(e => e.id === 'birthday').map(e => (
-              <span key={e.id} className="flex items-center gap-1">
-                <span className={`w-2 h-2 rounded-sm ${e.color}`} /> {e.label}
-              </span>
-            ))}
-          </>
-        )}
+        {unit === 'weeks' && showEvents && EVENT_COLORS.filter(e => e.id === 'birthday').map(e => (
+          <span key={e.id} className="flex items-center gap-1">
+            <span className={`w-2 h-2 rounded-sm ${e.color}`} /> {e.label}
+          </span>
+        ))}
       </div>
 
       {/* Grid */}
-      <div className="overflow-x-auto">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: `${cellCfg.gap}px` }}>
-          {rows.map((row, ri) => (
-            <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: `${cellCfg.gap}px` }}>
-              {/* Age label */}
-              <span
-                className={`text-right shrink-0 ${shouldLabel(row.label) ? 'text-gray-400 font-medium' : 'text-transparent'}`}
-                style={{ width: '24px', fontSize: '9px' }}
-              >
-                {shouldLabel(row.label) ? row.label : '.'}
-              </span>
-              {row.weeks.map((cell, wi) => {
-                const eventId = eventWeeks.get(`${cell.age}-${cell.week}`);
-                const eventCfg = eventId ? EVENT_COLORS.find(e => e.id === eventId) : null;
-
-                let bgClass;
-                if (eventCfg && cell.status === 'r') {
-                  bgClass = eventCfg.color;
-                } else if (cell.status === 'c') {
-                  bgClass = 'bg-port-accent shadow-[0_0_4px_rgba(59,130,246,0.5)]';
-                } else if (cell.status === 's') {
-                  bgClass = cell.age === currentAge ? 'bg-gray-500' : 'bg-gray-700';
-                } else {
-                  bgClass = 'bg-port-success/20';
-                }
-
-                return (
-                  <span
-                    key={wi}
-                    className={`shrink-0 rounded-[1px] ${bgClass} ${eventCfg ? `ring-1 ${eventCfg.ring}` : ''}`}
-                    style={{ width: `${cellCfg.size}px`, height: `${cellCfg.size}px` }}
-                    title={`Age ${cell.age}, Week ${cell.week + 1}${eventCfg ? ` — ${eventCfg.label}` : ''}`}
-                  />
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      </div>
+      {unit === 'years' && (
+        <YearGridView birthDate={birthDate} deathDate={deathDate} cellCfg={cellCfg} hideSpent={hideSpent} />
+      )}
+      {unit === 'months' && (
+        <MonthGridView birthDate={birthDate} deathDate={deathDate} cellCfg={cellCfg} hideSpent={hideSpent} />
+      )}
+      {unit === 'weeks' && (
+        <WeekGridView grid={grid} stats={stats} birthDate={birthDate} cellCfg={cellCfg} weekLayout={weekLayout} hideSpent={hideSpent} showEvents={showEvents} />
+      )}
+      {unit === 'days' && (
+        <DayGridView birthDate={birthDate} deathDate={deathDate} cellCfg={cellCfg} stats={stats} />
+      )}
     </div>
   );
 }
@@ -480,16 +760,25 @@ export default function CalendarTab() {
   }
 
   if (error || data?.error) {
+    const isBirthDateMissing = (error || data?.error || '').includes('Birth date not set');
     return (
       <div className="text-center py-12">
         <Calendar size={48} className="text-gray-600 mx-auto mb-4" />
         <p className="text-gray-400 mb-2">Life calendar unavailable</p>
-        <p className="text-sm text-gray-500">{error || data.error}</p>
+        <p className="text-sm text-gray-500 mb-4">{error || data.error}</p>
+        {isBirthDateMissing && (
+          <Link
+            to="/meatspace/age"
+            className="inline-block px-4 py-2 rounded bg-port-accent/20 text-port-accent hover:bg-port-accent/30 text-sm"
+          >
+            Set Birth Date
+          </Link>
+        )}
       </div>
     );
   }
 
-  const { stats, grid, budgets, birthDate } = data;
+  const { stats, grid, budgets, birthDate, deathDate } = data;
 
   const pctSpent = stats.age.weeks / stats.total.weeks * 100;
   const pctColor = pctSpent < 50 ? 'text-port-accent' : pctSpent < 75 ? 'text-port-warning' : 'text-port-error';
@@ -529,7 +818,7 @@ export default function CalendarTab() {
       </div>
 
       {/* Life Grid */}
-      <LifeGrid grid={grid} stats={stats} birthDate={birthDate} />
+      <LifeGrid grid={grid} stats={stats} birthDate={birthDate} deathDate={deathDate} />
 
       {/* Time remaining stats */}
       <TimeStats stats={stats} />
