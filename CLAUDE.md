@@ -107,6 +107,7 @@ port-error: #ef4444
 - **Push pattern**: `git pull --rebase --autostash && git push`
 - **Changelog**: `/cam` appends to `.changelog/NEXT.md`; `/release` finalizes it into a versioned file
 - **Versioning**: Version in `package.json` reflects the last release. Do not bump during development — `/release` handles version bumps
-- Commit code after each feature or bug fix
+- After each feature or bug fix, run `/simplify` and then commit and push code
+- If we have created enough commits to wrap up a feature or issue to warrent a production release, pull the latest maina nd release branches and then run `/release` from main
 
 See `.changelog/README.md` for detailed format and best practices.
