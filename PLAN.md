@@ -77,12 +77,20 @@ pm2 logs
 
 - [x] **M51**: Memory System PostgreSQL Upgrade - PostgreSQL + pgvector backend with HNSW vector search, tsvector full-text search, federation sync, and pg_dump backup integration
 - [x] **M44 P6**: MeatSpace - Genome/Epigenetic Migration cleanup (route comments updated to `/api/meatspace/genome/`, IdentityTab genome link points to `/meatspace/genome`)
-- [x] **M53**: POST (Power On Self Test) - Daily cognitive self-test with mental math drills (P1) and LLM-powered wit & memory drills (P2). See [POST](./docs/features/post.md)
+- [x] **M53**: POST (Power On Self Test) - Daily cognitive self-test with mental math drills (P1) and LLM-powered wit & memory drills (P2).
 - [x] **M44 P7**: MeatSpace - Apple Health Integration (live sync via Health Auto Export app + bulk XML import)
 - [x] **M46**: Unified Search (Cmd+K) - Global search across brain, memory, history, agents, tasks, and apps
 - [x] **GSD Tab**: Smart State Detection, One-Click Agent Spawn, Actionable Dashboard
 
 ### In Progress
+
+- [ ] **M55**: POST Enhancement — Memory builder, imagination drills, training mode, 5-min balanced sessions. See [POST](./docs/features/post.md)
+  - [ ] P1: Memory Builder engine + Elements Song — data model, CRUD routes, practice/mastery tracking, built-in Elements Song content with lyrics and element mapping
+  - [ ] P2: Memory Builder UI — MemoryItemList, MemoryPractice (learn/fill-blank/sequence/random-prompt/speed-run modes), ElementsSong periodic table visualization with mastery coloring
+  - [ ] P3: Imagination & Ideation drills — what-if, alternative-uses, story-prompt, invention-pitch, reframe; LLM generation + scoring; ImaginationDrillRunner UI
+  - [ ] P4: Training mode — per-domain train vs test toggle in session launcher, progressive difficulty, hints, immediate feedback, practice log tracking (separate from scored history)
+  - [ ] P5: 5-minute session flow — time-budgeted session that pulls one drill per enabled domain, transition UI between drills, session score as weighted domain average
+  - [ ] P6: Custom memory items — user adds songs/poems/speeches/sequences via config UI, auto-chunking, spaced repetition scheduling based on mastery
 
 - [ ] **M54**: MeatSpace Life Calendar — "4000 Weeks" mortality-aware time mapping
   - [x] P1-P3: Core calendar engine, Calendar tab UI, Overview integration (life grid, time stats, activity budgets, view modes, birthday highlights, hide-spent toggle, nav link)
@@ -106,6 +114,25 @@ pm2 logs
 ---
 
 ## Planned Feature Details
+
+### M55: POST Enhancement — Training + Memory Builder + Imagination
+
+Evolves POST from a test-only system into a cognitive training platform. Covers five domains: **Math** (existing), **Memory** (new), **Wordplay** (existing), **Verbal Agility** (existing), **Imagination** (new). Sessions take ~5 minutes with balanced time budgets across domains.
+
+**Phases:**
+
+- **P1: Memory Builder Engine + Elements Song** — Memory item data model (`data/meatspace/post-memory-items.json`), CRUD routes (`GET/POST/PUT/DELETE /api/meatspace/post/memory-items`), practice submission with mastery tracking (`POST /memory-items/:id/practice`), mastery retrieval. Built-in Elements Song: Tom Lehrer lyrics parsed into lines with element name → symbol/atomic number mapping, chunked into verses.
+- **P2: Memory Builder UI** — `MemoryItemList` (browse/add items), `MemoryPractice` with 5 training modes (learn, fill-in-the-blank, sequence recall, random prompt, speed run), `ElementsSong` component with periodic table grid colored by mastery (green/yellow/red), karaoke-style progressive reveal.
+- **P3: Imagination & Ideation Drills** — 5 new LLM drill types: `what-if` (absurd hypotheticals), `alternative-uses` (divergent thinking), `story-prompt` (connect 3 random words), `invention-pitch` (solve a problem creatively), `reframe` (positive reframing). LLM generation prompts + scoring prompts. `ImaginationDrillRunner` UI with textarea input and difficulty badges.
+- **P4: Training Mode** — Per-domain train/test toggle in `PostSessionLauncher`. Train mode: progressive difficulty, hints on wrong answers, immediate feedback, no final score. Practice log in `data/meatspace/post-training-log.json` tracks practice count, streaks, time spent. Train sessions don't appear in scored POST history.
+- **P5: 5-Minute Session Flow** — Session pulls 1 drill per enabled domain with time budgets (Math ~60s, Memory ~90s, Wordplay ~60s, Verbal ~60s, Imagination ~60s). Smooth transition UI between drills with domain label and progress. Session score = weighted average across domains.
+- **P6: Custom Memory Items** — Config UI for adding songs/poems/speeches/sequences. Auto-chunking algorithm splits content into learnable segments. Spaced repetition: focus practice on lowest-mastery chunks, graduated hint removal as mastery improves.
+
+**Data:** `data/meatspace/post-memory-items.json` (content + mastery), `data/meatspace/post-training-log.json` (practice sessions), extended `post-config.json` (imagination + memory drill settings)
+
+**Routes:** Extend existing POST routes + new memory item CRUD + practice endpoints. See [POST feature doc](./docs/features/post.md).
+
+*Touches: server/services/meatspacePost.js, server/services/meatspacePostLlm.js, new server/services/meatspacePostMemory.js, server/routes/meatspace.js, server/lib/postValidation.js, client/src/components/meatspace/post/*, client/src/hooks/usePostSession.js, client/src/services/api.js*
 
 ### M44 P7: Apple Health Integration
 
@@ -367,6 +394,7 @@ Check for new PortOS releases on GitHub and notify the user when an update is av
 - [JIRA Sprint Manager](./docs/features/jira-sprint-manager.md) - Autonomous JIRA triage and implementation
 - [Memory System](./docs/features/memory-system.md) - Semantic memory with LLM classification
 - [Messages Security](./docs/features/messages-security.md) - AI prompt injection threat model and defenses
+- [POST](./docs/features/post.md) - Cognitive self-test and training system
 - [Prompt Manager](./docs/features/prompt-manager.md) - Customizable AI prompts
 - [Soul System](./docs/features/soul-system.md) - Digital twin identity scaffold
 
