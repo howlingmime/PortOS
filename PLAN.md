@@ -89,7 +89,7 @@ pm2 logs
   - [x] P3: Imagination & Ideation drills — what-if, alternative-uses, story-prompt, invention-pitch, reframe; LLM generation + scoring; ImaginationDrillRunner UI
   - [x] P4: Training mode — train/test toggle in session launcher, no time pressure, immediate correct/wrong feedback with hints (math), per-response LLM scoring feedback, practice log tracking in `post-training-log.json` (separate from scored history)
   - [x] P5: 5-minute session flow — Quick 5 Min button picks one drill per enabled domain with time budgets (Math 60s, Memory 90s, Wordplay 60s, Verbal 60s, Imagination 60s), DrillTransition UI between drills with domain label/progress/auto-advance, domain-weighted session scoring, per-domain score summary in results
-  - [ ] P6: Custom memory items — user adds songs/poems/speeches/sequences via config UI, auto-chunking, spaced repetition scheduling based on mastery
+  - [x] P6: Custom memory items — config UI for adding songs/poems/speeches/sequences, auto-chunking by blank lines with 4-line fallback, spaced repetition mode (weakest chunks first, graduated hints: full→partial→minimal→none), chunk mastery overview
 
 - [ ] **M54**: MeatSpace Life Calendar — "4000 Weeks" mortality-aware time mapping
   - [x] P1-P3: Core calendar engine, Calendar tab UI, Overview integration (life grid, time stats, activity budgets, view modes, birthday highlights, hide-spent toggle, nav link)
@@ -125,7 +125,7 @@ Evolves POST from a test-only system into a cognitive training platform. Covers 
 - **P3: Imagination & Ideation Drills** — 5 new LLM drill types: `what-if` (absurd hypotheticals), `alternative-uses` (divergent thinking), `story-prompt` (connect 3 random words), `invention-pitch` (solve a problem creatively), `reframe` (positive reframing). LLM generation prompts + scoring prompts. `ImaginationDrillRunner` UI with textarea input and difficulty badges.
 - **P4: Training Mode** — Per-domain train/test toggle in `PostSessionLauncher`. Train mode: progressive difficulty, hints on wrong answers, immediate feedback, no final score. Practice log in `data/meatspace/post-training-log.json` tracks practice count, streaks, time spent. Train sessions don't appear in scored POST history.
 - **P5: 5-Minute Session Flow** — Session pulls 1 drill per enabled domain with time budgets (Math ~60s, Memory ~90s, Wordplay ~60s, Verbal ~60s, Imagination ~60s). Smooth transition UI between drills with domain label and progress. Session score = weighted average across domains.
-- **P6: Custom Memory Items** — Config UI for adding songs/poems/speeches/sequences. Auto-chunking algorithm splits content into learnable segments. Spaced repetition: focus practice on lowest-mastery chunks, graduated hint removal as mastery improves.
+- **P6: Custom Memory Items** ✅ — Config UI for adding songs/poems/speeches/sequences with title, type picker, and content textarea. Auto-chunking splits by blank lines (verse boundaries) with 4-line fallback. Spaced repetition mode orders chunks by mastery (weakest first) with graduated hint levels (full first-letters → partial → word-count-only → none). Chunk mastery overview with expandable per-chunk accuracy bars. New `GET /memory-items/:id/chunk-mastery` endpoint.
 
 **Data:** `data/meatspace/post-memory-items.json` (content + mastery), `data/meatspace/post-training-log.json` (practice sessions), extended `post-config.json` (imagination + memory drill settings)
 
