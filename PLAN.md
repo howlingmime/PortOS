@@ -95,7 +95,7 @@ pm2 logs
   - [x] P1-P3: Core calendar engine, Calendar tab UI, Overview integration (life grid, time stats, activity budgets, view modes, birthday highlights, hide-spent toggle, nav link)
   - [x] P4: Birthdate management — birthDate canonical source moved to `meatspace/config.json` with auto-migration from `goals.json`. `GET/PUT /api/meatspace/birth-date` endpoints. AgeTab shows birthdate display + inline edit. Calendar error links to `/meatspace/age`. Identity setBirthDate syncs to both stores.
   - [x] P4b: Life Calendar multi-unit views — renamed "Life in Weeks" to "Life Calendar" with Years/Months/Weeks/Days toggle. Year grid (10 cols), Month grid (12 cols/year), Week grid (existing layouts), Day grid (calendar-style per-year with navigation).
-  - [ ] P5: Additional event types — holidays, vacations, custom recurring events with color coding on the life grid
+  - [x] P5: Additional event types — holidays, vacations, milestones, health, custom events with color coding (amber/cyan/purple/red/emerald) on the life grid, collapsible events panel with CRUD, enable/disable toggle, yearly/one-time recurrence, default US holidays
   - [ ] P6: Mobile responsive cell size auto-detection
   - [ ] P7: Goal Tree integration — connect activities to goals, time feasibility analysis ("Can I finish this goal with my remaining time budget?")
 
