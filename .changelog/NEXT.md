@@ -1,6 +1,9 @@
 # Unreleased Changes
 
 ## Added
+- Outlook API sync — extracts bearer token from authenticated browser session via CDP, calls REST API directly instead of Playwright scraping (1.7s vs 5-10min), with automatic Playwright fallback
+- Token extraction for Teams (localStorage MSAL cache) — infrastructure ready for when Teams exposes usable REST APIs
+- Debug endpoints for token status, extraction testing, and cache management (`/api/messages/debug/token-status`, `test-token`, `clear-token`)
 - Messages Full Sync now reconciles cache against inbox, pruning messages that were archived/deleted/replied outside PortOS
 - MeatSpace Life Calendar tab — "4000 Weeks" mortality-aware time grid with weeks from birth to death, remaining Saturdays/Sundays/sleep/seasons stats, and customizable activity budgets (coffees, showers, workouts, etc.)
 - Life Calendar tile on MeatSpace Overview linking to full calendar view

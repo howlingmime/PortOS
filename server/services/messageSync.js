@@ -126,7 +126,20 @@ export async function syncAccount(accountId, io, options = {}) {
     if (account.type === 'gmail') {
       const { syncGmail } = await import('./messageGmailSync.js');
       providerResult = await syncGmail(account, cache, io);
-    } else if (account.type === 'outlook' || account.type === 'teams') {
+    } else if (account.type === 'outlook') {
+      // Try API sync first (fast), fall back to Playwright (slow)
+      const { syncOutlookApi } = await import('./messageApiSync.js');
+      providerResult = await syncOutlookApi(account, cache, io, { mode }).catch(err => {
+        console.log(`📧 API sync error, falling back to Playwright: ${err.message}`);
+        return null;
+      });
+      if (!providerResult) {
+        console.log(`📧 Falling back to Playwright sync for ${account.email}`);
+        const { syncPlaywright } = await import('./messagePlaywrightSync.js');
+        providerResult = await syncPlaywright(account, cache, io, { mode });
+      }
+    } else if (account.type === 'teams') {
+      // Teams v2 uses service workers + WebSocket — no usable REST API yet
       const { syncPlaywright } = await import('./messagePlaywrightSync.js');
       providerResult = await syncPlaywright(account, cache, io, { mode });
     } else {

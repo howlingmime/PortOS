@@ -10,6 +10,7 @@ import { getSelectors, updateSelectors, testSelectors, launchProvider } from '..
 import { evaluateMessages, generateReplyBody } from '../services/messageEvaluator.js';
 import { executeAction } from '../services/messageActions.js';
 import { listRules, deleteRule } from '../services/messageTriageRules.js';
+import { getToken, getTokenStatus, testApi, clearTokenCache } from '../services/messageTokenExtractor.js';
 
 const router = express.Router();
 
@@ -398,6 +399,40 @@ router.post('/:accountId/:messageId/action', asyncHandler(async (req, res) => {
   const result = await executeAction(accountId, messageId, action);
   req.app.get('io')?.emit('messages:changed', {});
   res.json(result);
+}));
+
+// === Debug: Token Extraction & API Testing ===
+const ALLOWED_TOKEN_PROVIDERS = ['outlook', 'teams'];
+
+router.get('/debug/token-status', asyncHandler(async (req, res) => {
+  const statuses = ALLOWED_TOKEN_PROVIDERS.map(p => getTokenStatus(p));
+  res.json({ providers: statuses });
+}));
+
+router.post('/debug/test-token', asyncHandler(async (req, res) => {
+  const provider = ALLOWED_TOKEN_PROVIDERS.includes(req.body?.provider) ? req.body.provider : 'outlook';
+  const tokenResult = await getToken(provider);
+  if (tokenResult.error) return res.status(503).json(tokenResult);
+
+  const decoded = tokenResult.decoded || {};
+  const tokenInfo = {
+    provider,
+    fresh: tokenResult.fresh,
+    length: tokenResult.token.length,
+    expires: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : 'unknown',
+    audience: decoded.aud || 'unknown',
+    scopes: decoded.scp || decoded.roles || 'unknown'
+  };
+
+  const apiResult = await testApi(provider, tokenResult.token, parseInt(req.query?.top, 10) || 5);
+
+  res.json({ token: tokenInfo, api: apiResult });
+}));
+
+router.post('/debug/clear-token', asyncHandler(async (req, res) => {
+  const provider = ALLOWED_TOKEN_PROVIDERS.includes(req.body?.provider) ? req.body.provider : null;
+  clearTokenCache(provider);
+  res.json({ cleared: true, provider: provider || 'all' });
 }));
 
 // === Message Detail Route (last to avoid capturing /launch, /selectors paths) ===
