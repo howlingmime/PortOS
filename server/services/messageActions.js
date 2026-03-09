@@ -90,24 +90,20 @@ export async function executeAction(accountId, messageId, action) {
 
   const page = await ensureProviderPage(account.type);
 
-  const safeSubject = (message.subject || '').replace(/'/g, "\\'").replace(/\n/g, ' ');
-  const script = account.type === 'outlook'
-    ? buildOutlookActionScript(safeSubject, action)
-    : buildGmailActionScript(safeSubject, action);
-
   console.log(`📧 ${action} message "${message.subject}" via ${account.type} browser`);
-  const result = await evaluateOnPage(page, script);
 
-  if (!result || result.error) {
-    const errorMsg = result?.error || `${action} failed — script returned no result`;
-    // If message genuinely not in inbox, just clean up local cache
-    if (result?.notInInbox) {
-      console.log(`📧 "${message.subject}" not found in inbox, cleaning up local cache`);
-    } else {
-      throw new Error(errorMsg);
-    }
+  if (account.type === 'outlook') {
+    await executeOutlookAction(page, message.subject || '', action);
   } else {
-    console.log(`📧 ${action} executed in browser for "${message.subject}"`);
+    const script = buildGmailActionScript((message.subject || '').replace(/'/g, "\\'").replace(/\n/g, ' '), action);
+    const result = await evaluateOnPage(page, script);
+    if (!result || result.error) {
+      if (result?.notInInbox) {
+        console.log(`📧 "${message.subject}" not found in inbox, cleaning up local cache`);
+      } else {
+        throw new Error(result?.error || `${action} failed`);
+      }
+    }
   }
 
   // Record triage correction if user chose differently than the AI
@@ -125,6 +121,104 @@ export async function executeAction(accountId, messageId, action) {
   console.log(`📧 ${action} complete for "${message.subject}"`);
 
   return { success: true, action, messageId };
+}
+
+/**
+ * Execute archive/delete on Outlook via CDP: find+click message, then send key via protocol.
+ */
+async function executeOutlookAction(page, subject, action) {
+  const { default: WebSocket } = await import('ws');
+
+  // Step 1: Find and click the message row using evaluateOnPage
+  const selectScript = `(async () => {
+    const listbox = document.querySelector("[role='listbox']");
+    if (!listbox) return { error: 'No message list found' };
+    const target = ${JSON.stringify(subject)}.toLowerCase();
+    const scrollContainer = listbox.closest('[role="region"]') || listbox.parentElement;
+    function findMatch() {
+      for (const row of listbox.querySelectorAll('[role="option"]')) {
+        const text = (row.getAttribute('aria-label') || row.innerText || '').toLowerCase();
+        if (text.includes(target)) return row;
+      }
+      return null;
+    }
+    let matched = findMatch();
+    if (!matched && scrollContainer) {
+      for (let i = 0; i < 15; i++) {
+        scrollContainer.scrollBy(0, 600);
+        await new Promise(r => setTimeout(r, 300));
+        matched = findMatch();
+        if (matched) break;
+      }
+    }
+    if (!matched) return { notInInbox: true, error: 'Message not found in inbox view' };
+    matched.scrollIntoView({ block: 'center' });
+    await new Promise(r => setTimeout(r, 200));
+    matched.click();
+    await new Promise(r => setTimeout(r, 800));
+    return { selected: true };
+  })()`;
+
+  const selectResult = await evaluateOnPage(page, selectScript);
+  if (!selectResult || selectResult.error) {
+    if (selectResult?.notInInbox) {
+      console.log(`📧 "${subject}" not found in inbox, cleaning up local cache`);
+      return;
+    }
+    throw new Error(selectResult?.error || 'Failed to select message');
+  }
+
+  // Step 2: Send Delete key via CDP Input.dispatchKeyEvent (protocol level, not DOM)
+  const wsUrl = page.webSocketDebuggerUrl;
+  if (!wsUrl) throw new Error('No WebSocket URL for CDP');
+
+  const keyCode = action === 'delete' ? 'Delete' : 'Backspace';
+  const nativeVirtualKeyCode = action === 'delete' ? 46 : 8;
+
+  await new Promise((resolve, reject) => {
+    const ws = new WebSocket(wsUrl);
+    const timer = setTimeout(() => { ws.close(); reject(new Error('CDP key dispatch timed out')); }, 10000);
+    let msgId = 1;
+
+    ws.on('open', () => {
+      // Send keyDown then keyUp
+      ws.send(JSON.stringify({
+        id: msgId++,
+        method: 'Input.dispatchKeyEvent',
+        params: { type: 'keyDown', key: keyCode, code: keyCode, nativeVirtualKeyCode, windowsVirtualKeyCode: nativeVirtualKeyCode }
+      }));
+      ws.send(JSON.stringify({
+        id: msgId++,
+        method: 'Input.dispatchKeyEvent',
+        params: { type: 'keyUp', key: keyCode, code: keyCode, nativeVirtualKeyCode, windowsVirtualKeyCode: nativeVirtualKeyCode }
+      }));
+    });
+
+    let responses = 0;
+    ws.on('message', (data) => {
+      const msg = safeJSONParse(data.toString(), null, { context: 'cdp-key' });
+      if (msg?.id) responses++;
+      if (responses >= 2) { clearTimeout(timer); ws.close(); resolve(); }
+    });
+    ws.on('error', (e) => { clearTimeout(timer); ws.close(); reject(e); });
+  });
+
+  // Step 3: Wait and verify message is gone
+  await new Promise(r => setTimeout(r, 1500));
+  const verifyScript = `(function() {
+    const listbox = document.querySelector("[role='listbox']");
+    if (!listbox) return { gone: true };
+    const target = ${JSON.stringify(subject)}.toLowerCase();
+    for (const row of listbox.querySelectorAll('[role="option"]')) {
+      const text = (row.getAttribute('aria-label') || row.innerText || '').toLowerCase();
+      if (text.includes(target)) return { gone: false };
+    }
+    return { gone: true };
+  })()`;
+  const verify = await evaluateOnPage(page, verifyScript);
+  if (verify && !verify.gone) {
+    throw new Error(`Message still in inbox after ${action} attempt — action may not have worked`);
+  }
 }
 
 function buildOutlookActionScript(subject, action) {
