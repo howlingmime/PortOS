@@ -71,7 +71,7 @@ async function _doUpdate(app, emit) {
   steps.push({ step: 'git-pull', success: true, message: pullMsg });
 
   // Step 2: Install deps for each subdir that has package.json
-  for (const sub of ['', 'client', 'server']) {
+  for (const sub of ['', 'client', 'server', 'admin']) {
     const subDir = sub ? join(dir, sub) : dir;
     if (existsSync(join(subDir, 'package.json'))) {
       const label = sub || 'root';

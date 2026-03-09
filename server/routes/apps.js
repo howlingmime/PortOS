@@ -411,8 +411,8 @@ router.post('/:id/build', loadApp, asyncHandler(async (req, res) => {
 
   console.log(`🔨 Building ${app.name}: ${buildCommand}`);
 
-  // Install dependencies before building (root, client, server subdirs)
-  for (const sub of ['', 'client', 'server']) {
+  // Install dependencies before building (root + common subdirs)
+  for (const sub of ['', 'client', 'server', 'admin']) {
     const subDir = sub ? join(app.repoPath, sub) : app.repoPath;
     if (existsSync(join(subDir, 'package.json'))) {
       const label = sub || 'root';
