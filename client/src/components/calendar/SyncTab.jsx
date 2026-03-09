@@ -51,7 +51,7 @@ export default function SyncTab({ accounts, onRefresh }) {
 
   const handleTestToken = async (provider) => {
     const result = await api.testCalendarToken(provider).catch(() => null);
-    if (result?.valid) {
+    if (result?.token) {
       toast.success(`${provider} token is valid`);
     } else {
       toast.error(`${provider} token is invalid or expired`);
