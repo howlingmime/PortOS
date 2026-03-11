@@ -1,6 +1,6 @@
 import express from 'express';
 import { z } from 'zod';
-import { asyncHandler } from '../lib/errorHandler.js';
+import { asyncHandler, ServerError } from '../lib/errorHandler.js';
 import { validateRequest } from '../lib/validation.js';
 import * as calendarAccounts from '../services/calendarAccounts.js';
 import * as calendarSync from '../services/calendarSync.js';
@@ -46,21 +46,21 @@ router.post('/accounts', asyncHandler(async (req, res) => {
 
 router.put('/accounts/:id', asyncHandler(async (req, res) => {
   if (!z.string().uuid().safeParse(req.params.id).success) {
-    return res.status(400).json({ error: 'Invalid account ID format' });
+    throw new ServerError('Invalid account ID format', { status: 400, code: 'VALIDATION_ERROR' });
   }
   const updates = validateRequest(updateAccountSchema, req.body);
   const account = await calendarAccounts.updateAccount(req.params.id, updates);
-  if (!account) return res.status(404).json({ error: 'Account not found' });
+  if (!account) throw new ServerError('Account not found', { status: 404, code: 'NOT_FOUND' });
   req.app.get('io')?.emit('calendar:changed', {});
   res.json(account);
 }));
 
 router.delete('/accounts/:id', asyncHandler(async (req, res) => {
   if (!z.string().uuid().safeParse(req.params.id).success) {
-    return res.status(400).json({ error: 'Invalid account ID format' });
+    throw new ServerError('Invalid account ID format', { status: 400, code: 'VALIDATION_ERROR' });
   }
   const deleted = await calendarAccounts.deleteAccount(req.params.id);
-  if (!deleted) return res.status(404).json({ error: 'Account not found' });
+  if (!deleted) throw new ServerError('Account not found', { status: 404, code: 'NOT_FOUND' });
   await calendarSync.deleteCache(req.params.id).catch(() => {});
   req.app.get('io')?.emit('calendar:changed', {});
   res.status(204).send();
@@ -69,7 +69,7 @@ router.delete('/accounts/:id', asyncHandler(async (req, res) => {
 // === Sync Routes ===
 router.post('/sync/:accountId', asyncHandler(async (req, res) => {
   if (!z.string().uuid().safeParse(req.params.accountId).success) {
-    return res.status(400).json({ error: 'Invalid account ID format' });
+    throw new ServerError('Invalid account ID format', { status: 400, code: 'VALIDATION_ERROR' });
   }
   const io = req.app.get('io');
   const result = await calendarSync.syncAccount(req.params.accountId, io);
@@ -79,7 +79,7 @@ router.post('/sync/:accountId', asyncHandler(async (req, res) => {
 
 router.get('/sync/:accountId/status', asyncHandler(async (req, res) => {
   if (!z.string().uuid().safeParse(req.params.accountId).success) {
-    return res.status(400).json({ error: 'Invalid account ID format' });
+    throw new ServerError('Invalid account ID format', { status: 400, code: 'VALIDATION_ERROR' });
   }
   const status = await calendarSync.getSyncStatus(req.params.accountId);
   if (!status) return res.status(404).json({ error: 'Account not found' });
