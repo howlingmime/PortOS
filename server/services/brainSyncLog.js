@@ -82,7 +82,7 @@ export async function appendChange(op, type, id, record, originInstanceId) {
  * Append multiple change entries in a single mutex-guarded batch (reduces lock contention)
  */
 export async function appendChanges(entries) {
-  if (!entries.length) return [];
+  if (!entries?.length) return [];
   return withLock(async () => {
     await ensureDir();
     const startSeq = currentSeq;
