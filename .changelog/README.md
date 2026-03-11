@@ -10,7 +10,7 @@ This directory contains detailed release notes for each version of PortOS.
 
 During development, all changelog entries are appended to `NEXT.md`. This file accumulates changes across multiple commits until a release is created.
 
-- `/cam` (commit all my work) automatically adds entries to `NEXT.md`
+- During development, append changelog entries to `NEXT.md` under the appropriate section (Added, Changed, Fixed, Removed)
 - `/release` renames `NEXT.md` to `v{version}.md` and finalizes it with the version number and release date
 - Do NOT create versioned changelog files manually — `/release` handles that
 
@@ -68,7 +68,7 @@ The GitHub Actions release workflow (`.github/workflows/release.yml`) automatica
 
 ## Development Workflow
 
-1. **During Development**: Each `/cam` commit appends entries to `NEXT.md` under the appropriate section (Added, Changed, Fixed, Removed)
+1. **During Development**: Append entries to `NEXT.md` under the appropriate section (Added, Changed, Fixed, Removed)
 
 2. **During Release** (`/release`):
    - Determines the version bump from conventional commit prefixes
@@ -80,14 +80,14 @@ The GitHub Actions release workflow (`.github/workflows/release.yml`) automatica
 ## Best Practices
 
 ### Do:
-- Update the changelog **as you work** via `/cam`
+- Update the changelog **as you work**
 - Use clear, descriptive entries
 - Group related changes together
 - Explain the "why" not just the "what"
 
 ### Don't:
 - Create versioned changelog files manually (use `/release`)
-- Bump the version in `/cam` — only `/release` does that
+- Bump the version manually — only `/release` does that
 - Use vague descriptions like "various improvements"
 - Leave placeholder or TODO content
 

@@ -16,68 +16,44 @@ Example progression: `0.22.0` → `0.22.1` (fix) → `0.23.0` (feature) → `1.0
 
 | Branch | Purpose |
 |--------|---------|
-| `main` | Production releases only |
-| `dev` | Active development |
+| `main` | Active development |
+| `release` | Push `main` to `release` to trigger GitHub Release workflow |
 
 ## Workflow
 
-### Version Bumping (Manual)
+### Version Bumping
 
-Version bumps happen in the same commit as the code change:
+Version is managed by the `/release` slash command. Do not bump `package.json` version manually during development.
 
-```bash
-# Bump version (choose one)
-npm version patch --no-git-tag-version   # bug fix
-npm version minor --no-git-tag-version   # new feature
-npm version major --no-git-tag-version   # breaking change
-
-# Stage version files along with your code changes
-git add package.json package-lock.json [other files]
-git commit -m "feat: add new feature"
-```
-
-### On Push to `dev`
+### On Push/PR to `main`
 
 CI runs tests and linting. No version changes.
 
-### On Merge `dev` → `main`
+### On Push `main` → `release`
 
 1. Release workflow triggers
-2. Creates git tag with current version (e.g., `v0.23.0`)
+2. Creates git tag with current version (e.g., `v1.31.0`)
 3. Generates GitHub release with changelog from `.changelog/v{major}.{minor}.x.md`
-4. Archives the changelog (renames `v0.23.x.md` → `v0.23.0.md`)
-5. Merges `main` back into `dev` to share the changelog archive commit
-
-## Manual Steps
+4. Archives the changelog (renames `v1.31.x.md` → `v1.31.0.md`) on `main`
+5. Fast-forwards `release` to match `main`
 
 ### Regular Development
 
 ```bash
-git checkout dev
+# Work on main or feature branches
+git checkout main
 git pull
 
-# Make changes, bump version, commit, push
-npm version patch --no-git-tag-version
-git add package.json package-lock.json [changed files]
+# Make changes, commit, push
+git add [changed files]
 git commit -m "fix: resolve issue"
 git pull --rebase --autostash && git push
 ```
 
 ### Creating a Release
 
-```bash
-git checkout dev
-git pull
-
-# Create PR from dev to main
-gh pr create --base main --head dev --title "Release v0.23.x"
-
-# After PR is merged:
-# - GitHub creates tag v0.23.0
-# - GitHub creates release with changelog
-# - Changelog archived on main, merged back to dev
-```
+Use the `/release` slash command from `main`. It handles version bumping, changelog finalization, and pushing to the `release` branch.
 
 ## CI Skip
 
-Use `[skip ci]` in commit messages to prevent CI from running (used by automation for changelog archives and merges).
+Use `[skip ci]` in commit messages to prevent CI from running (used by automation for changelog archives).
