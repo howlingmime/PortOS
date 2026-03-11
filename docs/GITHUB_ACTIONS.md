@@ -18,7 +18,7 @@ Triggers on PRs to `main`/`release` and pushes to `main`. Runs two parallel jobs
 - Installs root, server, and client dependencies
 - Runs server tests (`npm test --prefix server`)
 - Builds client (`npm run build --prefix client`)
-- Skips on `[skip ci]` commits
+- Skips on `[skip ci]` commits (push events only; PR CI always runs)
 
 ### Lint Job
 
