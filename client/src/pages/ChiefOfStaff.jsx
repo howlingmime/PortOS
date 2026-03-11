@@ -27,7 +27,6 @@ import {
   TasksTab,
   AgentsTab,
   JobsTab,
-  ScriptsTab,
   ScheduleTab,
   DigestTab,
   GsdTab,
@@ -43,12 +42,12 @@ import { resolveDynamicAvatar } from '../components/cos/constants';
 export default function ChiefOfStaff() {
   const { tab } = useParams();
   const navigate = useNavigate();
-  const activeTab = tab || 'tasks';
+  const validTabIds = useMemo(() => new Set(TABS.map(t => t.id)), []);
+  const activeTab = (tab && validTabIds.has(tab)) ? tab : 'tasks';
 
   const [status, setStatus] = useState(null);
   const [tasks, setTasks] = useState({ user: null, cos: null });
   const [agents, setAgents] = useState([]);
-  const [scripts, setScripts] = useState([]);
   const [health, setHealth] = useState(null);
   const [providers, setProviders] = useState([]);
   const [apps, setApps] = useState([]);
@@ -110,11 +109,10 @@ export default function ChiefOfStaff() {
   }, []);
 
   const fetchData = useCallback(async () => {
-    const [statusData, tasksData, agentsData, scriptsData, healthData, providersData, appsData, learningSummaryData] = await Promise.all([
+    const [statusData, tasksData, agentsData, healthData, providersData, appsData, learningSummaryData] = await Promise.all([
       api.getCosStatus().catch(() => null),
       api.getCosTasks().catch(() => ({ user: null, cos: null })),
       api.getCosAgents().catch(() => []),
-      api.getCosScripts().catch(() => ({ scripts: [] })),
       api.getCosHealth().catch(() => null),
       api.getProviders().catch(() => ({ providers: [] })),
       api.getApps().catch(() => []),
@@ -123,7 +121,6 @@ export default function ChiefOfStaff() {
     setStatus(statusData);
     setTasks(tasksData);
     setAgents(agentsData);
-    setScripts(scriptsData.scripts || []);
     setHealth(healthData);
     setProviders(providersData.providers || []);
     // Filter out PortOS Autofixer (it's part of PortOS project)
@@ -140,6 +137,13 @@ export default function ChiefOfStaff() {
     const runningAgent = agentsData.find(a => a.status === 'running');
     setActiveAgentMeta(runningAgent?.metadata || null);
   }, [deriveAgentState]);
+
+  // Redirect unknown tab IDs to the default tab
+  useEffect(() => {
+    if (tab && !validTabIds.has(tab)) {
+      navigate('/cos/tasks', { replace: true });
+    }
+  }, [tab, validTabIds, navigate]);
 
   useEffect(() => {
     fetchData();
@@ -810,11 +814,6 @@ export default function ChiefOfStaff() {
         {activeTab === 'jobs' && (
           <div role="tabpanel" id="tabpanel-jobs" aria-labelledby="tab-jobs">
             <JobsTab />
-          </div>
-        )}
-        {activeTab === 'scripts' && (
-          <div role="tabpanel" id="tabpanel-scripts" aria-labelledby="tab-scripts">
-            <ScriptsTab scripts={scripts} onRefresh={fetchData} />
           </div>
         )}
         {activeTab === 'schedule' && (
