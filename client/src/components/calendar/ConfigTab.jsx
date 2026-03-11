@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Plus, Trash2, RefreshCw, Globe, Mail } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Globe } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as api from '../../services/api';
 
-const TYPE_ICONS = { 'outlook-calendar': Globe, 'gmail-calendar': Mail };
-const TYPE_LABELS = { 'outlook-calendar': 'Outlook Calendar (API)', 'gmail-calendar': 'Google Calendar (API)' };
+const TYPE_ICONS = { 'outlook-calendar': Globe };
+const TYPE_LABELS = { 'outlook-calendar': 'Outlook Calendar (API)' };
 
 export default function ConfigTab({ accounts, setAccounts }) {
   const [showForm, setShowForm] = useState(false);

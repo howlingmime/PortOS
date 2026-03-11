@@ -918,7 +918,11 @@ router.post('/jobs/:id/trigger', asyncHandler(async (req, res) => {
     approvalRequired: false
   }, 'internal');
 
-  res.json({ success: true, type: 'agent', taskId: taskResult?.id });
+  if (!taskResult?.id) {
+    res.json({ success: false, type: 'agent', error: 'Task was not queued (may be duplicate or blocked)' });
+    return;
+  }
+  res.json({ success: true, type: 'agent', taskId: taskResult.id });
 }));
 
 // DELETE /api/cos/jobs/:id - Delete a job
