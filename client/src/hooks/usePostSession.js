@@ -128,21 +128,29 @@ export function usePostSession() {
     const q = currentDrill.questions?.[currentQuestionIndex];
     if (!q) return;
     const responseMs = Date.now() - questionStartRef.current;
-    const numValue = value === null ? null : Number(value);
+    const isTextAnswer = typeof q.expected === 'string';
 
     // For estimation drills, check within tolerance
     let correct;
-    if (currentDrill.type === 'estimation') {
+    let answered;
+    if (isTextAnswer) {
+      answered = value;
+      correct = value !== null && String(value).toLowerCase().trim() === String(q.expected).toLowerCase().trim();
+    } else if (currentDrill.type === 'estimation') {
+      const num = value === null ? null : Number(value);
+      answered = (num !== null && isNaN(num)) ? null : num;
       const tolerance = (currentDrill.config?.tolerancePct || 10) / 100;
-      correct = numValue !== null && Math.abs(numValue - q.expected) <= Math.abs(q.expected * tolerance);
+      correct = answered !== null && Math.abs(answered - q.expected) <= Math.abs(q.expected * tolerance);
     } else {
-      correct = numValue === q.expected;
+      const num = value === null ? null : Number(value);
+      answered = (num !== null && isNaN(num)) ? null : num;
+      correct = answered === q.expected;
     }
 
     const answer = {
       prompt: q.prompt,
       expected: q.expected,
-      answered: numValue,
+      answered,
       correct,
       responseMs
     };
