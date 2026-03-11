@@ -551,13 +551,13 @@ const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
  */
 export function sanitizeTaskMetadata(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const clean = {};
+  const clean = Object.create(null);
   let hasKeys = false;
   for (const key of ALLOWED_TASK_METADATA_KEYS) {
-    if (key in raw && !DANGEROUS_KEYS.has(key) && typeof raw[key] === 'boolean') {
+    if (Object.prototype.hasOwnProperty.call(raw, key) && typeof raw[key] === 'boolean') {
       clean[key] = raw[key];
       hasKeys = true;
     }
   }
-  return hasKeys ? clean : null;
+  return hasKeys ? { ...clean } : null;
 }

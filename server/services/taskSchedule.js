@@ -728,17 +728,37 @@ export async function loadSchedule() {
   let needsSave = false;
   for (const [taskType, config] of Object.entries(schedule.tasks)) {
     if (!config.prompt && DEFAULT_TASK_PROMPTS[taskType]) {
+      // No prompt set — initialize with current default and version
       config.prompt = DEFAULT_TASK_PROMPTS[taskType];
       config.promptVersion = PROMPT_VERSIONS[taskType] || 1;
       needsSave = true;
-    } else if (PROMPT_VERSIONS[taskType] && !config.promptCustomized) {
-      // Auto-upgrade non-customized prompts when code version is newer
-      const storedVersion = config.promptVersion || 1;
-      if (storedVersion < PROMPT_VERSIONS[taskType]) {
-        emitLog('info', `Upgrading ${taskType} prompt v${storedVersion} → v${PROMPT_VERSIONS[taskType]}`, { taskType }, '📅 TaskSchedule');
-        config.prompt = DEFAULT_TASK_PROMPTS[taskType];
-        config.promptVersion = PROMPT_VERSIONS[taskType];
-        needsSave = true;
+    } else {
+      // Legacy migration: infer customization when promptVersion is missing
+      if (
+        config.prompt &&
+        config.promptVersion === undefined &&
+        DEFAULT_TASK_PROMPTS[taskType]
+      ) {
+        if (config.prompt !== DEFAULT_TASK_PROMPTS[taskType]) {
+          // Prompt differs from default — treat as customized to avoid overwriting
+          config.promptCustomized = true;
+          needsSave = true;
+        } else {
+          // Prompt matches default — safe to assign version for future upgrades
+          config.promptVersion = PROMPT_VERSIONS[taskType] || 1;
+          needsSave = true;
+        }
+      }
+
+      if (PROMPT_VERSIONS[taskType] && !config.promptCustomized) {
+        // Auto-upgrade non-customized prompts when code version is newer
+        const storedVersion = config.promptVersion || 1;
+        if (storedVersion < PROMPT_VERSIONS[taskType]) {
+          emitLog('info', `Upgrading ${taskType} prompt v${storedVersion} → v${PROMPT_VERSIONS[taskType]}`, { taskType }, '📅 TaskSchedule');
+          config.prompt = DEFAULT_TASK_PROMPTS[taskType];
+          config.promptVersion = PROMPT_VERSIONS[taskType];
+          needsSave = true;
+        }
       }
     }
   }
