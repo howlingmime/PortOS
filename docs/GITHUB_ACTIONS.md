@@ -54,7 +54,7 @@ git pull --rebase --autostash && git push
 
 ## Adapting for Sub-Projects
 
-1. Copy `.github/workflows/ci.yml` and `release.yml`
+1. Copy `.github/workflows/ci.yml` and `.github/workflows/release.yml`
 2. Update installation and build commands for your project structure
 3. For monorepos, add package.json update steps for each workspace
 4. Update the changelog file path pattern if different

@@ -6,9 +6,9 @@ PortOS uses semantic versioning: **Major.Minor.Patch**
 
 | Component | Description | When Incremented |
 |-----------|-------------|------------------|
-| **Major** | Breaking changes | Via `/release` slash command |
-| **Minor** | New features | Via `/release` slash command |
-| **Patch** | Bug fixes, refactors | Via `/release` slash command |
+| **Major** | Breaking changes | Via `/do:release` slash command |
+| **Minor** | New features | Via `/do:release` slash command |
+| **Patch** | Bug fixes, refactors | Via `/do:release` slash command |
 
 Example progression: `0.22.0` → `0.22.1` (fix) → `0.23.0` (feature) → `1.0.0` (breaking)
 
@@ -23,7 +23,7 @@ Example progression: `0.22.0` → `0.22.1` (fix) → `0.23.0` (feature) → `1.0
 
 ### Version Bumping
 
-Version is managed by the `/release` slash command. Do not bump `package.json` version manually during development.
+Version is managed by the `/do:release` slash command (defined in the [slashdo](https://github.com/atomantic/slashdo) toolkit). Do not bump `package.json` version manually during development.
 
 ### On Push/PR to `main`
 
@@ -52,7 +52,7 @@ git pull --rebase --autostash && git push
 
 ### Creating a Release
 
-Use the `/release` slash command from `main`. It handles version bumping, changelog finalization, and pushing to the `release` branch.
+Use the `/do:release` slash command from `main`. It handles version bumping, changelog finalization, and pushing to the `release` branch.
 
 ## CI Skip
 

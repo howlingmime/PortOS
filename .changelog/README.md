@@ -11,8 +11,8 @@ This directory contains detailed release notes for each version of PortOS.
 During development, all changelog entries are appended to `NEXT.md`. This file accumulates changes across multiple commits until a release is created.
 
 - During development, append changelog entries to `NEXT.md` under the appropriate section (Added, Changed, Fixed, Removed)
-- `/release` renames `NEXT.md` to `v{version}.md` and finalizes it with the version number and release date
-- Do NOT create versioned changelog files manually — `/release` handles that
+- `/do:release` renames `NEXT.md` to `v{version}.md` and finalizes it with the version number and release date
+- Do NOT create versioned changelog files manually — `/do:release` handles that
 
 ### Versioned Files
 
@@ -22,7 +22,7 @@ Each release has its own markdown file:
 v{major}.{minor}.{patch}.md
 ```
 
-These are created automatically by `/release` from `NEXT.md`.
+These are created automatically by `/do:release` from `NEXT.md`.
 
 ## Format
 
@@ -70,7 +70,7 @@ The GitHub Actions release workflow (`.github/workflows/release.yml`) automatica
 
 1. **During Development**: Append entries to `NEXT.md` under the appropriate section (Added, Changed, Fixed, Removed)
 
-2. **During Release** (`/release`):
+2. **During Release** (`/do:release`):
    - Determines the version bump from conventional commit prefixes
    - Bumps `package.json` version
    - Renames `NEXT.md` → `v{new_version}.md`
@@ -86,8 +86,8 @@ The GitHub Actions release workflow (`.github/workflows/release.yml`) automatica
 - Explain the "why" not just the "what"
 
 ### Don't:
-- Create versioned changelog files manually (use `/release`)
-- Bump the version manually — only `/release` does that
+- Create versioned changelog files manually (use `/do:release`)
+- Bump the version manually — only `/do:release` does that
 - Use vague descriptions like "various improvements"
 - Leave placeholder or TODO content
 
