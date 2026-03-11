@@ -158,7 +158,7 @@ export async function syncAccount(accountId, io, options = {}) {
 
     // Reconcile: remove cached events no longer present
     let pruned = 0;
-    if (providerStatus === 'success' && newEvents.length > 0) {
+    if (providerStatus === 'success') {
       const fetchedIds = new Set(newEvents.filter(e => e.externalId).map(e => e.externalId));
       const before = cache.events.length;
       cache.events = cache.events.filter(e => !e.externalId || fetchedIds.has(e.externalId));

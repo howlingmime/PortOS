@@ -19,6 +19,23 @@ function mapResponseStatus(status) {
   return map[status?.Response] || 'unknown';
 }
 
+/**
+ * Normalize an Outlook DateTime value to ISO string.
+ * Outlook may return bare datetimes (no offset/Z) with a separate TimeZone field,
+ * or datetimes that already include an offset. Append 'Z' only when the value
+ * has no existing timezone indicator and the TimeZone is UTC.
+ */
+function normalizeDateTime(dateTimeStr, timeZone) {
+  // Already has timezone offset or Z suffix — parse as-is
+  if (/[Zz]$/.test(dateTimeStr) || /[+-]\d{2}:\d{2}$/.test(dateTimeStr)) {
+    return new Date(dateTimeStr).toISOString();
+  }
+  // Bare datetime — assume UTC only when TimeZone says so (or is absent)
+  const isUtc = !timeZone || timeZone === 'UTC' || timeZone === 'tzone://Microsoft/Utc';
+  const suffix = isUtc ? 'Z' : '';
+  return new Date(dateTimeStr + suffix).toISOString();
+}
+
 function mapAttendeeStatus(status) {
   const map = {
     None: 'none',
@@ -90,8 +107,8 @@ export async function syncOutlookCalendarApi(account, cache, io, options = {}) {
         title: item.Subject || '',
         description: item.Body?.Content || '',
         location: item.Location?.DisplayName || '',
-        startTime: item.Start?.DateTime ? new Date(item.Start.DateTime + 'Z').toISOString() : null,
-        endTime: item.End?.DateTime ? new Date(item.End.DateTime + 'Z').toISOString() : null,
+        startTime: item.Start?.DateTime ? normalizeDateTime(item.Start.DateTime, item.Start.TimeZone) : null,
+        endTime: item.End?.DateTime ? normalizeDateTime(item.End.DateTime, item.End.TimeZone) : null,
         isAllDay: item.IsAllDay || false,
         timeZone: item.Start?.TimeZone || 'UTC',
         organizer: {

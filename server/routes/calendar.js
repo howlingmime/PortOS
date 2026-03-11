@@ -11,7 +11,7 @@ const router = express.Router();
 // === Validation Schemas ===
 const createAccountSchema = z.object({
   name: z.string().min(1),
-  type: z.enum(['outlook-calendar', 'gmail-calendar']),
+  type: z.enum(['outlook-calendar']),
   email: z.union([z.string().email(), z.literal('')]).optional().default(''),
   syncConfig: z.object({
     maxAge: z.string().optional(),

@@ -264,7 +264,7 @@ export function usePostSession() {
     if (isTraining) {
       for (const r of drillResults) {
         const questionCount = r.questions?.length || r.responses?.length || 0;
-        const correctCount = r.questions?.filter(q => q.correct).length ?? 0;
+        const correctCount = r.questions?.filter(q => q.correct)?.length ?? 0;
         await submitTrainingEntry({
           module: r.module,
           drillType: r.type,

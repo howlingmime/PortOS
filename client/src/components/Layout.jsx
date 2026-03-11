@@ -193,10 +193,10 @@ const navItems = [
     label: 'Messages',
     icon: Mail,
     children: [
+      { to: '/messages/config', label: 'Config', icon: Settings },
       { to: '/messages/drafts', label: 'Drafts', icon: FilePen },
       { to: '/messages/inbox', label: 'Inbox', icon: Inbox },
-      { to: '/messages/sync', label: 'Sync', icon: RefreshCw },
-      { to: '/messages/config', label: 'Config', icon: Settings }
+      { to: '/messages/sync', label: 'Sync', icon: RefreshCw }
     ]
   },
   { to: '/post', label: 'POST', icon: Zap, single: true },

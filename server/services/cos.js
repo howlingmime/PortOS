@@ -3610,6 +3610,26 @@ async function registerSingleJobSchedule(jobId) {
 // Track jobs currently being spawned (between task:ready emit and agent registration)
 // to prevent duplicate spawns when timers overlap or fire during spawn
 const spawningJobIds = new Set();
+const spawningJobTimeouts = new Map();
+
+function addSpawningJob(jobId) {
+  spawningJobIds.add(jobId);
+  // Auto-clear after 5 minutes if spawn never completes
+  if (spawningJobTimeouts.has(jobId)) clearTimeout(spawningJobTimeouts.get(jobId));
+  spawningJobTimeouts.set(jobId, setTimeout(() => {
+    spawningJobIds.delete(jobId);
+    spawningJobTimeouts.delete(jobId);
+  }, 5 * 60 * 1000));
+}
+
+function clearSpawningJob(jobId) {
+  spawningJobIds.delete(jobId);
+  const timeout = spawningJobTimeouts.get(jobId);
+  if (timeout) {
+    clearTimeout(timeout);
+    spawningJobTimeouts.delete(jobId);
+  }
+}
 
 /**
  * Execute a scheduled autonomous job and re-register its timer.
@@ -3680,10 +3700,15 @@ async function executeScheduledJob(jobId) {
     }
 
     // Mark as spawning before emitting task:ready to prevent races
-    spawningJobIds.add(jobId);
-    const task = await generateTaskFromJob(job);
-    emitLog('info', `Autonomous job firing: ${job.name}`, { jobId, category: job.category });
-    cosEvents.emit('task:ready', task);
+    addSpawningJob(jobId);
+    try {
+      const task = await generateTaskFromJob(job);
+      emitLog('info', `Autonomous job firing: ${job.name}`, { jobId, category: job.category });
+      cosEvents.emit('task:ready', task);
+    } catch (err) {
+      clearSpawningJob(jobId);
+      emitLog('error', `Failed to fire autonomous job: ${job.name} - ${err?.message || err}`, { jobId, category: job.category });
+    }
   }
 
   // Re-register for next fire time
@@ -3787,7 +3812,7 @@ async function init() {
 
   // Record autonomous job execution only after the agent actually spawns
   cosEvents.on('job:spawned', async ({ jobId }) => {
-    spawningJobIds.delete(jobId);
+    clearSpawningJob(jobId);
     await recordJobExecution(jobId).catch(err =>
       console.error(`❌ Failed to record job execution for ${jobId}: ${err.message}`)
     );
