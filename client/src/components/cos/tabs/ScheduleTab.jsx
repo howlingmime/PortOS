@@ -822,13 +822,7 @@ export default function ScheduleTab({ apps }) {
     }
   };
 
-  // Backward-compat aliases used in child components
-  const handleUpdateSelfImprovement = handleUpdateTask;
-  const handleUpdateAppImprovement = handleUpdateTask;
-  const handleTriggerSelfImprovement = (taskType) => handleTriggerTask(taskType);
   const handleTriggerAppImprovement = (taskType, appId) => handleTriggerTask(taskType, appId);
-  const handleResetSelfImprovement = handleResetTask;
-  const handleResetAppImprovement = handleResetTask;
 
   const handleUpdateAppOverride = async (appId, taskType, { enabled, interval, taskMetadata }) => {
     const result = await api.updateAppTaskTypeOverride(appId, taskType, { enabled, interval, taskMetadata }).catch(err => {

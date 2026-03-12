@@ -18,7 +18,7 @@ import * as goalProgress from '../services/goalProgress.js';
 import * as decisionLog from '../services/decisionLog.js';
 import { reinitialize as reinitializeEmbeddings } from '../services/memoryEmbeddings.js';
 import { asyncHandler, ServerError } from '../lib/errorHandler.js';
-import { validateRequest } from '../lib/validation.js';
+import { validateRequest, sanitizeTaskMetadata } from '../lib/validation.js';
 import { z } from 'zod';
 
 const router = Router();
@@ -72,6 +72,9 @@ function pickScheduleSettings(body) {
   const settings = {};
   for (const key of SCHEDULE_FIELDS) {
     if (body[key] !== undefined) settings[key] = body[key];
+  }
+  if (settings.taskMetadata) {
+    settings.taskMetadata = sanitizeTaskMetadata(settings.taskMetadata);
   }
   return settings;
 }
@@ -890,7 +893,12 @@ router.post('/jobs', asyncHandler(async (req, res) => {
 
 // PUT /api/cos/jobs/:id - Update a job
 router.put('/jobs/:id', asyncHandler(async (req, res) => {
-  const job = await autonomousJobs.updateJob(req.params.id, req.body);
+  const { name, description, category, type, interval, intervalMs, scheduledTime,
+    enabled, priority, autonomyLevel, promptTemplate, command, triggerAction } = req.body;
+  const job = await autonomousJobs.updateJob(req.params.id, {
+    name, description, category, type, interval, intervalMs, scheduledTime,
+    enabled, priority, autonomyLevel, promptTemplate, command, triggerAction
+  });
   if (!job) {
     throw new ServerError('Job not found', { status: 404, code: 'NOT_FOUND' });
   }
@@ -1016,7 +1024,10 @@ router.post('/templates/:id/use', asyncHandler(async (req, res) => {
 
 // PUT /api/cos/templates/:id - Update a template
 router.put('/templates/:id', asyncHandler(async (req, res) => {
-  const result = await taskTemplates.updateTemplate(req.params.id, req.body);
+  const { name, icon, description, context, category, provider, model, app } = req.body;
+  const result = await taskTemplates.updateTemplate(req.params.id, {
+    name, icon, description, context, category, provider, model, app
+  });
   if (result.error) {
     throw new ServerError(result.error, { status: 400, code: 'BAD_REQUEST' });
   }

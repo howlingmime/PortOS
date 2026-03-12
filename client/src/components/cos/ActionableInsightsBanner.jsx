@@ -117,7 +117,7 @@ export default function ActionableInsightsBanner({ onTaskUnblocked }) {
     onTaskUnblocked?.(taskId);
   };
 
-  if (loading || !data) {
+  if (loading || !data?.insights) {
     return null;
   }
 
