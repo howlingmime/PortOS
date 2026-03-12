@@ -856,7 +856,7 @@ router.get('/jobs/gates', asyncHandler(async (req, res) => {
   const results = settled.map((s, i) =>
     s.status === 'fulfilled'
       ? s.value
-      : { jobId: gateIds[i], shouldRun: false, reason: `Gate error: ${s.reason?.message || s.reason}`, error: true }
+      : { jobId: gateIds[i], shouldRun: true, reason: `Gate error (fail-open): ${s.reason?.message || s.reason}`, error: true }
   );
   res.json({ gates: results });
 }));

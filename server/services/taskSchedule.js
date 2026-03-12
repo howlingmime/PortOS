@@ -756,8 +756,11 @@ export async function loadSchedule() {
     const loadedTask = loaded.tasks?.[taskType] || {};
     const merged = { ...defaultTask, ...loadedTask };
     // Deep-merge taskMetadata: preserve explicit null (clears metadata), otherwise merge defaults with stored
+    // Only spread if loadedTask.taskMetadata is a plain object to avoid corrupting config
     if (defaultTask.taskMetadata && loadedTask.taskMetadata !== null) {
-      merged.taskMetadata = { ...defaultTask.taskMetadata, ...(loadedTask.taskMetadata || {}) };
+      const storedMeta = loadedTask.taskMetadata;
+      const isPlainObject = storedMeta && typeof storedMeta === 'object' && !Array.isArray(storedMeta);
+      merged.taskMetadata = { ...defaultTask.taskMetadata, ...(isPlainObject ? storedMeta : {}) };
     }
     mergedTasks[taskType] = merged;
   }
