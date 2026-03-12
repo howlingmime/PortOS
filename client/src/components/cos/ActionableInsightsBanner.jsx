@@ -205,7 +205,7 @@ export default function ActionableInsightsBanner({ onTaskUnblocked }) {
               onClick={() => handleAction(primaryInsight)}
               className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 text-white rounded transition-colors min-h-[32px]"
             >
-              {primaryInsight.action.label}
+              {hasBlockedTasks ? (isExpanded ? 'Collapse' : 'View Tasks') : primaryInsight.action.label}
               {hasBlockedTasks
                 ? (isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />)
                 : <ChevronRight size={12} />

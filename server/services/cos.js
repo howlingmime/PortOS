@@ -21,7 +21,7 @@ import { getAdaptiveCooldownMultiplier, getSkippedTaskTypes, getPerformanceSumma
 import { schedule as scheduleEvent, cancel as cancelEvent, getStats as getSchedulerStats } from './eventScheduler.js';
 import { createMutex } from '../lib/asyncMutex.js';
 import { generateProactiveTasks as generateMissionTasks, getStats as getMissionStats } from './missions.js';
-import { generateTaskFromJob, recordJobExecution, isScriptJob, executeScriptJob, isShellJob, executeShellJob } from './autonomousJobs.js';
+import { generateTaskFromJob, recordJobExecution, recordJobGateSkip, isScriptJob, executeScriptJob, isShellJob, executeShellJob } from './autonomousJobs.js';
 import { checkJobGate, hasGate } from './jobGates.js';
 import { formatDuration, safeJSONParse } from '../lib/fileUtils.js';
 import { sanitizeTaskMetadata } from '../lib/validation.js';
@@ -3753,9 +3753,9 @@ async function executeScheduledJob(jobId) {
     }
     if (!gateResult.shouldRun) {
       emitLog('debug', `Job ${job.name} gate skipped: ${gateResult.reason}`, { jobId, gate: gateResult });
-      // Update lastRun so the job schedules at the next interval rather than firing immediately
-      await recordJobExecution(jobId).catch(err =>
-        console.error(`❌ Failed to record gate-skip execution for ${jobId}: ${err.message}`)
+      // Update lastRun so the job reschedules at its normal interval, but don't increment runCount
+      await recordJobGateSkip(jobId).catch(err =>
+        console.error(`❌ Failed to record gate-skip for ${jobId}: ${err.message}`)
       );
       await registerSingleJobSchedule(jobId);
       return;
