@@ -128,12 +128,17 @@ export function usePostSession() {
     const q = currentDrill.questions?.[currentQuestionIndex];
     if (!q) return;
     const responseMs = Date.now() - questionStartRef.current;
-    const isTextAnswer = typeof q.expected === 'string';
+    const hasFillBlankAnswers = Array.isArray(q.answers) && q.answers.length > 0;
+    const isTextAnswer = typeof q.expected === 'string' || hasFillBlankAnswers;
 
     // For estimation drills, check within tolerance
     let correct;
     let answered;
-    if (isTextAnswer) {
+    if (hasFillBlankAnswers) {
+      answered = value;
+      const normalized = value !== null ? String(value).toLowerCase().trim() : '';
+      correct = q.answers.some(a => String(a).toLowerCase().trim() === normalized);
+    } else if (isTextAnswer) {
       answered = value;
       correct = value !== null && String(value).toLowerCase().trim() === String(q.expected).toLowerCase().trim();
     } else if (currentDrill.type === 'estimation') {
