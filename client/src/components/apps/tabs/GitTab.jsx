@@ -274,6 +274,13 @@ export default function GitTab({ appId, appName, repoPath }) {
           b.name === branchName ? { ...b, hasLocal: false } : b
         ));
       }
+      if (remote && !local) {
+        setBranches(prev => prev.map(b =>
+          b.name === branchName
+            ? { ...b, tracking: null, ahead: 0, behind: 0, hasRemote: false }
+            : b
+        ));
+      }
     }
   };
 

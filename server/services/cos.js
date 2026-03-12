@@ -3743,7 +3743,14 @@ async function executeScheduledJob(jobId) {
     }
 
     // Run gate check — skip LLM if precondition not met
-    const gateResult = await checkJobGate(jobId);
+    // Gate errors fail-open (run the job) to avoid silently dropping scheduled work
+    let gateResult;
+    try {
+      gateResult = await checkJobGate(jobId);
+    } catch (gateErr) {
+      emitLog('warn', `Job ${job.name} gate error, failing open: ${gateErr?.message || gateErr}`, { jobId });
+      gateResult = { shouldRun: true, reason: 'Gate error — failing open' };
+    }
     if (!gateResult.shouldRun) {
       emitLog('debug', `Job ${job.name} gate skipped: ${gateResult.reason}`, { jobId, gate: gateResult });
       await registerSingleJobSchedule(jobId);

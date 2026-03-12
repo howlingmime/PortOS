@@ -37,7 +37,6 @@ function formatTimeRemaining(ms) {
 function toggleMetadataField(metadata, field) {
   const current = metadata || {};
   const newMeta = { ...current, [field]: !current[field] };
-  if (!newMeta[field]) delete newMeta[field];
   return Object.keys(newMeta).length ? newMeta : null;
 }
 
