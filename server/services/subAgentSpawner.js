@@ -1828,6 +1828,10 @@ async function handleAgentCompletion(agentId, exitCode, success, duration) {
   // Process memory extraction and app cooldown
   await processAgentCompletion(agentId, task, success, outputBuffer);
 
+  // Fetch agent state once for JIRA and plan-question blocks
+  const { getAgent: getAgentState } = await import('./cos.js');
+  const agentState = await getAgentState(agentId).catch(() => null);
+
   // JIRA integration: push branch, create PR, comment on ticket
   const jiraTicketId = agent.task?.metadata?.jiraTicketId;
   const jiraBranch = agent.task?.metadata?.jiraBranch;
@@ -1835,9 +1839,6 @@ async function handleAgentCompletion(agentId, exitCode, success, duration) {
   const jiraCreatePR = agent.task?.metadata?.jiraCreatePR;
 
   if (jiraTicketId && jiraBranch && success) {
-    // Get workspace from registered agent state (runnerAgents doesn't store it)
-    const { getAgent: getAgentState } = await import('./cos.js');
-    const agentState = await getAgentState(agentId).catch(() => null);
     const workspace = agentState?.metadata?.workspacePath || ROOT_DIR;
 
     // Resolve JIRA ticket URL for linking in PR description
@@ -1895,6 +1896,34 @@ async function handleAgentCompletion(agentId, exitCode, success, duration) {
     await git.checkout(workspace, returnBranch).catch(err => {
       emitLog('warn', `Failed to checkout back to ${returnBranch}: ${err.message}`, { agentId });
     });
+  }
+
+  // Check for plan questions marker file (feature-ideas task needing user input)
+  if (task?.metadata?.analysisType === 'feature-ideas') {
+    const planWorkspace = agentState?.metadata?.workspacePath || task?.metadata?.repoPath || ROOT_DIR;
+    const markerPath = join(planWorkspace, '.plan-questions.md');
+
+    const markerContent = await readFile(markerPath, 'utf8').catch(() => null);
+    if (markerContent) {
+      const titleMatch = markerContent.match(/^#\s+Plan Question:\s*(.+)/m);
+      const title = titleMatch?.[1]?.trim() || 'PLAN.md item needs your input';
+      const appId = task.metadata?.app;
+
+      const { addNotification, NOTIFICATION_TYPES, PRIORITY_LEVELS } = await import('./notifications.js');
+      await addNotification({
+        type: NOTIFICATION_TYPES.PLAN_QUESTION,
+        title,
+        message: markerContent,
+        priority: PRIORITY_LEVELS.MEDIUM,
+        link: appId ? `/apps/${appId}/documents` : undefined,
+        metadata: { appId, agentId, taskType: 'feature-ideas' }
+      }).catch(err => {
+        emitLog('warn', `Failed to create plan_question notification: ${err.message}`, { agentId });
+      });
+
+      await rm(markerPath).catch(() => {});
+      emitLog('info', `📋 Plan question notification created: ${title}`, { agentId, appId });
+    }
   }
 
   // Clean up worktree if agent was using one (skip merge when JIRA branch — PR handles merge)

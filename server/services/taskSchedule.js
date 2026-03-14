@@ -324,42 +324,49 @@ Use Playwright MCP to test the app at different viewport sizes:
 4. Fix CSS responsive classes as needed
 5. Test fixes and commit changes`,
 
-  'feature-ideas': `[Improvement: {appName}] Implement a Feature Idea
+  'feature-ideas': `[Improvement: {appName}] Implement Next Planned Feature
 
-You are working in a git worktree on a feature branch. Your goal is to implement ONE feature and open a PR.
+You are working in a git worktree on a feature branch. Your goal is to implement the next planned item from PLAN.md.
 
 Repository: {repoPath}
 
-## Research Phase
+## Phase 1 — Find the Next Task
 
-1. Read GOALS.md from {repoPath} for context on the app's goals and priorities.
-   If no GOALS.md exists, focus on general improvements.
-2. Read PLAN.md from {repoPath} for the current roadmap and planned work.
-3. Search for existing feature idea documents:
-   - Check .planning/ directory for feature specs, research docs, or FEATURES.md
-   - Check for any TODO.md, IDEAS.md, or similar feature tracking files
-4. Review recent completed tasks and user feedback to understand patterns
-5. Review recent git log to see what's been implemented recently
+1. Read PLAN.md from {repoPath}
+2. Find the first unchecked item (\`- [ ]\`) that does NOT have a \`<!-- NEEDS_INPUT -->\` annotation
+3. If no unchecked items exist, stop and report: "PLAN.md has no remaining items."
 
-## Selection Phase
+## Phase 2 — Evaluate Feasibility
 
-6. Choose ONE feature to implement that:
-   - Aligns with GOALS.md priorities
-   - Is NOT already planned in PLAN.md (avoid duplicating roadmap work)
-   - Is NOT already documented in existing feature idea files
-   - Is a small, self-contained improvement (completable in one session)
-   - Saves user time, improves the developer experience, or makes the app more useful
+4. Read relevant source files to understand the scope of the item
+5. Determine: can this be implemented without user clarification?
+   - Consider: are requirements clear? Are there ambiguous design choices? Does it depend on external decisions?
 
-## Implementation Phase
+## Phase 3a — Implement (if feasible)
 
-7. Implement the feature:
-   - Write clean, tested code
-   - Follow existing patterns in the codebase
+6. Implement the feature:
+   - Write clean, tested code following existing patterns
    - Run tests to ensure nothing is broken
+7. Run \`/simplify\` to review changed code for reuse, quality, and efficiency. Fix any issues found.
+8. Check the PLAN.md item: change \`- [ ]\` to \`- [x]\`
+9. Commit with a clear description referencing the PLAN.md item
 
-8. Run \`/simplify\` to review changed code for reuse, quality, and efficiency. Fix any issues found.
+## Phase 3b — Request Clarification (if not feasible)
 
-9. Commit with a clear description of the feature and rationale`,
+6. Create a file named \`.plan-questions.md\` in the repository root with this format:
+   \`\`\`
+   # Plan Question: <short title summarizing the PLAN.md item>
+
+   ## PLAN.md Item
+   <the exact text of the unchecked item>
+
+   ## Questions
+   - <question 1>
+   - <question 2>
+   \`\`\`
+7. Annotate the PLAN.md item by appending \` <!-- NEEDS_INPUT -->\` to its line
+8. Commit both changes with message "chore: flag PLAN.md item needing user input"
+9. Do NOT open a PR — stop here`,
 
   'error-handling': `[Improvement: {appName}] Improve Error Handling
 
@@ -554,7 +561,7 @@ Repository: {repoPath}
 // Prompt versions — bump when a default prompt changes so existing instances auto-upgrade.
 // Only non-customized prompts (promptCustomized !== true) are upgraded.
 const PROMPT_VERSIONS = {
-  'feature-ideas': 2   // v2: implement feature in worktree+PR with /simplify, check GOALS/PLAN/FEATURES
+  'feature-ideas': 3   // v3: implement next PLAN.md item, flag items needing user input
 };
 
 // Known previous default prompts for legacy migration.
@@ -589,7 +596,44 @@ Repository: {repoPath}
 
 6. Commit with a clear description of the change and rationale
 
-Think critically about what we have before adding more.`
+Think critically about what we have before adding more.`,
+    // v2 default prompt
+    `[Improvement: {appName}] Implement a Feature Idea
+
+You are working in a git worktree on a feature branch. Your goal is to implement ONE feature and open a PR.
+
+Repository: {repoPath}
+
+## Research Phase
+
+1. Read GOALS.md from {repoPath} for context on the app's goals and priorities.
+   If no GOALS.md exists, focus on general improvements.
+2. Read PLAN.md from {repoPath} for the current roadmap and planned work.
+3. Search for existing feature idea documents:
+   - Check .planning/ directory for feature specs, research docs, or FEATURES.md
+   - Check for any TODO.md, IDEAS.md, or similar feature tracking files
+4. Review recent completed tasks and user feedback to understand patterns
+5. Review recent git log to see what's been implemented recently
+
+## Selection Phase
+
+6. Choose ONE feature to implement that:
+   - Aligns with GOALS.md priorities
+   - Is NOT already planned in PLAN.md (avoid duplicating roadmap work)
+   - Is NOT already documented in existing feature idea files
+   - Is a small, self-contained improvement (completable in one session)
+   - Saves user time, improves the developer experience, or makes the app more useful
+
+## Implementation Phase
+
+7. Implement the feature:
+   - Write clean, tested code
+   - Follow existing patterns in the codebase
+   - Run tests to ensure nothing is broken
+
+8. Run \`/simplify\` to review changed code for reuse, quality, and efficiency. Fix any issues found.
+
+9. Commit with a clear description of the feature and rationale`
   ]
 };
 
@@ -1392,7 +1436,7 @@ function getTaskTypeDescription(taskType) {
     'performance': 'Performance optimization',
     'test-coverage': 'Improve test coverage',
     'documentation': 'Update documentation',
-    'feature-ideas': 'Brainstorm and implement features',
+    'feature-ideas': 'Implement next planned feature',
     'accessibility': 'Accessibility audit',
     'dependency-updates': 'Update dependencies',
     'release-check': 'Check dev for release readiness',

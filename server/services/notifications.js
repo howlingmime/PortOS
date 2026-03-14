@@ -33,7 +33,8 @@ export const NOTIFICATION_TYPES = {
   CODE_REVIEW: 'code_review',
   HEALTH_ISSUE: 'health_issue',
   BRIEFING_READY: 'briefing_ready',
-  AUTOBIOGRAPHY_PROMPT: 'autobiography_prompt'
+  AUTOBIOGRAPHY_PROMPT: 'autobiography_prompt',
+  PLAN_QUESTION: 'plan_question'
 };
 
 // Priority levels

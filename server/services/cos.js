@@ -1906,7 +1906,8 @@ async function generateManagedAppImprovementTask(app, state) {
   // Replace template variables in the prompt
   const description = promptTemplate
     .replace(/\{appName\}/g, app.name)
-    .replace(/\{repoPath\}/g, app.repoPath);
+    .replace(/\{repoPath\}/g, app.repoPath)
+    .replace(/\{appId\}/g, app.id);
 
   // Get interval settings to determine provider/model
   const interval = await taskSchedule.getTaskInterval(nextType);
@@ -1983,7 +1984,8 @@ async function generateManagedAppImprovementTaskForType(taskType, app, state) {
   // Replace template variables in the prompt
   const description = promptTemplate
     .replace(/\{appName\}/g, app.name)
-    .replace(/\{repoPath\}/g, app.repoPath);
+    .replace(/\{repoPath\}/g, app.repoPath)
+    .replace(/\{appId\}/g, app.id);
 
   // Get interval settings to determine provider/model
   const interval = await taskSchedule.getTaskInterval(taskType);

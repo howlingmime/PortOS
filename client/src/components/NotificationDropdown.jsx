@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, X, CheckCheck, Trash2, Brain, ListTodo, AlertTriangle, Code } from 'lucide-react';
+import { Bell, X, CheckCheck, Trash2, Brain, ListTodo, AlertTriangle, Code, HelpCircle } from 'lucide-react';
 
 const NOTIFICATION_TYPE_CONFIG = {
   memory_approval: {
@@ -22,6 +22,11 @@ const NOTIFICATION_TYPE_CONFIG = {
     icon: AlertTriangle,
     color: 'text-red-400',
     bgColor: 'bg-red-500/20'
+  },
+  plan_question: {
+    icon: HelpCircle,
+    color: 'text-emerald-400',
+    bgColor: 'bg-emerald-500/20'
   }
 };
 
