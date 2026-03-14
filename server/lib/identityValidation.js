@@ -72,10 +72,26 @@ export const addMilestoneInputSchema = z.object({
   targetDate: validCalendarDate.optional()
 });
 
+// --- Goal Progress Log Schemas ---
+
+export const addProgressEntrySchema = z.object({
+  date: validCalendarDate,
+  note: z.string().min(1).max(1000),
+  durationMinutes: z.number().int().min(1).max(1440).optional()
+});
+
 // --- Goal-Activity Link Schemas ---
 
 export const linkActivityInputSchema = z.object({
   activityName: z.string().min(1).max(200),
   requiredFrequency: z.number().positive().optional(),
   note: z.string().max(500).optional().default('')
+});
+
+// --- Goal-Calendar Link Schemas ---
+
+export const linkCalendarInputSchema = z.object({
+  subcalendarId: z.string().min(1),
+  subcalendarName: z.string().min(1),
+  matchPattern: z.string().max(200).optional().default('')
 });

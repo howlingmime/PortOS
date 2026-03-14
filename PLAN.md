@@ -68,7 +68,11 @@ See [GOALS.md](./GOALS.md) for project goals and direction.
 - [ ] **M42 P5**: Unified Digital Twin Identity System - Cross-Insights Engine. See [Identity System](./docs/features/identity-system.md)
 - [ ] **M45**: Data Backup & Recovery - Scheduled backup of `./data/` to external drive or NAS. All persistence is JSON files with zero redundancy — one bad write or disk failure loses brain, identity, health, and memory data. Incremental backup with restore verification.
 - [ ] **M47**: Push Notifications - Webhook-based alerts when agents complete tasks, critical errors occur, or goals stall. Discord/Telegram integration for mobile awareness without needing the dashboard open.
-- [ ] **M48 P1-P4**: Google Calendar Integration - OAuth2, two-way event sync, chronotype-aware smart scheduling, CoS autonomous rescheduling, calendar UI with week/month views
+- [x] **M48 P1-P5**: Google Calendar Integration - MCP push sync, subcalendar management, goal-calendar linking, daily review with auto-progress-logging, dormancy support
+- [ ] **M48 P6**: Calendar Consolidation - Merge MeatSpace > Calendar (Life Calendar / "4000 Weeks") under top-level Calendar as a "Lifetime" sub-tab, eliminating the confusing dual-calendar navigation
+- [x] **M48 P7**: UI-Triggered Google Calendar Sync - "Sync Google" button in Sync tab + "Discover Calendars" in Config tab, both spawn headless Claude CLI with MCP to fetch events/calendar list. Works as zero-config fallback using user's existing Claude MCP auth.
+- [x] **M48 P8**: Direct Google Calendar API Sync - `googleapis` npm with OAuth2 setup in Config tab, sync method selector (Claude MCP vs Google API), tokens cached in `data/calendar/google-auth/` with auto-refresh
+- [ ] **M48 P9**: Auto-Configure Google OAuth via CDP - "Auto-Configure" button in Config tab launches Google Cloud Console in PortOS CDP browser. User logs in manually, then a Playwright script automates: create project, enable Calendar API, configure OAuth consent screen (add user as test user), create Web app credentials with redirect URI, extract client ID/secret, save to PortOS, and initiate the OAuth consent flow. Reduces multi-step manual setup to one click + Google login.
 - [ ] **M49 P1-P4**: Life Goals & Todo Planning - Enhanced goal model with todos and milestones, calendar time-blocking, AI-powered periodic check-ins, mortality-aware progress dashboard
 - [ ] **M52**: Update Detection - Poll GitHub releases for new version tags, compare against local `package.json` version, surface update availability in dashboard and settings
 
@@ -126,22 +130,11 @@ External notification delivery for critical events when not actively viewing the
 
 ### M48: Google Calendar Integration
 
-Shared Google OAuth2 foundation — `server/services/googleAuth.js` handles OAuth2 consent flow, token storage/refresh, scope management. Tokens stored in `data/google/auth.json`. Reused by both Calendar and Gmail.
+**Completed (P1-P5):** MCP push sync architecture — instead of OAuth2 complexity, Google Calendar events are synced via Claude Code MCP tools pushing to PortOS endpoints. Subcalendar management with enable/disable/dormant states, goal-calendar linking with match patterns, daily review UI for confirming events and auto-logging progress, dormancy support for inactive calendars.
 
-**Phases:**
+**Remaining:**
 
-- **P1: Calendar Read & OAuth** — Google OAuth2 service, calendar event listing, basic week/month calendar UI, settings page for Google connection
-- **P2: Calendar Write & Sync** — Event CRUD (create/update/delete synced to Google), two-way incremental sync using Google's `syncToken`, conflict detection (last-writer-wins, Google as source of truth for external events), configurable sync interval (default 5min)
-- **P3: Smart Scheduling & CoS** — Free slot finder API, chronotype-aware slot selection (reads `data/digital-twin/chronotype.json` for peak-focus windows), auto-schedule human tasks during optimal windows, CoS autonomous job `job-calendar-schedule` for rescheduling when conflicts arise
-- **P4: Calendar UI Polish** — Week/day/month views, color coding by source/type, dashboard calendar widget (today's events), linked goal/todo indicators on events
-
-**Data:** `data/google/auth.json` (OAuth tokens), `data/calendar/events.json` (local event cache with Google sync tokens), `data/calendar/config.json` (sync settings, working hours, chronotype preferences)
-
-**Routes:** `GET/POST/PUT/DELETE /api/calendar/events`, `POST /api/calendar/sync`, `GET /api/calendar/free-slots`, `POST /api/calendar/schedule-task`, `GET /api/google/oauth/start`, `GET /api/google/oauth/callback`, `GET /api/google/status`
-
-**Nav:** Top-level sidebar item "Calendar" (alphabetically between Chief of Staff and Dev Tools)
-
-*Touches: new server/services/googleAuth.js, server/services/calendar.js, server/services/calendarScheduler.js, server/routes/google.js, server/routes/calendar.js, client/src/pages/Calendar.jsx, client/src/components/calendar/tabs/, Layout.jsx, autonomousJobs.js, data/digital-twin/chronotype.json*
+- **P6: Calendar Consolidation** — MeatSpace > Calendar ("4000 Weeks" Life Calendar) and top-level Calendar are confusing dual navigation. Move the Life Calendar view under top-level Calendar as a "Lifetime" sub-tab. Remove the MeatSpace > Calendar nav entry. Ensure route `/calendar/lifetime` renders the existing Life Calendar component. Update Layout.jsx nav items accordingly.
 
 ### M49: Life Goals & Todo Planning
 
@@ -335,7 +328,7 @@ Three audit passes identified remaining items across architecture, bugs, code qu
 2. **M45**: Data Backup & Recovery — protect `./data/` from data loss
 3. **M50 P7-P9**: Messages — Digital Twin voice drafting, CoS automation, auto-send with AI review gate
 4. **M34 P5-P7**: Digital Twin — Multi-modal capture, advanced testing, personas
-5. **M48 P1**: Google Calendar — OAuth2 foundation + calendar read
+5. **M48 P6**: Calendar Consolidation — Move MeatSpace Life Calendar under top-level Calendar as "Lifetime" tab
 6. **M49 P1**: Life Goals — Enhanced goal model with todos and progress tracking
 7. **M47**: Push Notifications — Discord/Telegram alerts for agent completions and errors
 8. **M52**: Update Detection — GitHub release polling and update notification

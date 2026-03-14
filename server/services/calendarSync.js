@@ -3,7 +3,7 @@ import { join } from 'path';
 import { ensureDir, PATHS, readJSONFile } from '../lib/fileUtils.js';
 import { getAccount, updateSyncStatus } from './calendarAccounts.js';
 
-const CACHE_DIR = join(PATHS.calendar, 'cache');
+export const CACHE_DIR = join(PATHS.calendar, 'cache');
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const syncLocks = new Map();
 
@@ -38,7 +38,7 @@ function filterByDateRange(events, startDate, endDate) {
 
 const DEFAULT_CACHE = { syncCursor: null, events: [] };
 
-async function loadCache(accountId) {
+export async function loadCache(accountId) {
   if (!UUID_RE.test(accountId)) throw new Error(`Invalid accountId: ${accountId}`);
   await ensureDir(CACHE_DIR);
   const parsed = await readJSONFile(join(CACHE_DIR, `${accountId}.json`), DEFAULT_CACHE);
@@ -46,10 +46,19 @@ async function loadCache(accountId) {
   return parsed;
 }
 
-async function saveCache(accountId, cache) {
+export async function saveCache(accountId, cache) {
   await ensureDir(CACHE_DIR);
   const filePath = join(CACHE_DIR, `${accountId}.json`);
   await writeFile(filePath, JSON.stringify(cache, null, 2));
+}
+
+function filterByEnabledSubcalendars(events, account) {
+  if (!account?.subcalendars?.length) return events;
+  const enabledIds = new Set(
+    account.subcalendars.filter(sc => sc.enabled && !sc.dormant).map(sc => sc.calendarId)
+  );
+  // Only filter events that have a subcalendarId (google-calendar events)
+  return events.filter(e => !e.subcalendarId || enabledIds.has(e.subcalendarId));
 }
 
 export async function getEvents(options = {}) {
@@ -57,7 +66,9 @@ export async function getEvents(options = {}) {
 
   if (accountId) {
     const cache = await loadCache(accountId);
+    const account = await getAccount(accountId);
     let events = cache.events.map(e => ({ ...e, accountId: e.accountId || accountId }));
+    events = filterByEnabledSubcalendars(events, account);
     events = filterBySearch(events, search);
     events = filterByDateRange(events, startDate, endDate);
     return {
@@ -69,13 +80,19 @@ export async function getEvents(options = {}) {
   // Aggregate across all account caches
   await ensureDir(CACHE_DIR);
   const files = await readdir(CACHE_DIR).catch(() => []);
+  const { listAccounts } = await import('./calendarAccounts.js');
+  const accounts = await listAccounts();
+  const accountMap = new Map(accounts.map(a => [a.id, a]));
+
   let allEvents = [];
   for (const file of files) {
     if (!file.endsWith('.json')) continue;
     const fileAccountId = file.replace('.json', '');
     if (!UUID_RE.test(fileAccountId)) continue;
     const cache = await loadCache(fileAccountId);
-    allEvents.push(...cache.events.map(e => ({ ...e, accountId: e.accountId || fileAccountId })));
+    let events = cache.events.map(e => ({ ...e, accountId: e.accountId || fileAccountId }));
+    events = filterByEnabledSubcalendars(events, accountMap.get(fileAccountId));
+    allEvents.push(...events);
   }
   allEvents = filterBySearch(allEvents, search);
   allEvents = filterByDateRange(allEvents, startDate, endDate);
@@ -84,6 +101,24 @@ export async function getEvents(options = {}) {
     events: allEvents.slice(offset, offset + limit),
     total: allEvents.length
   };
+}
+
+export async function purgeDisabledSubcalendars(accountId) {
+  const account = await getAccount(accountId);
+  if (!account?.subcalendars?.length) return { purged: 0 };
+
+  const enabledIds = new Set(
+    account.subcalendars.filter(sc => sc.enabled && !sc.dormant).map(sc => sc.calendarId)
+  );
+  const cache = await loadCache(accountId);
+  const before = cache.events.length;
+  cache.events = cache.events.filter(e => !e.subcalendarId || enabledIds.has(e.subcalendarId));
+  const purged = before - cache.events.length;
+  if (purged > 0) {
+    await saveCache(accountId, cache);
+    console.log(`🧹 Purged ${purged} events from disabled subcalendars for account ${accountId}`);
+  }
+  return { purged, remaining: cache.events.length };
 }
 
 export async function getEvent(accountId, eventId) {
@@ -125,6 +160,9 @@ export async function syncAccount(accountId, io, options = {}) {
     if (account.type === 'outlook-calendar') {
       const { syncOutlookCalendarApi } = await import('./calendarApiSync.js');
       providerResult = await syncOutlookCalendarApi(account, cache, io, options);
+    } else if (account.type === 'google-calendar') {
+      // Google Calendar uses push sync — syncAccount is a no-op
+      return { newEvents: 0, pruned: 0, total: cache.events.length, status: 'push-only' };
     } else {
       throw new Error(`Unsupported calendar account type: ${account.type}`);
     }

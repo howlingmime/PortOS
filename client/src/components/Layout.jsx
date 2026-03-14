@@ -110,6 +110,7 @@ const navItems = [
       { to: '/calendar/config', label: 'Config', icon: Settings },
       { to: '/calendar/day', label: 'Day', icon: Calendar },
       { to: '/calendar/month', label: 'Month', icon: CalendarDays },
+      { to: '/calendar/review', label: 'Review', icon: ClipboardList },
       { to: '/calendar/sync', label: 'Sync', icon: RefreshCw },
       { to: '/calendar/week', label: 'Week', icon: CalendarDays }
     ]

@@ -1,10 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, RefreshCw, MapPin } from 'lucide-react';
 import * as api from '../../services/api';
 import socket from '../../services/socket';
 import EventDetail from './EventDetail';
 
-const HOURS = Array.from({ length: 17 }, (_, i) => i + 6); // 6am to 10pm
+const START_HOUR = 6;
+const END_HOUR = 23;
+const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => i + START_HOUR); // 6am to 10pm
+const PX_PER_HOUR = 80;
+const PX_PER_15MIN = PX_PER_HOUR / 4; // 20px per 15-min block
+const START_MINUTES = START_HOUR * 60;
 
 function formatHour(hour) {
   if (hour === 0) return '12 AM';
@@ -13,14 +18,79 @@ function formatHour(hour) {
   return `${hour - 12} PM`;
 }
 
-function getEventPosition(event) {
+function getEventMinutes(event) {
   const start = new Date(event.startTime);
   const end = new Date(event.endTime);
-  const startMinutes = start.getHours() * 60 + start.getMinutes();
-  const endMinutes = end.getHours() * 60 + end.getMinutes();
-  const top = ((startMinutes - 360) / 60) * 64; // 64px per hour, starting at 6am (360min)
-  const height = Math.max(((endMinutes - startMinutes) / 60) * 64, 24);
+  return {
+    startMin: start.getHours() * 60 + start.getMinutes(),
+    endMin: end.getHours() * 60 + end.getMinutes()
+  };
+}
+
+function getEventPosition(event) {
+  const { startMin, endMin } = getEventMinutes(event);
+  const top = ((startMin - START_MINUTES) / 60) * PX_PER_HOUR;
+  const height = Math.max(((endMin - startMin) / 60) * PX_PER_HOUR, PX_PER_15MIN);
   return { top: Math.max(top, 0), height };
+}
+
+/**
+ * Assign columns to overlapping events so they render side-by-side.
+ * Returns a Map of eventKey -> { column, totalColumns }
+ */
+function layoutEvents(events) {
+  const items = events.map(e => {
+    const { startMin, endMin } = getEventMinutes(e);
+    return { event: e, startMin, endMin: Math.max(endMin, startMin + 15) };
+  }).sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+
+  const groups = []; // groups of overlapping events
+  let currentGroup = [];
+  let groupEnd = -1;
+
+  for (const item of items) {
+    if (currentGroup.length === 0 || item.startMin < groupEnd) {
+      currentGroup.push(item);
+      groupEnd = Math.max(groupEnd, item.endMin);
+    } else {
+      groups.push(currentGroup);
+      currentGroup = [item];
+      groupEnd = item.endMin;
+    }
+  }
+  if (currentGroup.length > 0) groups.push(currentGroup);
+
+  const layout = new Map();
+  for (const group of groups) {
+    // Assign columns greedily
+    const columns = [];
+    for (const item of group) {
+      let placed = false;
+      for (let col = 0; col < columns.length; col++) {
+        if (columns[col] <= item.startMin) {
+          columns[col] = item.endMin;
+          layout.set(eventKey(item.event), { column: col, totalColumns: 0 });
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        layout.set(eventKey(item.event), { column: columns.length, totalColumns: 0 });
+        columns.push(item.endMin);
+      }
+    }
+    // Set totalColumns for all events in this group
+    const total = columns.length;
+    for (const item of group) {
+      const l = layout.get(eventKey(item.event));
+      if (l) l.totalColumns = total;
+    }
+  }
+  return layout;
+}
+
+function eventKey(e) {
+  return `${e.accountId}-${e.id}`;
 }
 
 function formatDate(date) {
@@ -67,14 +137,15 @@ export default function DayView() {
     setLoading(true);
   };
 
-  const allDayEvents = events.filter(e => e.isAllDay);
-  const timedEvents = events.filter(e => !e.isAllDay);
+  const allDayEvents = useMemo(() => events.filter(e => e.isAllDay), [events]);
+  const timedEvents = useMemo(() => events.filter(e => !e.isAllDay), [events]);
+  const layout = useMemo(() => layoutEvents(timedEvents), [timedEvents]);
 
   // Current time indicator
   const now = new Date();
   const isToday = date.toDateString() === now.toDateString();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const nowTop = ((nowMinutes - 360) / 60) * 64;
+  const nowTop = ((nowMinutes - START_MINUTES) / 60) * PX_PER_HOUR;
 
   return (
     <div className="space-y-4">
@@ -119,11 +190,21 @@ export default function DayView() {
           {/* Time grid */}
           <div className="relative border border-port-border rounded-lg overflow-hidden bg-port-card">
             {HOURS.map(hour => (
-              <div key={hour} className="flex border-b border-port-border last:border-b-0" style={{ height: 64 }}>
-                <div className="w-16 shrink-0 text-xs text-gray-500 text-right pr-2 pt-1">
-                  {formatHour(hour)}
+              <div key={hour} className="border-b border-port-border last:border-b-0" style={{ height: PX_PER_HOUR }}>
+                <div className="flex h-full">
+                  <div className="w-16 shrink-0 text-xs text-gray-500 text-right pr-2 pt-1">
+                    {formatHour(hour)}
+                  </div>
+                  <div className="flex-1 border-l border-port-border flex flex-col">
+                    {[0, 1, 2, 3].map(q => (
+                      <div
+                        key={q}
+                        className={`flex-1 ${q > 0 ? 'border-t border-port-border/30' : ''}`}
+                        style={{ height: PX_PER_15MIN }}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="flex-1 border-l border-port-border" />
               </div>
             ))}
 
@@ -131,14 +212,24 @@ export default function DayView() {
             <div className="absolute top-0 left-16 right-0 bottom-0">
               {timedEvents.map(event => {
                 const { top, height } = getEventPosition(event);
+                const key = eventKey(event);
+                const { column, totalColumns } = layout.get(key) || { column: 0, totalColumns: 1 };
+                const widthPercent = 100 / totalColumns;
+                const leftPercent = column * widthPercent;
                 return (
                   <button
-                    key={`${event.accountId}-${event.id}`}
+                    key={key}
                     onClick={() => setSelectedEvent(event)}
-                    className="absolute left-1 right-1 px-2 py-1 bg-port-accent/20 border-l-2 border-port-accent rounded text-left overflow-hidden hover:bg-port-accent/30 transition-colors"
-                    style={{ top, height, minHeight: 24 }}
+                    className="absolute px-1.5 py-0.5 bg-port-accent/20 border-l-2 border-port-accent rounded text-left overflow-hidden hover:bg-port-accent/30 transition-colors"
+                    style={{
+                      top,
+                      height,
+                      minHeight: PX_PER_15MIN,
+                      left: `calc(${leftPercent}% + 2px)`,
+                      width: `calc(${widthPercent}% - 4px)`
+                    }}
                   >
-                    <div className="text-xs font-medium text-white truncate">{event.title}</div>
+                    <div className="text-xs leading-tight font-medium text-white truncate">{event.title}</div>
                     {height > 32 && event.location && (
                       <div className="flex items-center gap-1 text-[10px] text-gray-400 truncate">
                         <MapPin size={10} /> {event.location}
@@ -149,7 +240,7 @@ export default function DayView() {
               })}
 
               {/* Current time line */}
-              {isToday && nowTop >= 0 && nowTop <= HOURS.length * 64 && (
+              {isToday && nowTop >= 0 && nowTop <= HOURS.length * PX_PER_HOUR && (
                 <div className="absolute left-0 right-0 flex items-center pointer-events-none" style={{ top: nowTop }}>
                   <div className="w-2 h-2 rounded-full bg-port-error -ml-1" />
                   <div className="flex-1 h-px bg-port-error" />

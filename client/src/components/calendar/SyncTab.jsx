@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, AlertCircle, Trash2, TestTube } from 'lucide-react';
+import { RefreshCw, AlertCircle, Trash2, TestTube, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as api from '../../services/api';
 import socket from '../../services/socket';
@@ -8,6 +8,7 @@ export default function SyncTab({ accounts, onRefresh }) {
   const [syncing, setSyncing] = useState({});
   const [tokenStatus, setTokenStatus] = useState(null);
   const [tokenLoading, setTokenLoading] = useState(true);
+  const [mcpProgress, setMcpProgress] = useState({});
 
   const fetchTokenStatus = useCallback(async () => {
     const data = await api.getCalendarTokenStatus().catch(() => null);
@@ -23,6 +24,7 @@ export default function SyncTab({ accounts, onRefresh }) {
     };
     const onSyncCompleted = ({ accountId, newEvents }) => {
       setSyncing(prev => ({ ...prev, [accountId]: null }));
+      setMcpProgress(prev => { const next = {...prev}; delete next[accountId]; return next; });
       toast.success(`Calendar sync complete: ${newEvents ?? 0} events`);
       onRefresh();
     };
@@ -31,14 +33,20 @@ export default function SyncTab({ accounts, onRefresh }) {
       toast.error(`Calendar sync failed: ${error ?? 'unknown error'}`);
     };
 
+    const onSyncProgress = ({ accountId, message }) => {
+      setMcpProgress(prev => ({ ...prev, [accountId]: message }));
+    };
+
     socket.on('calendar:sync:started', onSyncStarted);
     socket.on('calendar:sync:completed', onSyncCompleted);
     socket.on('calendar:sync:failed', onSyncFailed);
+    socket.on('calendar:sync:progress', onSyncProgress);
 
     return () => {
       socket.off('calendar:sync:started', onSyncStarted);
       socket.off('calendar:sync:completed', onSyncCompleted);
       socket.off('calendar:sync:failed', onSyncFailed);
+      socket.off('calendar:sync:progress', onSyncProgress);
     };
   }, [fetchTokenStatus, onRefresh]);
 
@@ -47,6 +55,26 @@ export default function SyncTab({ accounts, onRefresh }) {
     await api.syncCalendarAccount(accountId).catch(() => {
       setSyncing(prev => ({ ...prev, [accountId]: null }));
     });
+  };
+
+  const handleGoogleSync = async (account) => {
+    setSyncing(prev => ({ ...prev, [account.id]: 'syncing' }));
+    setMcpProgress(prev => ({ ...prev, [account.id]: 'Starting Google Calendar sync...' }));
+
+    const useApi = account.syncMethod === 'google-api';
+    const result = useApi
+      ? await api.apiSyncGoogleCalendar(account.id).catch(() => null)
+      : await api.mcpSyncGoogleCalendar(account.id).catch(() => null);
+
+    setMcpProgress(prev => { const next = {...prev}; delete next[account.id]; return next; });
+    if (!result || result.error) {
+      setSyncing(prev => ({ ...prev, [account.id]: null }));
+      if (result?.error?.includes('spawn Claude')) {
+        toast.error('Claude CLI not found. Ensure Claude Code is installed and in your PATH.');
+      } else if (result?.error?.includes('OAuth')) {
+        toast.error('Google OAuth not configured. Set up in Config tab.');
+      }
+    }
   };
 
   const handleTestToken = async (provider) => {
@@ -95,7 +123,21 @@ export default function SyncTab({ accounts, onRefresh }) {
                   </span>
                 )}
                 {syncing[account.id] === 'syncing' ? (
-                  <RefreshCw size={16} className="text-port-accent animate-spin" />
+                  <div className="flex items-center gap-2">
+                    <RefreshCw size={16} className="text-port-accent animate-spin" />
+                    {mcpProgress[account.id] && account.type === 'google-calendar' && (
+                      <span className="text-xs text-gray-500">{mcpProgress[account.id]}</span>
+                    )}
+                  </div>
+                ) : account.type === 'google-calendar' ? (
+                  <button
+                    onClick={() => handleGoogleSync(account)}
+                    disabled={!account.enabled}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-port-accent/10 text-port-accent rounded text-sm hover:bg-port-accent/20 transition-colors disabled:opacity-50"
+                    title={account.syncMethod === 'google-api' ? 'Sync via Google API' : 'Sync via Claude MCP'}
+                  >
+                    <Calendar size={14} /> {account.syncMethod === 'google-api' ? 'Sync (API)' : 'Sync (Claude)'}
+                  </button>
                 ) : (
                   <button
                     onClick={() => handleSync(account.id)}

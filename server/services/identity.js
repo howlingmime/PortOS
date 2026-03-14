@@ -696,6 +696,7 @@ export async function getGoals() {
     if (goal.parentId === undefined) { goal.parentId = null; needsSave = true; }
     if (!Array.isArray(goal.tags)) { goal.tags = []; needsSave = true; }
     if (!Array.isArray(goal.linkedActivities)) { goal.linkedActivities = []; needsSave = true; }
+    if (!Array.isArray(goal.linkedCalendars)) { goal.linkedCalendars = []; needsSave = true; }
   }
   if (needsSave) await saveJSON(GOALS_FILE, data);
   return data;
@@ -946,6 +947,45 @@ export async function addMilestone(goalId, { title, targetDate }) {
   return milestone;
 }
 
+export async function addProgressEntry(goalId, { date, note, durationMinutes }) {
+  const goals = await loadJSON(GOALS_FILE, DEFAULT_GOALS);
+  const goal = goals.goals.find(g => g.id === goalId);
+  if (!goal) return null;
+
+  if (!goal.progressLog) goal.progressLog = [];
+
+  const entry = {
+    id: `prog-${uuidv4()}`,
+    date,
+    note,
+    durationMinutes: durationMinutes || null,
+    createdAt: new Date().toISOString()
+  };
+
+  goal.progressLog.push(entry);
+  goal.updatedAt = new Date().toISOString();
+  goals.updatedAt = new Date().toISOString();
+  await saveJSON(GOALS_FILE, goals);
+
+  console.log(`📝 Progress logged for "${goal.title}": ${note} (${durationMinutes ? durationMinutes + 'min' : 'no duration'})`);
+  return entry;
+}
+
+export async function deleteProgressEntry(goalId, entryId) {
+  const goals = await loadJSON(GOALS_FILE, DEFAULT_GOALS);
+  const goal = goals.goals.find(g => g.id === goalId);
+  if (!goal) return null;
+
+  const idx = (goal.progressLog || []).findIndex(e => e.id === entryId);
+  if (idx === -1) return null;
+
+  goal.progressLog.splice(idx, 1);
+  goal.updatedAt = new Date().toISOString();
+  goals.updatedAt = new Date().toISOString();
+  await saveJSON(GOALS_FILE, goals);
+  return { deleted: true };
+}
+
 export async function completeMilestone(goalId, milestoneId) {
   const goals = await loadJSON(GOALS_FILE, DEFAULT_GOALS);
   const goal = goals.goals.find(g => g.id === goalId);
@@ -959,4 +999,71 @@ export async function completeMilestone(goalId, milestoneId) {
   goals.updatedAt = new Date().toISOString();
   await saveJSON(GOALS_FILE, goals);
   return milestone;
+}
+
+export async function linkCalendarToGoal(goalId, { subcalendarId, subcalendarName, matchPattern }) {
+  const goals = await loadJSON(GOALS_FILE, DEFAULT_GOALS);
+  const goal = goals.goals.find(g => g.id === goalId);
+  if (!goal) return null;
+
+  if (!goal.linkedCalendars) goal.linkedCalendars = [];
+
+  // Prevent duplicates
+  const existing = goal.linkedCalendars.find(lc => lc.subcalendarId === subcalendarId);
+  if (existing) {
+    existing.subcalendarName = subcalendarName;
+    existing.matchPattern = matchPattern || '';
+  } else {
+    goal.linkedCalendars.push({
+      subcalendarId,
+      subcalendarName,
+      matchPattern: matchPattern || '',
+      linkedAt: new Date().toISOString()
+    });
+  }
+
+  goal.updatedAt = new Date().toISOString();
+  goals.updatedAt = new Date().toISOString();
+  await saveJSON(GOALS_FILE, goals);
+  console.log(`📅 Calendar "${subcalendarName}" linked to goal "${goal.title}"`);
+  return goal;
+}
+
+export async function unlinkCalendarFromGoal(goalId, subcalendarId) {
+  const goals = await loadJSON(GOALS_FILE, DEFAULT_GOALS);
+  const goal = goals.goals.find(g => g.id === goalId);
+  if (!goal) return null;
+
+  if (!goal.linkedCalendars) return goal;
+  const idx = goal.linkedCalendars.findIndex(lc => lc.subcalendarId === subcalendarId);
+  if (idx === -1) return goal;
+
+  goal.linkedCalendars.splice(idx, 1);
+  goal.updatedAt = new Date().toISOString();
+  goals.updatedAt = new Date().toISOString();
+  await saveJSON(GOALS_FILE, goals);
+  console.log(`📅 Calendar unlinked from goal "${goal.title}"`);
+  return goal;
+}
+
+export async function getGoalCalendarEvents(goalId, startDate, endDate) {
+  const goals = await loadJSON(GOALS_FILE, DEFAULT_GOALS);
+  const goal = goals.goals.find(g => g.id === goalId);
+  if (!goal || !goal.linkedCalendars?.length) return [];
+
+  const { getEvents } = await import('./calendarSync.js');
+  const { events } = await getEvents({ startDate, endDate, limit: 200 });
+
+  const linkedIds = new Set(goal.linkedCalendars.map(lc => lc.subcalendarId));
+  const patternMap = {};
+  for (const lc of goal.linkedCalendars) {
+    patternMap[lc.subcalendarId] = lc.matchPattern;
+  }
+
+  return events.filter(e => {
+    if (!linkedIds.has(e.subcalendarId)) return false;
+    const pattern = patternMap[e.subcalendarId];
+    if (!pattern) return true;
+    return e.title?.toLowerCase().includes(pattern.toLowerCase());
+  });
 }
