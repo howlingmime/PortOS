@@ -1611,6 +1611,22 @@ export const updateSettings = (data) => request('/settings', {
   body: JSON.stringify(data)
 });
 
+// Telegram
+export const getTelegramStatus = () => request('/telegram/status');
+export const updateTelegramConfig = (data) => request('/telegram/config', {
+  method: 'PUT',
+  body: JSON.stringify(data)
+});
+export const deleteTelegramConfig = () => request('/telegram/config', { method: 'DELETE' });
+export const testTelegram = (message) => request('/telegram/test', {
+  method: 'POST',
+  body: JSON.stringify({ message })
+});
+export const updateTelegramForwardTypes = (forwardTypes) => request('/telegram/forward-types', {
+  method: 'PUT',
+  body: JSON.stringify({ forwardTypes })
+});
+
 // Insights
 export const getGenomeHealthCorrelations = () => request('/insights/genome-health');
 export const getInsightThemes = () => request('/insights/themes');

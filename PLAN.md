@@ -67,7 +67,7 @@ See [GOALS.md](./GOALS.md) for project goals and direction.
 - [ ] **M50 P1-P4**: Email Management - Gmail + Outlook integration, AI categorization and priority extraction, Digital Twin voice drafting, review-before-send outbox, Brain knowledge capture
 - [ ] **M34 P5-P7**: Digital Twin - Multi-modal capture, advanced testing, personas
 - [ ] **M42 P5**: Unified Digital Twin Identity System - Cross-Insights Engine. See [Identity System](./docs/features/identity-system.md)
-- [ ] **M47**: Push Notifications - Webhook-based alerts when agents complete tasks, critical errors occur, or goals stall. Discord/Telegram integration for mobile awareness without needing the dashboard open.
+- [x] **M56**: Telegram Bot Integration - External notification channel via Telegram bot. ChatId allowlisting, notification forwarding with rate limiting and type filtering, conversational commands (/status, /goals, /agents, /checkin, /help), goal check-in persistence. Replaces M47.
 - [x] **M48 P1-P5**: Google Calendar Integration - MCP push sync, subcalendar management, goal-calendar linking, daily review with auto-progress-logging, dormancy support
 - [x] **M48 P6**: Calendar Consolidation - Moved Life Calendar from MeatSpace to Calendar > Lifetime tab with accuracy improvement tips
 - [x] **M48 P7**: UI-Triggered Google Calendar Sync - "Sync Google" button in Sync tab + "Discover Calendars" in Config tab

@@ -55,6 +55,7 @@ import instancesRoutes from './routes/instances.js';
 import meatspaceRoutes from './routes/meatspace.js';
 import githubRoutes from './routes/github.js';
 import settingsRoutes from './routes/settings.js';
+import telegramRoutes from './routes/telegram.js';
 import updateRoutes from './routes/update.js';
 import { ensureSelf, startPolling } from './services/instances.js';
 import { initSyncLog } from './services/brainSyncLog.js';
@@ -70,6 +71,7 @@ import './services/subAgentSpawner.js'; // Initialize CoS agent spawner
 import * as automationScheduler from './services/automationScheduler.js';
 import * as agentActionExecutor from './services/agentActionExecutor.js';
 import { startBackupScheduler } from './services/backupScheduler.js';
+import * as telegram from './services/telegram.js';
 import { startUpdateScheduler, recordUpdateResult, clearStaleUpdateInProgress, getCurrentVersion } from './services/updateChecker.js';
 import { startBrainScheduler } from './services/brainScheduler.js';
 import { recoverStuckClassifications } from './services/brain.js';
@@ -243,6 +245,7 @@ app.use('/api/instances', instancesRoutes);
 app.use('/api/meatspace', meatspaceRoutes);
 app.use('/api/github', githubRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/telegram', telegramRoutes);
 app.use('/api/update', updateRoutes);
 
 // Initialize agent automation scheduler and action executor
@@ -257,6 +260,8 @@ startBrainScheduler();
 initBrainMemoryBridge();
 // Initialize backup scheduler for daily data backups
 startBackupScheduler().catch(err => console.error(`❌ Backup scheduler init failed: ${err.message}`));
+// Initialize Telegram bot (if configured)
+telegram.init().catch(err => console.error(`❌ Telegram init failed: ${err.message}`));
 // Check for update completion marker from a previous update cycle
 const updateMarkerPath = join(__dirname, '..', 'data', 'update-complete.json');
 const removeMarker = () => unlink(updateMarkerPath).catch(e => {
