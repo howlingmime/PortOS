@@ -946,6 +946,45 @@ export async function addMilestone(goalId, { title, targetDate }) {
   return milestone;
 }
 
+export async function addProgressEntry(goalId, { date, note, durationMinutes }) {
+  const goals = await loadJSON(GOALS_FILE, DEFAULT_GOALS);
+  const goal = goals.goals.find(g => g.id === goalId);
+  if (!goal) return null;
+
+  if (!goal.progressLog) goal.progressLog = [];
+
+  const entry = {
+    id: `prog-${uuidv4()}`,
+    date,
+    note,
+    durationMinutes: durationMinutes || null,
+    createdAt: new Date().toISOString()
+  };
+
+  goal.progressLog.push(entry);
+  goal.updatedAt = new Date().toISOString();
+  goals.updatedAt = new Date().toISOString();
+  await saveJSON(GOALS_FILE, goals);
+
+  console.log(`📝 Progress logged for "${goal.title}": ${note} (${durationMinutes ? durationMinutes + 'min' : 'no duration'})`);
+  return entry;
+}
+
+export async function deleteProgressEntry(goalId, entryId) {
+  const goals = await loadJSON(GOALS_FILE, DEFAULT_GOALS);
+  const goal = goals.goals.find(g => g.id === goalId);
+  if (!goal) return null;
+
+  const idx = (goal.progressLog || []).findIndex(e => e.id === entryId);
+  if (idx === -1) return null;
+
+  goal.progressLog.splice(idx, 1);
+  goal.updatedAt = new Date().toISOString();
+  goals.updatedAt = new Date().toISOString();
+  await saveJSON(GOALS_FILE, goals);
+  return { deleted: true };
+}
+
 export async function completeMilestone(goalId, milestoneId) {
   const goals = await loadJSON(GOALS_FILE, DEFAULT_GOALS);
   const goal = goals.goals.find(g => g.id === goalId);

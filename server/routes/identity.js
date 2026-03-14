@@ -8,6 +8,7 @@ import {
   createGoalInputSchema,
   updateGoalInputSchema,
   addMilestoneInputSchema,
+  addProgressEntrySchema,
   linkActivityInputSchema
 } from '../lib/identityValidation.js';
 
@@ -128,6 +129,25 @@ router.put('/goals/:id/milestones/:milestoneId/complete', asyncHandler(async (re
     throw new ServerError('Goal or milestone not found', { status: 404, code: 'NOT_FOUND' });
   }
   res.json(milestone);
+}));
+
+// POST /api/digital-twin/identity/goals/:id/progress — Log progress entry
+router.post('/goals/:id/progress', asyncHandler(async (req, res) => {
+  const data = validateRequest(addProgressEntrySchema, req.body);
+  const entry = await identityService.addProgressEntry(req.params.id, data);
+  if (!entry) {
+    throw new ServerError('Goal not found', { status: 404, code: 'NOT_FOUND' });
+  }
+  res.status(201).json(entry);
+}));
+
+// DELETE /api/digital-twin/identity/goals/:id/progress/:entryId — Delete progress entry
+router.delete('/goals/:id/progress/:entryId', asyncHandler(async (req, res) => {
+  const result = await identityService.deleteProgressEntry(req.params.id, req.params.entryId);
+  if (!result) {
+    throw new ServerError('Goal or progress entry not found', { status: 404, code: 'NOT_FOUND' });
+  }
+  res.status(204).send();
 }));
 
 // POST /api/digital-twin/identity/goals/:id/activities — Link activity to goal
