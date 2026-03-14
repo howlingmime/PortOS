@@ -8,8 +8,7 @@ const CREDENTIALS_FILE = join(AUTH_DIR, 'credentials.json');
 const TOKENS_FILE = join(AUTH_DIR, 'tokens.json');
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar.readonly',
-  'https://www.googleapis.com/auth/gmail.readonly',
-  'https://www.googleapis.com/auth/gmail.send'
+  'https://www.googleapis.com/auth/gmail.modify'
 ];
 export const OAUTH_REDIRECT_URI = `http://localhost:${process.env.PORT || 5555}/api/calendar/google/oauth/callback`;
 

@@ -24,42 +24,77 @@ function decodeBase64Url(str) {
 }
 
 /**
- * Extract plain text body from Gmail message payload.
- * Walks multipart structure looking for text/plain, falls back to text/html.
+ * Convert HTML to readable plain text by stripping style/script/head blocks, then tags.
+ */
+function htmlToText(html) {
+  return html
+    .replace(/<head\b[^>]*>[\s\S]*?<\/head>/gi, '')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/tr>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&zwnj;/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+}
+
+/**
+ * Extract text and HTML body from Gmail message payload.
+ * Returns { text, html } — prefers text/plain for text, keeps raw HTML separately.
  */
 function extractBody(payload) {
-  if (!payload) return '';
+  if (!payload) return { text: '', html: '' };
 
   // Simple message with body data directly
   if (payload.body?.data) {
-    return decodeBase64Url(payload.body.data);
+    const content = decodeBase64Url(payload.body.data);
+    const isHtml = payload.mimeType === 'text/html';
+    return {
+      text: isHtml ? htmlToText(content) : content,
+      html: isHtml ? content : ''
+    };
   }
 
-  // Multipart — search parts recursively
+  // Multipart — collect both text/plain and text/html
   if (payload.parts) {
-    // Prefer text/plain
+    let text = '';
+    let html = '';
+
     for (const part of payload.parts) {
-      if (part.mimeType === 'text/plain' && part.body?.data) {
-        return decodeBase64Url(part.body.data);
+      if (part.mimeType === 'text/plain' && part.body?.data && !text) {
+        text = decodeBase64Url(part.body.data);
       }
-    }
-    // Fall back to text/html (strip tags for plain text)
-    for (const part of payload.parts) {
-      if (part.mimeType === 'text/html' && part.body?.data) {
-        const html = decodeBase64Url(part.body.data);
-        return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+      if (part.mimeType === 'text/html' && part.body?.data && !html) {
+        html = decodeBase64Url(part.body.data);
       }
-    }
-    // Recurse into nested multipart
-    for (const part of payload.parts) {
-      if (part.parts) {
+      // Recurse into nested multipart
+      if (part.parts && !text && !html) {
         const nested = extractBody(part);
-        if (nested) return nested;
+        if (nested.text) text = nested.text;
+        if (nested.html) html = nested.html;
       }
     }
+
+    // If no plain text but have HTML, derive text from HTML
+    if (!text && html) {
+      text = htmlToText(html);
+    }
+
+    return { text, html };
   }
 
-  return '';
+  return { text: '', html: '' };
 }
 
 /**
@@ -147,7 +182,7 @@ export async function syncGmail(account, cache, io, options = {}) {
       const headers = data.payload?.headers || [];
       const from = parseSender(getHeader(headers, 'From'));
       const labelIds = data.labelIds || [];
-      const bodyText = extractBody(data.payload);
+      const body = extractBody(data.payload);
 
       messages.push({
         id: uuidv4(),
@@ -159,8 +194,9 @@ export async function syncGmail(account, cache, io, options = {}) {
         to: parseRecipients(getHeader(headers, 'To')),
         cc: parseRecipients(getHeader(headers, 'Cc')),
         subject: getHeader(headers, 'Subject'),
-        bodyText,
-        bodyFull: !!bodyText,
+        bodyText: body.text,
+        bodyHtml: body.html || undefined,
+        bodyFull: !!(body.text || body.html),
         date: data.internalDate ? new Date(parseInt(data.internalDate)).toISOString() : new Date().toISOString(),
         isRead: !labelIds.includes('UNREAD'),
         isUnread: labelIds.includes('UNREAD'),

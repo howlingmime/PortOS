@@ -84,17 +84,17 @@ export async function executeAction(accountId, messageId, action) {
   const message = await getMessage(accountId, messageId);
   if (!message) throw new Error('Message not found');
 
-  if (!PROVIDER_URLS[account.type]) {
-    throw new Error(`${action} not supported for ${account.type}`);
-  }
-
-  const page = await ensureProviderPage(account.type);
-
-  console.log(`📧 ${action} message "${message.subject}" via ${account.type} browser`);
-
-  if (account.type === 'outlook') {
+  // Gmail: use API directly instead of browser automation
+  if (account.type === 'gmail' && message.apiId) {
+    await executeGmailApiAction(message, action);
+  } else if (account.type === 'outlook') {
+    const page = await ensureProviderPage(account.type);
+    console.log(`📧 ${action} message "${message.subject}" via ${account.type} browser`);
     await executeOutlookAction(page, message.subject || '', action);
-  } else {
+  } else if (account.type === 'gmail') {
+    // Fallback to browser if no apiId
+    const page = await ensureProviderPage(account.type);
+    console.log(`📧 ${action} message "${message.subject}" via gmail browser`);
     const script = buildGmailActionScript((message.subject || '').replace(/'/g, "\\'").replace(/\n/g, ' '), action);
     const result = await evaluateOnPage(page, script);
     if (!result || result.error) {
@@ -104,6 +104,8 @@ export async function executeAction(accountId, messageId, action) {
         throw new Error(result?.error || `${action} failed`);
       }
     }
+  } else {
+    throw new Error(`${action} not supported for ${account.type}`);
   }
 
   // Record triage correction if user chose differently than the AI
@@ -121,6 +123,32 @@ export async function executeAction(accountId, messageId, action) {
   console.log(`📧 ${action} complete for "${message.subject}"`);
 
   return { success: true, action, messageId };
+}
+
+/**
+ * Execute archive/delete on Gmail via the Google API.
+ * Archive = remove INBOX label. Delete = move to trash.
+ */
+async function executeGmailApiAction(message, action) {
+  const { google } = await import('googleapis');
+  const { getAuthenticatedClient } = await import('./googleAuth.js');
+
+  const auth = await getAuthenticatedClient();
+  if (!auth) throw new Error('Google OAuth not configured');
+
+  const gmail = google.gmail({ version: 'v1', auth });
+
+  if (action === 'delete') {
+    await gmail.users.messages.trash({ userId: 'me', id: message.apiId });
+    console.log(`📧 Gmail API: trashed "${message.subject}"`);
+  } else if (action === 'archive') {
+    await gmail.users.messages.modify({
+      userId: 'me',
+      id: message.apiId,
+      requestBody: { removeLabelIds: ['INBOX'] }
+    });
+    console.log(`📧 Gmail API: archived "${message.subject}"`);
+  }
 }
 
 /**

@@ -1,7 +1,61 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, Reply, Sparkles, Send, MessageSquare, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { ArrowLeft, Reply, Sparkles, Send, MessageSquare, RefreshCw, Archive, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as api from '../../services/api';
+
+/**
+ * Renders HTML email content in a sandboxed iframe.
+ * Strips scripts, sets sandbox restrictions, and auto-resizes to content height.
+ */
+function SafeHtmlBody({ html }) {
+  const iframeRef = useRef(null);
+
+  const writeContent = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    // Strip script tags and event handlers from HTML
+    const sanitized = html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '')
+      .replace(/\s+on\w+\s*=\s*\S+/gi, '');
+
+    const doc = iframe.contentDocument;
+    if (!doc) return;
+
+    doc.open();
+    doc.write(`<!DOCTYPE html><html><head><style>
+      body { margin: 0; padding: 8px; font-family: -apple-system, sans-serif; font-size: 14px; color: #d1d5db; background: transparent; word-wrap: break-word; overflow-wrap: break-word; }
+      a { color: #3b82f6; }
+      img { max-width: 100%; height: auto; }
+      table { max-width: 100% !important; }
+    </style></head><body>${sanitized}</body></html>`);
+    doc.close();
+
+    // Auto-resize iframe to content height
+    const resize = () => {
+      const h = doc.documentElement?.scrollHeight || doc.body?.scrollHeight;
+      if (h) iframe.style.height = `${h + 16}px`;
+    };
+    resize();
+    // Resize again after images load
+    doc.querySelectorAll('img').forEach(img => img.addEventListener('load', resize));
+  }, [html]);
+
+  useEffect(() => {
+    writeContent();
+  }, [writeContent]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      sandbox="allow-same-origin"
+      className="w-full border-0 min-h-[100px]"
+      style={{ background: 'transparent' }}
+      title="Email content"
+    />
+  );
+}
 
 export default function MessageDetail({ message, accounts, onBack }) {
   const [showReply, setShowReply] = useState(false);
@@ -12,6 +66,7 @@ export default function MessageDetail({ message, accounts, onBack }) {
   const [threadLoading, setThreadLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [displayedMessage, setDisplayedMessage] = useState(message);
+  const [actioning, setActioning] = useState(null);
 
   // Sync displayedMessage when the message prop changes (e.g., selecting a different message)
   useEffect(() => {
@@ -36,7 +91,6 @@ export default function MessageDetail({ message, accounts, onBack }) {
     setRefreshing(false);
     if (!result) return;
     if (result.error) return toast.error(result.error);
-    // Result is the updated messages array
     if (Array.isArray(result)) {
       const updated = result.find(m => m.id === message.id) || result[0];
       if (updated) setDisplayedMessage(prev => ({ ...prev, ...updated }));
@@ -84,87 +138,46 @@ export default function MessageDetail({ message, accounts, onBack }) {
     setGeneratedDraftId(null);
   };
 
+  const handleAction = (action) => {
+    if (!displayedMessage.accountId) return;
+    setActioning(action);
+    api.executeMessageAction(displayedMessage.accountId, displayedMessage.id, action)
+      .then(() => {
+        toast.success(`Message ${action}d`);
+        onBack();
+      })
+      .catch(() => toast.error(`Failed to ${action} message`))
+      .finally(() => setActioning(null));
+  };
+
   // Show thread or single message
   const hasThread = threadMessages.length > 1;
   const displayMessages = hasThread ? threadMessages : [displayedMessage];
 
   return (
     <div className="space-y-4">
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"
-      >
-        <ArrowLeft size={16} /> Back to inbox
-      </button>
-
-      <div className="p-4 bg-port-card rounded-lg border border-port-border">
-        <h2 className="text-lg font-medium text-white">{displayedMessage.subject || '(no subject)'}</h2>
-        {hasThread && (
-          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-            <MessageSquare size={12} />
-            <span>{threadMessages.length} messages in conversation</span>
-          </div>
-        )}
-      </div>
-
-      {threadLoading ? (
-        <div className="text-sm text-gray-500 animate-pulse">Loading conversation...</div>
-      ) : (
-        <div className="space-y-3">
-          {displayMessages.map((msg, i) => (
-            <div
-              key={msg.id || i}
-              className="p-4 bg-port-card rounded-lg border border-port-border space-y-2"
-            >
-              <div className="flex items-center gap-4 text-sm">
-                <span className="text-gray-400">
-                  From: <span className="text-white">{msg.from?.name || msg.from?.email || 'Unknown'}</span>
-                </span>
-                {msg.date && (
-                  <span className="text-gray-500">{new Date(msg.date).toLocaleString()}</span>
-                )}
-              </div>
-              {msg.to?.length > 0 && (
-                <div className="text-xs text-gray-500">
-                  To: {msg.to.map(t => typeof t === 'string' ? t : t.email || t).join(', ')}
-                </div>
-              )}
-              <div className="pt-2 border-t border-port-border text-sm text-gray-300 whitespace-pre-wrap">
-                {msg.bodyText || '(no content)'}
-              </div>
-              {!msg.bodyFull && msg.bodyText && (
-                <div className="text-xs text-gray-600 italic">Preview only — re-sync for full content</div>
-              )}
-            </div>
-          ))}
+      {/* Header: back + subject + actions — single compact row */}
+      <div className="flex items-center gap-3 px-3 py-2 bg-port-card rounded-lg border border-port-border">
+        <button onClick={onBack} className="text-gray-400 hover:text-white transition-colors shrink-0">
+          <ArrowLeft size={16} />
+        </button>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-medium text-white truncate">{displayedMessage.subject || '(no subject)'}</h2>
+          {hasThread && (
+            <span className="text-xs text-gray-500">{threadMessages.length} messages</span>
+          )}
         </div>
-      )}
-
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setShowReply(!showReply)}
-          className="flex items-center gap-2 px-3 py-2 bg-port-accent/10 text-port-accent rounded-lg text-sm hover:bg-port-accent/20 transition-colors"
-        >
-          <Reply size={16} /> Reply
-        </button>
-        <button
-          onClick={handleGenerateReply}
-          disabled={generating}
-          className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 text-purple-400 rounded-lg text-sm hover:bg-purple-500/20 transition-colors disabled:opacity-50"
-        >
-          <Sparkles size={16} className={generating ? 'animate-pulse' : ''} />
-          {generating ? 'Generating...' : 'AI Reply'}
-        </button>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="flex items-center gap-2 px-3 py-2 bg-port-accent/10 text-port-accent rounded-lg text-sm hover:bg-port-accent/20 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-          {refreshing ? 'Fetching...' : 'Refresh'}
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          <button onClick={() => setShowReply(!showReply)} className="p-1.5 text-port-accent hover:bg-port-accent/10 rounded transition-colors" title="Reply"><Reply size={14} /></button>
+          <button onClick={handleGenerateReply} disabled={generating} className="p-1.5 text-purple-400 hover:bg-purple-500/10 rounded transition-colors disabled:opacity-50" title="AI Reply"><Sparkles size={14} className={generating ? 'animate-pulse' : ''} /></button>
+          <button onClick={handleRefresh} disabled={refreshing} className="p-1.5 text-port-accent hover:bg-port-accent/10 rounded transition-colors disabled:opacity-50" title="Refresh"><RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /></button>
+          <span className="w-px h-4 bg-port-border mx-0.5" />
+          <button onClick={() => handleAction('archive')} disabled={!!actioning} className="p-1.5 text-port-warning hover:bg-port-warning/10 rounded transition-colors disabled:opacity-50" title="Archive"><Archive size={14} /></button>
+          <button onClick={() => handleAction('delete')} disabled={!!actioning} className="p-1.5 text-port-error hover:bg-port-error/10 rounded transition-colors disabled:opacity-50" title="Delete"><Trash2 size={14} /></button>
+        </div>
       </div>
 
+      {/* Reply composer */}
       {showReply && (
         <div className="p-4 bg-port-card rounded-lg border border-port-border space-y-3">
           <textarea
@@ -188,6 +201,44 @@ export default function MessageDetail({ message, accounts, onBack }) {
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Message body / thread */}
+      {threadLoading ? (
+        <div className="text-sm text-gray-500 animate-pulse">Loading conversation...</div>
+      ) : (
+        <div className="space-y-3">
+          {displayMessages.map((msg, i) => (
+            <div
+              key={msg.id || i}
+              className="p-4 bg-port-card rounded-lg border border-port-border space-y-2"
+            >
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-gray-400">
+                  From: <span className="text-white">{msg.from?.name || msg.from?.email || 'Unknown'}</span>
+                </span>
+                {msg.date && (
+                  <span className="text-gray-500">{new Date(msg.date).toLocaleString()}</span>
+                )}
+              </div>
+              {msg.to?.length > 0 && (
+                <div className="text-xs text-gray-500">
+                  To: {msg.to.map(t => typeof t === 'string' ? t : t.email || t).join(', ')}
+                </div>
+              )}
+              <div className="pt-2 border-t border-port-border text-sm text-gray-300">
+                {msg.bodyHtml ? (
+                  <SafeHtmlBody html={msg.bodyHtml} />
+                ) : (
+                  <div className="whitespace-pre-wrap">{msg.bodyText || '(no content)'}</div>
+                )}
+              </div>
+              {!msg.bodyFull && msg.bodyText && (
+                <div className="text-xs text-gray-600 italic">Preview only — re-sync for full content</div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

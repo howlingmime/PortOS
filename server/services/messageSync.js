@@ -169,6 +169,7 @@ export async function syncAccount(accountId, io, options = {}) {
         if (msg.bodyFull && msg.bodyText) {
           existing.bodyText = msg.bodyText;
           existing.bodyFull = true;
+          if (msg.bodyHtml) existing.bodyHtml = msg.bodyHtml;
         }
         // Set threadId if newly available
         if (msg.threadId && !existing.threadId) existing.threadId = msg.threadId;
