@@ -30,8 +30,5 @@
   },
   "devDependencies": {
     "pm2": "^6.0.14"
-  },
-  "dependencies": {
-    "googleapis": "^171.4.0"
   }
 }

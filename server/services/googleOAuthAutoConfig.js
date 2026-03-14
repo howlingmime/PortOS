@@ -216,8 +216,10 @@ export async function runAutomatedSetup(userEmail, io) {
         // Step 3/4: Contact Information — fill email
         emit('consent', 'Filling contact email...');
         const email = userEmail || 'portos@localhost';
+        const safeEmail = JSON.stringify(email);
         await evaluateOnPage(page, `
           (function() {
+            const emailVal = ${safeEmail};
             const inputs = document.querySelectorAll('input[type="text"], input:not([type])');
             const emailInput = [...inputs].find(i => {
               const ph = i.placeholder || '';
@@ -227,8 +229,8 @@ export async function runAutomatedSetup(userEmail, io) {
             if (emailInput) {
               emailInput.focus();
               const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-              if (setter) setter.call(emailInput, '${email}');
-              else emailInput.value = '${email}';
+              if (setter) setter.call(emailInput, emailVal);
+              else emailInput.value = emailVal;
               emailInput.dispatchEvent(new Event('input', { bubbles: true }));
               emailInput.dispatchEvent(new Event('change', { bubbles: true }));
               return true;
@@ -267,8 +269,9 @@ export async function runAutomatedSetup(userEmail, io) {
   emit('test-user', 'Adding test user...');
   page = await navAndWait(`https://console.cloud.google.com/auth/audience${projectParam}`, 5000);
   if (page) {
+    const safeUserEmail = JSON.stringify(userEmail || '');
     const hasUser = await evaluateOnPage(page, `
-      document.body.innerText.includes('${userEmail || ''}') && !'${userEmail}'.includes('portos')
+      document.body.innerText.includes(${safeUserEmail}) && !${safeUserEmail}.includes('portos')
     `);
     if (!hasUser && userEmail) {
       await clickByText(page, ['Add users']);
@@ -276,14 +279,15 @@ export async function runAutomatedSetup(userEmail, io) {
       // Fill email in the dialog
       await evaluateOnPage(page, `
         (function() {
+          const emailVal = ${safeUserEmail};
           const dialog = document.querySelector('[role="dialog"]');
           if (!dialog) return false;
           const input = dialog.querySelector('input[type="text"], input:not([type])');
           if (!input) return false;
           input.focus();
           const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-          if (setter) setter.call(input, '${userEmail}');
-          else input.value = '${userEmail}';
+          if (setter) setter.call(input, emailVal);
+          else input.value = emailVal;
           input.dispatchEvent(new Event('input', { bubbles: true }));
           input.dispatchEvent(new Event('change', { bubbles: true }));
           input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));

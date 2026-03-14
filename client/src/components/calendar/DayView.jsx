@@ -7,8 +7,8 @@ import EventDetail from './EventDetail';
 const START_HOUR = 6;
 const END_HOUR = 23;
 const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => i + START_HOUR); // 6am to 10pm
-const PX_PER_HOUR = 64;
-const PX_PER_15MIN = PX_PER_HOUR / 4; // 16px per 15-min block
+const PX_PER_HOUR = 80;
+const PX_PER_15MIN = PX_PER_HOUR / 4; // 20px per 15-min block
 const START_MINUTES = START_HOUR * 60;
 
 function formatHour(hour) {
@@ -137,8 +137,8 @@ export default function DayView() {
     setLoading(true);
   };
 
-  const allDayEvents = events.filter(e => e.isAllDay);
-  const timedEvents = events.filter(e => !e.isAllDay);
+  const allDayEvents = useMemo(() => events.filter(e => e.isAllDay), [events]);
+  const timedEvents = useMemo(() => events.filter(e => !e.isAllDay), [events]);
   const layout = useMemo(() => layoutEvents(timedEvents), [timedEvents]);
 
   // Current time indicator
@@ -229,7 +229,7 @@ export default function DayView() {
                       width: `calc(${widthPercent}% - 4px)`
                     }}
                   >
-                    <div className="text-xs font-medium text-white truncate">{event.title}</div>
+                    <div className="text-xs leading-tight font-medium text-white truncate">{event.title}</div>
                     {height > 32 && event.location && (
                       <div className="flex items-center gap-1 text-[10px] text-gray-400 truncate">
                         <MapPin size={10} /> {event.location}

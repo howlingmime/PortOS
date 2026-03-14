@@ -15,7 +15,6 @@ export default function ConfigTab({ accounts, setAccounts }) {
   const [savingSubcals, setSavingSubcals] = useState(null);
   const [discovering, setDiscovering] = useState(null);
   const [googleAuth, setGoogleAuth] = useState(null);
-  const [showOAuthSetup, setShowOAuthSetup] = useState(null);
   const [oauthForm, setOauthForm] = useState({ clientId: '', clientSecret: '' });
   const [savingOAuth, setSavingOAuth] = useState(false);
   const [autoConfigStep, setAutoConfigStep] = useState(null); // null | 'launching' | 'login' | 'project' | 'api' | 'consent' | 'credentials' | 'capturing' | 'done'

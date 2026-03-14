@@ -92,7 +92,7 @@ export async function getDailyReview(date) {
       totalEvents: enrichedEvents.length,
       confirmed: Object.values(existing.confirmations).filter(c => c.happened).length,
       skipped: Object.values(existing.confirmations).filter(c => c.happened === false).length,
-      unreviewed: enrichedEvents.length - Object.keys(existing.confirmations).length
+      unreviewed: enrichedEvents.filter(e => !existing.confirmations[e.id]).length
     },
     updatedAt: existing.updatedAt
   };
