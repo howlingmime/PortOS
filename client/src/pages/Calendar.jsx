@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { CalendarDays, Calendar as CalendarIcon, ClipboardList, Columns, LayoutGrid, RefreshCw, Settings } from 'lucide-react';
+import { CalendarDays, Calendar as CalendarIcon, ClipboardList, Clock, Columns, LayoutGrid, RefreshCw, Settings } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import * as api from '../services/api';
 
@@ -9,6 +9,7 @@ import WeekView from '../components/calendar/WeekView';
 import MonthView from '../components/calendar/MonthView';
 import ConfigTab from '../components/calendar/ConfigTab';
 import ReviewTab from '../components/calendar/ReviewTab';
+import CalendarLifetimeTab from '../components/meatspace/tabs/CalendarTab';
 import SyncTab from '../components/calendar/SyncTab';
 
 const TABS = [
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'day', label: 'Day', icon: CalendarIcon },
   { id: 'week', label: 'Week', icon: Columns },
   { id: 'month', label: 'Month', icon: LayoutGrid },
+  { id: 'lifetime', label: 'Lifetime', icon: Clock },
   { id: 'review', label: 'Review', icon: ClipboardList },
   { id: 'sync', label: 'Sync', icon: RefreshCw },
   { id: 'config', label: 'Config', icon: Settings }
@@ -53,6 +55,8 @@ export default function Calendar() {
         return <WeekView accounts={accounts} />;
       case 'month':
         return <MonthView accounts={accounts} />;
+      case 'lifetime':
+        return <CalendarLifetimeTab />;
       case 'review':
         return <ReviewTab />;
       case 'config':
