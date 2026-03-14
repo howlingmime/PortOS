@@ -3,7 +3,7 @@ import { join } from 'path';
 import { ensureDir, PATHS, readJSONFile } from '../lib/fileUtils.js';
 import { getAccount, updateSyncStatus } from './calendarAccounts.js';
 
-const CACHE_DIR = join(PATHS.calendar, 'cache');
+export const CACHE_DIR = join(PATHS.calendar, 'cache');
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const syncLocks = new Map();
 
@@ -38,7 +38,7 @@ function filterByDateRange(events, startDate, endDate) {
 
 const DEFAULT_CACHE = { syncCursor: null, events: [] };
 
-async function loadCache(accountId) {
+export async function loadCache(accountId) {
   if (!UUID_RE.test(accountId)) throw new Error(`Invalid accountId: ${accountId}`);
   await ensureDir(CACHE_DIR);
   const parsed = await readJSONFile(join(CACHE_DIR, `${accountId}.json`), DEFAULT_CACHE);
@@ -46,7 +46,7 @@ async function loadCache(accountId) {
   return parsed;
 }
 
-async function saveCache(accountId, cache) {
+export async function saveCache(accountId, cache) {
   await ensureDir(CACHE_DIR);
   const filePath = join(CACHE_DIR, `${accountId}.json`);
   await writeFile(filePath, JSON.stringify(cache, null, 2));

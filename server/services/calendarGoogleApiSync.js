@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from './googleAuth.js';
-import { getAccount } from './calendarAccounts.js';
-import { pushSyncEvents } from './calendarGoogleSync.js';
+import { getAccount, mergeDiscoveredSubcalendars } from './calendarAccounts.js';
+import { pushSyncEvents, getSyncDateRange } from './calendarGoogleSync.js';
 
 export async function apiSyncAccount(accountId, io) {
   const account = await getAccount(accountId);
@@ -18,23 +18,17 @@ export async function apiSyncAccount(accountId, io) {
   console.log(`📅 Starting Google API sync for ${account.name} (${enabledCalendars.length} calendars)`);
 
   const calendar = google.calendar({ version: 'v3', auth });
-  const now = new Date();
-  const pastDate = new Date(now);
-  pastDate.setDate(pastDate.getDate() - 7);
-  const futureDate = new Date(now);
-  futureDate.setDate(futureDate.getDate() + 30);
+  const { pastDate, futureDate } = getSyncDateRange();
 
   let totalNew = 0;
   let totalUpdated = 0;
   let totalPruned = 0;
   const results = [];
 
-  for (const sc of enabledCalendars) {
+  const fetchResults = await Promise.all(enabledCalendars.map(async (sc) => {
     io?.emit('calendar:sync:progress', { accountId, message: `Fetching ${sc.name}...` });
-
     const allEvents = [];
     let pageToken;
-
     do {
       const response = await calendar.events.list({
         calendarId: sc.calendarId,
@@ -57,7 +51,10 @@ export async function apiSyncAccount(accountId, io) {
       })));
       pageToken = response.data.nextPageToken;
     } while (pageToken);
+    return { sc, allEvents };
+  }));
 
+  for (const { sc, allEvents } of fetchResults) {
     const syncResult = await pushSyncEvents(accountId, sc.calendarId, sc.name, allEvents, null);
     totalNew += syncResult.newEvents;
     totalUpdated += syncResult.updated;
@@ -89,20 +86,13 @@ export async function apiDiscoverCalendars(accountId) {
     pageToken = response.data.nextPageToken;
   } while (pageToken);
 
-  // Merge with existing subcalendars
-  const existingMap = new Map((account.subcalendars || []).map(sc => [sc.calendarId, sc]));
-  const merged = allCalendars.map(cal => {
-    const existing = existingMap.get(cal.id);
-    return {
-      calendarId: cal.id,
-      name: cal.summaryOverride || cal.summary || cal.id,
-      color: cal.backgroundColor || existing?.color || '',
-      enabled: existing?.enabled ?? false,
-      dormant: existing?.dormant ?? false,
-      goalIds: existing?.goalIds || [],
-      addedAt: existing?.addedAt || new Date().toISOString()
-    };
-  });
+  // Normalize to { id, name, color } shape for merge helper
+  const discovered = allCalendars.map(cal => ({
+    id: cal.id,
+    name: cal.summaryOverride || cal.summary || cal.id,
+    color: cal.backgroundColor || ''
+  }));
+  const merged = mergeDiscoveredSubcalendars(account.subcalendars, discovered);
 
   const { updateSubcalendars } = await import('./calendarAccounts.js');
   await updateSubcalendars(accountId, merged);

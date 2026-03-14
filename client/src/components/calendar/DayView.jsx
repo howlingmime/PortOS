@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, RefreshCw, MapPin } from 'lucide-react';
 import * as api from '../../services/api';
 import socket from '../../services/socket';
@@ -139,6 +139,7 @@ export default function DayView() {
 
   const allDayEvents = events.filter(e => e.isAllDay);
   const timedEvents = events.filter(e => !e.isAllDay);
+  const layout = useMemo(() => layoutEvents(timedEvents), [timedEvents]);
 
   // Current time indicator
   const now = new Date();
@@ -209,37 +210,34 @@ export default function DayView() {
 
             {/* Events overlay */}
             <div className="absolute top-0 left-16 right-0 bottom-0">
-              {(() => {
-                const layout = layoutEvents(timedEvents);
-                return timedEvents.map(event => {
-                  const { top, height } = getEventPosition(event);
-                  const key = eventKey(event);
-                  const { column, totalColumns } = layout.get(key) || { column: 0, totalColumns: 1 };
-                  const widthPercent = 100 / totalColumns;
-                  const leftPercent = column * widthPercent;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setSelectedEvent(event)}
-                      className="absolute px-1.5 py-0.5 bg-port-accent/20 border-l-2 border-port-accent rounded text-left overflow-hidden hover:bg-port-accent/30 transition-colors"
-                      style={{
-                        top,
-                        height,
-                        minHeight: PX_PER_15MIN,
-                        left: `calc(${leftPercent}% + 2px)`,
-                        width: `calc(${widthPercent}% - 4px)`
-                      }}
-                    >
-                      <div className="text-xs font-medium text-white truncate">{event.title}</div>
-                      {height > 32 && event.location && (
-                        <div className="flex items-center gap-1 text-[10px] text-gray-400 truncate">
-                          <MapPin size={10} /> {event.location}
-                        </div>
-                      )}
-                    </button>
-                  );
-                });
-              })()}
+              {timedEvents.map(event => {
+                const { top, height } = getEventPosition(event);
+                const key = eventKey(event);
+                const { column, totalColumns } = layout.get(key) || { column: 0, totalColumns: 1 };
+                const widthPercent = 100 / totalColumns;
+                const leftPercent = column * widthPercent;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedEvent(event)}
+                    className="absolute px-1.5 py-0.5 bg-port-accent/20 border-l-2 border-port-accent rounded text-left overflow-hidden hover:bg-port-accent/30 transition-colors"
+                    style={{
+                      top,
+                      height,
+                      minHeight: PX_PER_15MIN,
+                      left: `calc(${leftPercent}% + 2px)`,
+                      width: `calc(${widthPercent}% - 4px)`
+                    }}
+                  >
+                    <div className="text-xs font-medium text-white truncate">{event.title}</div>
+                    {height > 32 && event.location && (
+                      <div className="flex items-center gap-1 text-[10px] text-gray-400 truncate">
+                        <MapPin size={10} /> {event.location}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
 
               {/* Current time line */}
               {isToday && nowTop >= 0 && nowTop <= HOURS.length * PX_PER_HOUR && (

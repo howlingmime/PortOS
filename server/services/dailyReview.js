@@ -22,13 +22,12 @@ export async function getDailyReview(date) {
   // Get all events for this date across all accounts
   const startDate = `${date}T00:00:00`;
   const endDate = `${date}T23:59:59`;
-  const { events } = await calendarSync.getEvents({ startDate, endDate, limit: 200 });
-
-  // Load existing review data for this date
-  const existing = await loadReview(date) || { confirmations: {}, updatedAt: null };
-
-  // Get accounts for subcalendar info
-  const accounts = await calendarAccounts.listAccounts();
+  const [{ events }, existing, accounts, goalsData] = await Promise.all([
+    calendarSync.getEvents({ startDate, endDate, limit: 200 }),
+    loadReview(date).then(r => r || { confirmations: {}, updatedAt: null }),
+    calendarAccounts.listAccounts(),
+    getGoals()
+  ]);
   const subcalendarMap = {};
   for (const account of accounts) {
     for (const sc of (account.subcalendars || [])) {
@@ -36,8 +35,7 @@ export async function getDailyReview(date) {
     }
   }
 
-  // Get goals for linking info
-  const goalsData = await getGoals();
+  // Build goal and subcalendar maps for linking info
   const goalMap = {};
   for (const goal of goalsData.goals) {
     goalMap[goal.id] = goal;

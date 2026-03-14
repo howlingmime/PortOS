@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import * as api from '../../services/api';
 
 const TYPE_ICONS = { 'outlook-calendar': Globe, 'google-calendar': Calendar };
-const TYPE_LABELS = { 'outlook-calendar': 'Outlook Calendar (API)', 'google-calendar': 'Google Calendar (MCP Push)' };
+const TYPE_LABELS = { 'outlook-calendar': 'Outlook Calendar (API)', 'google-calendar': 'Google Calendar' };
 
 export default function ConfigTab({ accounts, setAccounts }) {
   const [showForm, setShowForm] = useState(false);
@@ -19,7 +19,6 @@ export default function ConfigTab({ accounts, setAccounts }) {
   const [oauthForm, setOauthForm] = useState({ clientId: '', clientSecret: '' });
   const [savingOAuth, setSavingOAuth] = useState(false);
   const [autoConfigStep, setAutoConfigStep] = useState(null); // null | 'launching' | 'login' | 'project' | 'api' | 'consent' | 'credentials' | 'capturing' | 'done'
-  const [autoConfigBusy, setAutoConfigBusy] = useState(false);
 
   const fetchGoogleAuth = async () => {
     const status = await api.getGoogleAuthStatus().catch(() => null);
@@ -67,9 +66,7 @@ export default function ConfigTab({ accounts, setAccounts }) {
   };
 
   const handleAutoConfigStart = async () => {
-    setAutoConfigBusy(true);
     const result = await api.startGoogleAutoConfig().catch(() => null);
-    setAutoConfigBusy(false);
     if (!result || result.error) {
       return toast.error(result?.error || 'Failed to open browser');
     }
@@ -78,13 +75,11 @@ export default function ConfigTab({ accounts, setAccounts }) {
   };
 
   const handleAutoConfigContinue = async () => {
-    setAutoConfigBusy(true);
     setAutoConfigStep('running');
     // Find the google account's email to pass as test user
     const googleAccount = accounts.find(a => a.type === 'google-calendar');
     const email = googleAccount?.email || '';
     const result = await api.runGoogleAutoConfig(email).catch(() => null);
-    setAutoConfigBusy(false);
     if (!result || result.status === 'error') {
       setAutoConfigStep('login');
       return toast.error(result?.errors?.[0] || 'Automated setup failed. Try manual setup instead.');
@@ -375,10 +370,9 @@ export default function ConfigTab({ accounts, setAccounts }) {
                               {!autoConfigStep ? (
                                 <button
                                   onClick={handleAutoConfigStart}
-                                  disabled={autoConfigBusy}
-                                  className="flex items-center gap-1.5 w-full px-3 py-2 text-xs rounded bg-port-accent/10 text-port-accent hover:bg-port-accent/20 border border-port-accent/20 disabled:opacity-50"
+                                  className="flex items-center gap-1.5 w-full px-3 py-2 text-xs rounded bg-port-accent/10 text-port-accent hover:bg-port-accent/20 border border-port-accent/20"
                                 >
-                                  {autoConfigBusy ? <RefreshCw size={14} className="animate-spin" /> : <Monitor size={14} />}
+                                  <Monitor size={14} />
                                   Setup with PortOS Browser (automated)
                                 </button>
                               ) : autoConfigStep === 'running' ? (
@@ -403,7 +397,7 @@ export default function ConfigTab({ accounts, setAccounts }) {
                                   <div className="flex gap-2 pt-1">
                                     <button
                                       onClick={handleAutoConfigContinue}
-                                      disabled={autoConfigBusy}
+                                      disabled={autoConfigStep === 'running'}
                                       className="flex items-center gap-1 px-3 py-1.5 text-xs rounded bg-port-accent text-white hover:bg-port-accent/80 disabled:opacity-50"
                                     >
                                       <Wand2 size={12} /> Continue

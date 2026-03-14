@@ -55,7 +55,10 @@ export async function createAccount(data) {
       goalIds: sc.goalIds || [],
       addedAt: sc.addedAt || new Date().toISOString()
     }));
-    accounts[id].syncMethod = 'claude-mcp'; // default, user can switch to 'google-api'
+    // Default to google-api if OAuth is configured, otherwise claude-mcp
+    const { getAuthStatus } = await import('./googleAuth.js');
+    const authStatus = await getAuthStatus().catch(() => ({}));
+    accounts[id].syncMethod = authStatus.hasTokens ? 'google-api' : 'claude-mcp';
   }
   await saveAccounts(accounts);
   console.log(`📅 Calendar account created: ${data.name} (${data.type})`);
@@ -101,6 +104,22 @@ export async function updateSubcalendars(id, subcalendars) {
   await saveAccounts(accounts);
   console.log(`📅 Updated subcalendars for account ${accounts[id].name}: ${subcalendars.length} calendars`);
   return accounts[id];
+}
+
+export function mergeDiscoveredSubcalendars(existing, discovered) {
+  const existingMap = new Map((existing || []).map(sc => [sc.calendarId, sc]));
+  return discovered.map(cal => {
+    const prev = existingMap.get(cal.id);
+    return {
+      calendarId: cal.id,
+      name: cal.name || cal.id,
+      color: cal.color || prev?.color || '',
+      enabled: prev?.enabled ?? false,
+      dormant: prev?.dormant ?? false,
+      goalIds: prev?.goalIds || [],
+      addedAt: prev?.addedAt || new Date().toISOString()
+    };
+  });
 }
 
 export async function updateSyncStatus(id, status) {

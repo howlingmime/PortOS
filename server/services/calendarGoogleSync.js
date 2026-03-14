@@ -1,12 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'crypto';
 import { spawn } from 'child_process';
-import { getAccount, updateSyncStatus } from './calendarAccounts.js';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
-import { ensureDir, PATHS, readJSONFile } from '../lib/fileUtils.js';
-
-const CACHE_DIR = join(PATHS.calendar, 'cache');
+import { getAccount, updateSyncStatus, mergeDiscoveredSubcalendars } from './calendarAccounts.js';
+import { loadCache, saveCache } from './calendarSync.js';
 
 function md5(str) {
   return createHash('md5').update(str).digest('hex').slice(0, 12);
@@ -38,16 +34,13 @@ export function normalizeGoogleEvent(event, subcalendarId, subcalendarName) {
   };
 }
 
-async function loadCache(accountId) {
-  await ensureDir(CACHE_DIR);
-  const parsed = await readJSONFile(join(CACHE_DIR, `${accountId}.json`), { syncCursor: null, events: [] });
-  if (!parsed || !Array.isArray(parsed.events)) return { syncCursor: null, events: [] };
-  return parsed;
-}
-
-async function saveCache(accountId, cache) {
-  await ensureDir(CACHE_DIR);
-  await writeFile(join(CACHE_DIR, `${accountId}.json`), JSON.stringify(cache, null, 2));
+export function getSyncDateRange(pastDays = 7, futureDays = 30) {
+  const now = new Date();
+  const pastDate = new Date(now);
+  pastDate.setDate(pastDate.getDate() - pastDays);
+  const futureDate = new Date(now);
+  futureDate.setDate(futureDate.getDate() + futureDays);
+  return { pastDate, futureDate };
 }
 
 export async function pushSyncEvents(accountId, calendarId, calendarName, rawEvents, io) {
@@ -128,11 +121,7 @@ export async function mcpSyncAccount(accountId, io) {
   io?.emit('calendar:sync:started', { accountId, method: 'mcp' });
   console.log(`📅 Starting MCP sync for ${account.name} (${enabledCalendars.length} calendars)`);
 
-  const now = new Date();
-  const pastDate = new Date(now);
-  pastDate.setDate(pastDate.getDate() - 7);
-  const futureDate = new Date(now);
-  futureDate.setDate(futureDate.getDate() + 30);
+  const { pastDate, futureDate } = getSyncDateRange();
   const timeMin = pastDate.toISOString().slice(0, 19);
   const timeMax = futureDate.toISOString().slice(0, 19);
 
@@ -244,19 +233,7 @@ Output NOTHING else — just the JSON array.`;
   if (!Array.isArray(calendars)) return { error: 'Invalid calendar list format', status: 502 };
 
   // Merge with existing subcalendars (preserve enabled/dormant state)
-  const existingMap = new Map((account.subcalendars || []).map(sc => [sc.calendarId, sc]));
-  const merged = calendars.map(cal => {
-    const existing = existingMap.get(cal.id);
-    return {
-      calendarId: cal.id,
-      name: cal.name || cal.id,
-      color: cal.color || existing?.color || '',
-      enabled: existing?.enabled ?? false,
-      dormant: existing?.dormant ?? false,
-      goalIds: existing?.goalIds || [],
-      addedAt: existing?.addedAt || new Date().toISOString()
-    };
-  });
+  const merged = mergeDiscoveredSubcalendars(account.subcalendars, calendars);
 
   // Save merged subcalendars
   const { updateSubcalendars } = await import('./calendarAccounts.js');
