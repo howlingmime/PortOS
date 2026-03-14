@@ -281,6 +281,13 @@ router.post('/google/auto-configure/capture', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
+router.post('/google/auto-configure/run', asyncHandler(async (req, res) => {
+  const io = req.app.get('io');
+  const result = await googleOAuthAutoConfig.runAutomatedSetup(io);
+  if (result.status === 'error') return res.status(500).json(result);
+  res.json(result);
+}));
+
 // === Google API Sync Routes ===
 router.post('/sync/:accountId/api', asyncHandler(async (req, res) => {
   if (!z.string().uuid().safeParse(req.params.accountId).success) {

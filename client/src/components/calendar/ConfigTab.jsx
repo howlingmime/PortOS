@@ -77,24 +77,22 @@ export default function ConfigTab({ accounts, setAccounts }) {
     toast.success('Google Cloud Console opened in PortOS browser');
   };
 
-  const handleAutoConfigNavigate = async (step) => {
+  const handleAutoConfigContinue = async () => {
     setAutoConfigBusy(true);
-    await api.navigateGoogleAutoConfig(step).catch(() => null);
+    setAutoConfigStep('running');
+    const result = await api.runGoogleAutoConfig().catch(() => null);
     setAutoConfigBusy(false);
-    setAutoConfigStep(step === 'enable-api' ? 'api' : step === 'credentials' ? 'consent' : 'credentials');
-  };
-
-  const handleAutoConfigCapture = async () => {
-    setAutoConfigBusy(true);
-    const result = await api.captureGoogleCredentials().catch(() => null);
-    setAutoConfigBusy(false);
-    if (!result || result.error) {
-      return toast.error(result?.error || 'Could not capture credentials');
+    if (!result || result.status === 'error') {
+      setAutoConfigStep('login');
+      return toast.error(result?.errors?.[0] || 'Automated setup failed. Try manual setup instead.');
     }
-    toast.success('OAuth credentials captured!');
+    if (result.status === 'partial') {
+      toast('Setup partially completed. Some steps may need manual attention.', { icon: '⚠️' });
+    } else {
+      toast.success('Google OAuth setup complete!');
+    }
     setAutoConfigStep('done');
     fetchGoogleAuth();
-    // Open auth URL if available
     if (result.authUrl) {
       window.open(result.authUrl, '_blank');
       toast.success('Complete Google authorization in the opened tab');
@@ -378,79 +376,49 @@ export default function ConfigTab({ accounts, setAccounts }) {
                                   className="flex items-center gap-1.5 w-full px-3 py-2 text-xs rounded bg-port-accent/10 text-port-accent hover:bg-port-accent/20 border border-port-accent/20 disabled:opacity-50"
                                 >
                                   {autoConfigBusy ? <RefreshCw size={14} className="animate-spin" /> : <Monitor size={14} />}
-                                  Setup with PortOS Browser (guided)
+                                  Setup with PortOS Browser (automated)
                                 </button>
-                              ) : autoConfigStep !== 'done' && (
+                              ) : autoConfigStep === 'running' ? (
+                                <div className="flex items-center gap-2 p-3 bg-port-bg/80 rounded border border-port-border">
+                                  <RefreshCw size={14} className="text-port-accent animate-spin shrink-0" />
+                                  <div className="text-xs text-gray-400">
+                                    Automating Google Cloud setup... enabling Calendar API, configuring OAuth consent, creating credentials.
+                                    This may take up to a minute.
+                                  </div>
+                                </div>
+                              ) : autoConfigStep === 'login' ? (
                                 <div className="space-y-2 p-2.5 bg-port-bg/80 rounded border border-port-border">
                                   <div className="flex items-center gap-1.5 text-xs font-medium text-port-accent">
-                                    <Wand2 size={12} />
-                                    Guided Setup via PortOS Browser
+                                    <Monitor size={12} />
+                                    Google Cloud Console is open in the PortOS browser
                                   </div>
-                                  <div className="space-y-1.5 text-xs">
-                                    <div className={`flex items-center gap-2 ${autoConfigStep === 'login' ? 'text-white' : 'text-gray-600'}`}>
-                                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 ${autoConfigStep === 'login' ? 'bg-port-accent text-white' : 'bg-gray-700 text-gray-500'}`}>1</span>
-                                      Log in to Google Cloud Console in the browser window
-                                    </div>
-                                    <div className={`flex items-center gap-2 ${autoConfigStep === 'project' ? 'text-white' : 'text-gray-600'}`}>
-                                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 ${autoConfigStep === 'project' ? 'bg-port-accent text-white' : 'bg-gray-700 text-gray-500'}`}>2</span>
-                                      Create a project (or select existing)
-                                    </div>
-                                    <div className={`flex items-center gap-2 ${autoConfigStep === 'api' ? 'text-white' : 'text-gray-600'}`}>
-                                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 ${autoConfigStep === 'api' ? 'bg-port-accent text-white' : 'bg-gray-700 text-gray-500'}`}>3</span>
-                                      Enable the Google Calendar API
-                                    </div>
-                                    <div className={`flex items-center gap-2 ${autoConfigStep === 'consent' ? 'text-white' : 'text-gray-600'}`}>
-                                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 ${autoConfigStep === 'consent' ? 'bg-port-accent text-white' : 'bg-gray-700 text-gray-500'}`}>4</span>
-                                      Configure OAuth consent screen (External, add yourself as test user)
-                                    </div>
-                                    <div className={`flex items-center gap-2 ${autoConfigStep === 'credentials' ? 'text-white' : 'text-gray-600'}`}>
-                                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 ${autoConfigStep === 'credentials' ? 'bg-port-accent text-white' : 'bg-gray-700 text-gray-500'}`}>5</span>
-                                      Create OAuth client ID (Web app) with redirect URI:
-                                    </div>
-                                    <code className="block px-2 py-1 bg-port-bg rounded text-gray-400 select-all text-[10px] ml-6">
-                                      http://localhost:5555/api/calendar/google/oauth/callback
-                                    </code>
+                                  <div className="text-xs text-gray-400 space-y-1">
+                                    <p>1. Log in to your Google account (if not already logged in)</p>
+                                    <p>2. Select or create a Google Cloud project</p>
+                                    <p>Then click Continue — PortOS will automate the rest (enable API, configure OAuth, create credentials).</p>
                                   </div>
-
-                                  <div className="flex flex-wrap gap-1.5 pt-1">
+                                  <div className="flex gap-2 pt-1">
                                     <button
-                                      onClick={() => { setAutoConfigStep('project'); handleAutoConfigNavigate('enable-api'); }}
+                                      onClick={handleAutoConfigContinue}
                                       disabled={autoConfigBusy}
-                                      className="px-2 py-1 text-[10px] rounded bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-50"
+                                      className="flex items-center gap-1 px-3 py-1.5 text-xs rounded bg-port-accent text-white hover:bg-port-accent/80 disabled:opacity-50"
                                     >
-                                      Open Calendar API
+                                      <Wand2 size={12} /> Continue
                                     </button>
                                     <button
-                                      onClick={() => handleAutoConfigNavigate('credentials')}
-                                      disabled={autoConfigBusy}
-                                      className="px-2 py-1 text-[10px] rounded bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-50"
+                                      onClick={() => setAutoConfigStep(null)}
+                                      className="px-3 py-1.5 text-xs rounded bg-port-border text-gray-400 hover:text-white"
                                     >
-                                      Open Credentials
-                                    </button>
-                                    <button
-                                      onClick={() => handleAutoConfigNavigate('create-client')}
-                                      disabled={autoConfigBusy}
-                                      className="px-2 py-1 text-[10px] rounded bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-50"
-                                    >
-                                      Create OAuth Client
-                                    </button>
-                                    <button
-                                      onClick={handleAutoConfigCapture}
-                                      disabled={autoConfigBusy}
-                                      className="flex items-center gap-1 px-2 py-1 text-[10px] rounded bg-port-success/20 text-port-success hover:bg-port-success/30 disabled:opacity-50"
-                                    >
-                                      {autoConfigBusy ? <RefreshCw size={10} className="animate-spin" /> : <Wand2 size={10} />}
-                                      Capture Credentials
+                                      Cancel
                                     </button>
                                   </div>
-                                  <button
-                                    onClick={() => setAutoConfigStep(null)}
-                                    className="text-[10px] text-gray-600 hover:text-gray-400"
-                                  >
-                                    Cancel guided setup
-                                  </button>
                                 </div>
-                              )}
+                              ) : autoConfigStep === 'done' ? (
+                                <div className="flex items-center gap-1.5 text-xs text-port-success p-2">
+                                  <Key size={12} />
+                                  Setup complete — credentials captured. Authorize below if prompted.
+                                </div>
+                              ) : null}
 
                               {/* Manual setup (always available as fallback) */}
                               <details className="text-xs text-gray-600">
