@@ -18,14 +18,79 @@ function formatHour(hour) {
   return `${hour - 12} PM`;
 }
 
-function getEventPosition(event) {
+function getEventMinutes(event) {
   const start = new Date(event.startTime);
   const end = new Date(event.endTime);
-  const startMinutes = start.getHours() * 60 + start.getMinutes();
-  const endMinutes = end.getHours() * 60 + end.getMinutes();
-  const top = ((startMinutes - START_MINUTES) / 60) * PX_PER_HOUR;
-  const height = Math.max(((endMinutes - startMinutes) / 60) * PX_PER_HOUR, PX_PER_15MIN);
+  return {
+    startMin: start.getHours() * 60 + start.getMinutes(),
+    endMin: end.getHours() * 60 + end.getMinutes()
+  };
+}
+
+function getEventPosition(event) {
+  const { startMin, endMin } = getEventMinutes(event);
+  const top = ((startMin - START_MINUTES) / 60) * PX_PER_HOUR;
+  const height = Math.max(((endMin - startMin) / 60) * PX_PER_HOUR, PX_PER_15MIN);
   return { top: Math.max(top, 0), height };
+}
+
+/**
+ * Assign columns to overlapping events so they render side-by-side.
+ * Returns a Map of eventKey -> { column, totalColumns }
+ */
+function layoutEvents(events) {
+  const items = events.map(e => {
+    const { startMin, endMin } = getEventMinutes(e);
+    return { event: e, startMin, endMin: Math.max(endMin, startMin + 15) };
+  }).sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+
+  const groups = []; // groups of overlapping events
+  let currentGroup = [];
+  let groupEnd = -1;
+
+  for (const item of items) {
+    if (currentGroup.length === 0 || item.startMin < groupEnd) {
+      currentGroup.push(item);
+      groupEnd = Math.max(groupEnd, item.endMin);
+    } else {
+      groups.push(currentGroup);
+      currentGroup = [item];
+      groupEnd = item.endMin;
+    }
+  }
+  if (currentGroup.length > 0) groups.push(currentGroup);
+
+  const layout = new Map();
+  for (const group of groups) {
+    // Assign columns greedily
+    const columns = [];
+    for (const item of group) {
+      let placed = false;
+      for (let col = 0; col < columns.length; col++) {
+        if (columns[col] <= item.startMin) {
+          columns[col] = item.endMin;
+          layout.set(eventKey(item.event), { column: col, totalColumns: 0 });
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        layout.set(eventKey(item.event), { column: columns.length, totalColumns: 0 });
+        columns.push(item.endMin);
+      }
+    }
+    // Set totalColumns for all events in this group
+    const total = columns.length;
+    for (const item of group) {
+      const l = layout.get(eventKey(item.event));
+      if (l) l.totalColumns = total;
+    }
+  }
+  return layout;
+}
+
+function eventKey(e) {
+  return `${e.accountId}-${e.id}`;
 }
 
 function formatDate(date) {
@@ -144,24 +209,37 @@ export default function DayView() {
 
             {/* Events overlay */}
             <div className="absolute top-0 left-16 right-0 bottom-0">
-              {timedEvents.map(event => {
-                const { top, height } = getEventPosition(event);
-                return (
-                  <button
-                    key={`${event.accountId}-${event.id}`}
-                    onClick={() => setSelectedEvent(event)}
-                    className="absolute left-1 right-1 px-2 py-1 bg-port-accent/20 border-l-2 border-port-accent rounded text-left overflow-hidden hover:bg-port-accent/30 transition-colors"
-                    style={{ top, height, minHeight: 24 }}
-                  >
-                    <div className="text-xs font-medium text-white truncate">{event.title}</div>
-                    {height > 32 && event.location && (
-                      <div className="flex items-center gap-1 text-[10px] text-gray-400 truncate">
-                        <MapPin size={10} /> {event.location}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
+              {(() => {
+                const layout = layoutEvents(timedEvents);
+                return timedEvents.map(event => {
+                  const { top, height } = getEventPosition(event);
+                  const key = eventKey(event);
+                  const { column, totalColumns } = layout.get(key) || { column: 0, totalColumns: 1 };
+                  const widthPercent = 100 / totalColumns;
+                  const leftPercent = column * widthPercent;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setSelectedEvent(event)}
+                      className="absolute px-1.5 py-0.5 bg-port-accent/20 border-l-2 border-port-accent rounded text-left overflow-hidden hover:bg-port-accent/30 transition-colors"
+                      style={{
+                        top,
+                        height,
+                        minHeight: PX_PER_15MIN,
+                        left: `calc(${leftPercent}% + 2px)`,
+                        width: `calc(${widthPercent}% - 4px)`
+                      }}
+                    >
+                      <div className="text-xs font-medium text-white truncate">{event.title}</div>
+                      {height > 32 && event.location && (
+                        <div className="flex items-center gap-1 text-[10px] text-gray-400 truncate">
+                          <MapPin size={10} /> {event.location}
+                        </div>
+                      )}
+                    </button>
+                  );
+                });
+              })()}
 
               {/* Current time line */}
               {isToday && nowTop >= 0 && nowTop <= HOURS.length * PX_PER_HOUR && (
