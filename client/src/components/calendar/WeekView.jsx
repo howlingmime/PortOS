@@ -7,8 +7,8 @@ import EventDetail from './EventDetail';
 const START_HOUR = 6;
 const END_HOUR = 23;
 const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => i + START_HOUR);
-const PX_PER_HOUR = 48;
-const PX_PER_15MIN = PX_PER_HOUR / 4; // 12px per 15-min block
+const PX_PER_HOUR = 80;
+const PX_PER_15MIN = PX_PER_HOUR / 4; // 20px per 15-min block
 const START_MINUTES = START_HOUR * 60;
 
 function formatHour(hour) {
@@ -276,7 +276,7 @@ export default function WeekView() {
                             width: `calc(${widthPercent}% - 2px)`
                           }}
                         >
-                          <div className="text-[10px] font-medium text-white truncate">{event.title}</div>
+                          <div className="text-[10px] leading-tight font-medium text-white truncate">{event.title}</div>
                         </button>
                       );
                     })}
