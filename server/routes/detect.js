@@ -85,6 +85,15 @@ router.post('/repo', asyncHandler(async (req, res) => {
     }
   }
 
+  // Check for iOS project (XcodeGen project.yml or .xcodeproj)
+  if (existsSync(join(path, 'project.yml'))) {
+    const ymlContent = await readFile(join(path, 'project.yml'), 'utf-8').catch(() => '');
+    if (ymlContent.includes('platform: iOS') || ymlContent.includes("deploymentTarget:")) {
+      result.type = 'ios-native';
+      result.startCommands = ['open *.xcodeproj'];
+    }
+  }
+
   // Check for .git
   if (existsSync(join(path, '.git'))) {
     result.hasGit = true;

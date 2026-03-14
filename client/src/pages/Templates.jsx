@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layers, Code, Server, Globe, Plus } from 'lucide-react';
+import { Layers, Code, Server, Globe, Smartphone, Plus } from 'lucide-react';
 import * as api from '../services/api';
 import DirectoryPicker from '../components/DirectoryPicker';
 
@@ -8,7 +8,8 @@ const ICONS = {
   layers: Layers,
   code: Code,
   server: Server,
-  globe: Globe
+  globe: Globe,
+  smartphone: Smartphone
 };
 
 export default function Templates() {
