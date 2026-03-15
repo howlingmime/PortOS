@@ -7,7 +7,10 @@ import * as api from '../services/api';
 import IconPicker from '../components/IconPicker';
 import FolderPicker from '../components/FolderPicker';
 
-const DETECTION_STEPS = [
+/** App types that do not use PM2 for process management */
+const NON_PM2_TYPES = new Set(['ios-native', 'macos-native', 'xcode', 'swift']);
+
+const DETECTION_STEPS_PM2 = [
   { id: 'validate', label: 'Validating path' },
   { id: 'files', label: 'Scanning files' },
   { id: 'package', label: 'Reading package.json' },
@@ -15,6 +18,14 @@ const DETECTION_STEPS = [
   { id: 'pm2', label: 'Checking PM2' },
   { id: 'readme', label: 'Reading README' },
   { id: 'standardize', label: 'Standardizing PM2 config' }
+];
+
+const DETECTION_STEPS_NON_PM2 = [
+  { id: 'validate', label: 'Validating path' },
+  { id: 'files', label: 'Scanning files' },
+  { id: 'package', label: 'Reading project config' },
+  { id: 'config', label: 'Checking configs' },
+  { id: 'readme', label: 'Reading README' }
 ];
 
 export default function CreateApp() {
@@ -41,6 +52,7 @@ export default function CreateApp() {
   const [pm2Names, setPm2Names] = useState('');
   const [pm2Status, setPm2Status] = useState(null);
   const [icon, setIcon] = useState('package');
+  const [appType, setAppType] = useState('unknown');
 
   // Submit state
   const [submitting, setSubmitting] = useState(false);
@@ -73,6 +85,7 @@ export default function CreateApp() {
       setDetectionLog(prev => [...prev, { step, status, ...data }]);
 
       // Update form fields as data comes in
+      if (data.type) setAppType(data.type);
       if (data.name) setName(data.name);
       if (data.description) setDescription(data.description);
       if (data.uiPort) setUiPort(String(data.uiPort));
@@ -94,6 +107,7 @@ export default function CreateApp() {
       setDetecting(false);
       if (success && result) {
         setDetected(true);
+        if (result.type) setAppType(result.type);
         if (result.name) setName(result.name);
         if (result.description) setDescription(result.description);
         if (result.uiPort) setUiPort(String(result.uiPort));
@@ -133,14 +147,16 @@ export default function CreateApp() {
     };
   }, []);
 
-  // Auto-trigger standardization after detection completes
+  const isNonPm2 = NON_PM2_TYPES.has(appType);
+
+  // Auto-trigger standardization after detection completes (skip for non-PM2 apps)
   useEffect(() => {
-    if (detected && activeProvider && repoPath && !standardizing && !standardizeResult) {
+    if (detected && activeProvider && repoPath && !standardizing && !standardizeResult && !isNonPm2) {
       setStandardizing(true);
       setSteps(prev => ({ ...prev, standardize: { status: 'running', data: { message: 'Analyzing configuration...' } } }));
       socketRef.current?.emit('standardize:start', { repoPath, providerId: activeProvider.id });
     }
-  }, [detected, activeProvider, repoPath, standardizing, standardizeResult]);
+  }, [detected, activeProvider, repoPath, standardizing, standardizeResult, isNonPm2]);
 
   // Start streaming detection
   const handleImport = () => {
@@ -167,15 +183,18 @@ export default function CreateApp() {
     const data = {
       name,
       repoPath,
+      type: appType !== 'unknown' ? appType : undefined,
       icon,
       uiPort: uiPort ? parseInt(uiPort, 10) : null,
       devUiPort: devUiPort ? parseInt(devUiPort, 10) : null,
       apiPort: apiPort ? parseInt(apiPort, 10) : null,
       buildCommand: buildCommand || undefined,
-      startCommands: startCommands.split('\n').filter(Boolean),
-      pm2ProcessNames: pm2Names
-        ? pm2Names.split(',').map(s => s.trim()).filter(Boolean)
-        : [name.toLowerCase().replace(/[^a-z0-9]/g, '-')]
+      startCommands: startCommands ? startCommands.split('\n').filter(Boolean) : [],
+      pm2ProcessNames: isNonPm2
+        ? []
+        : pm2Names
+          ? pm2Names.split(',').map(s => s.trim()).filter(Boolean)
+          : [name.toLowerCase().replace(/[^a-z0-9]/g, '-')]
     };
 
     const result = await api.createApp(data).catch(err => {
@@ -193,6 +212,7 @@ export default function CreateApp() {
     setDetectionLog([]);
     setName('');
     setDescription('');
+    setAppType('unknown');
     setUiPort('');
     setDevUiPort('');
     setApiPort('');
@@ -250,7 +270,7 @@ export default function CreateApp() {
           {/* Detection Progress */}
           {detecting && (
             <div className="mt-4 space-y-2">
-              {DETECTION_STEPS.map(({ id, label }) => (
+              {(isNonPm2 ? DETECTION_STEPS_NON_PM2 : DETECTION_STEPS_PM2).map(({ id, label }) => (
                 <div key={id} className="flex items-center gap-2 text-sm">
                   {getStepIcon(id)}
                   <span className={steps[id]?.status === 'running' ? 'text-port-accent' :
@@ -267,8 +287,20 @@ export default function CreateApp() {
             </div>
           )}
 
+          {/* App Type Badge */}
+          {detected && isNonPm2 && (
+            <div className="mt-3 p-3 bg-port-accent/10 border border-port-accent/30 rounded-lg">
+              <p className="text-sm text-port-accent font-medium">
+                {appType === 'ios-native' ? '📱 iOS App' :
+                 appType === 'macos-native' ? '🖥️ macOS App' :
+                 appType === 'swift' ? '🐦 Swift Package' :
+                 '🔨 Xcode Project'} — not managed by PM2
+              </p>
+            </div>
+          )}
+
           {/* PM2 Running Status */}
-          {pm2Status && pm2Status.length > 0 && (
+          {pm2Status && pm2Status.length > 0 && !isNonPm2 && (
             <div className="mt-3 p-3 bg-port-warning/10 border border-port-warning/30 rounded-lg">
               <p className="text-sm text-port-warning font-medium flex items-center gap-2">
                 <Play size={14} /> Already running in PM2
@@ -299,7 +331,7 @@ export default function CreateApp() {
           )}
 
           {/* No Provider Warning */}
-          {detected && !activeProvider && !standardizing && !standardizeResult && (
+          {detected && !activeProvider && !standardizing && !standardizeResult && !isNonPm2 && (
             <div className="mt-3 p-3 bg-port-border/50 border border-port-border rounded-lg">
               <p className="text-xs text-gray-400">
                 <span className="text-port-warning">⚠</span> No LLM provider configured. PM2 standardization skipped.
@@ -384,52 +416,58 @@ export default function CreateApp() {
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">UI Port</label>
-                <input
-                  type="number"
-                  value={uiPort}
-                  onChange={(e) => setUiPort(e.target.value)}
-                  placeholder="3000"
-                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
-                />
+            {/* Port fields - only for PM2/server apps */}
+            {!isNonPm2 && (
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">UI Port</label>
+                  <input
+                    type="number"
+                    value={uiPort}
+                    onChange={(e) => setUiPort(e.target.value)}
+                    placeholder="3000"
+                    className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Dev UI Port</label>
+                  <input
+                    type="number"
+                    value={devUiPort}
+                    onChange={(e) => setDevUiPort(e.target.value)}
+                    placeholder="3001"
+                    className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">API Port</label>
+                  <input
+                    type="number"
+                    value={apiPort}
+                    onChange={(e) => setApiPort(e.target.value)}
+                    placeholder="3002"
+                    className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Dev UI Port</label>
-                <input
-                  type="number"
-                  value={devUiPort}
-                  onChange={(e) => setDevUiPort(e.target.value)}
-                  placeholder="3001"
-                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">API Port</label>
-                <input
-                  type="number"
-                  value={apiPort}
-                  onChange={(e) => setApiPort(e.target.value)}
-                  placeholder="3002"
-                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
-                />
-              </div>
-            </div>
+            )}
 
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Start Commands (one per line)</label>
-              <textarea
-                value={startCommands}
-                onChange={(e) => setStartCommands(e.target.value)}
-                placeholder="npm run dev"
-                rows={2}
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden font-mono text-sm"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Commands to start your app. Multiple lines = multiple PM2 processes.
-              </p>
-            </div>
+            {/* Start commands - only for PM2/server apps */}
+            {!isNonPm2 && (
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Start Commands (one per line)</label>
+                <textarea
+                  value={startCommands}
+                  onChange={(e) => setStartCommands(e.target.value)}
+                  placeholder="npm run dev"
+                  rows={2}
+                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Commands to start your app. Multiple lines = multiple PM2 processes.
+                </p>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm text-gray-400 mb-1">Build Command</label>
@@ -437,27 +475,30 @@ export default function CreateApp() {
                 type="text"
                 value={buildCommand}
                 onChange={(e) => setBuildCommand(e.target.value)}
-                placeholder="npm run build"
+                placeholder={isNonPm2 ? 'xcodebuild -scheme MyApp build' : 'npm run build'}
                 className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden font-mono text-sm"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Command to build the production UI. Enables the Build button.
+                {isNonPm2 ? 'Command to build the project.' : 'Command to build the production UI. Enables the Build button.'}
               </p>
             </div>
 
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">PM2 Process Names (comma-separated)</label>
-              <input
-                type="text"
-                value={pm2Names}
-                onChange={(e) => setPm2Names(e.target.value)}
-                placeholder="my-app-ui, my-app-api"
-                className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Names for PM2 processes. Leave blank to auto-generate from app name.
-              </p>
-            </div>
+            {/* PM2 process names - only for PM2/server apps */}
+            {!isNonPm2 && (
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">PM2 Process Names (comma-separated)</label>
+                <input
+                  type="text"
+                  value={pm2Names}
+                  onChange={(e) => setPm2Names(e.target.value)}
+                  placeholder="my-app-ui, my-app-api"
+                  className="w-full px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white focus:border-port-accent focus:outline-hidden"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Names for PM2 processes. Leave blank to auto-generate from app name.
+                </p>
+              </div>
+            )}
           </div>
         )}
 

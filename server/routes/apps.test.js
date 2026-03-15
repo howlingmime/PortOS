@@ -31,7 +31,9 @@ vi.mock('../services/history.js', () => ({
 }));
 
 vi.mock('../services/streamingDetect.js', () => ({
-  parseEcosystemFromPath: vi.fn()
+  parseEcosystemFromPath: vi.fn(),
+  usesPm2: vi.fn((type) => !new Set(['ios-native', 'macos-native', 'xcode', 'swift']).has(type)),
+  NON_PM2_TYPES: new Set(['ios-native', 'macos-native', 'xcode', 'swift'])
 }));
 
 vi.mock('../services/appUpdater.js', () => ({

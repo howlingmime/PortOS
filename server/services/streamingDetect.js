@@ -5,6 +5,12 @@ import { homedir } from 'os';
 import { execPm2 } from './pm2.js';
 import { safeJSONParse } from '../lib/fileUtils.js';
 
+/** App types that do not use PM2 for process management */
+export const NON_PM2_TYPES = new Set(['ios-native', 'macos-native', 'xcode', 'swift']);
+
+/** Check if an app type uses PM2 for process management */
+export const usesPm2 = (type) => !NON_PM2_TYPES.has(type);
+
 /**
  * Parse ecosystem.config.js/cjs to extract all processes with their ports
  * Uses regex parsing since we can't safely execute arbitrary JS
@@ -393,6 +399,52 @@ export async function streamDetection(socket, dirPath) {
   const files = entries.map(e => e.name);
   emit('files', 'done', { message: `Found ${files.length} files`, files: files.slice(0, 20) });
 
+  // Detect Swift/Xcode projects from directory contents
+  const hasXcodeproj = files.some(f => f.endsWith('.xcodeproj') || f.endsWith('.xcworkspace'));
+  const hasProjectYml = files.includes('project.yml');
+  const hasPackageSwift = files.includes('Package.swift');
+
+  if (hasXcodeproj || hasProjectYml || hasPackageSwift) {
+    // Parse project.yml for XcodeGen projects
+    if (hasProjectYml) {
+      const ymlContent = await readFile(join(dirPath, 'project.yml'), 'utf-8').catch(() => '');
+      const nameMatch = ymlContent.match(/^name:\s*(.+)$/m);
+      if (nameMatch) result.name = nameMatch[1].trim();
+
+      // Detect platform from targets
+      const platformMatch = ymlContent.match(/platform:\s*\[?([^\]\n]+)/);
+      if (platformMatch) {
+        const platforms = platformMatch[1].toLowerCase();
+        if (platforms.includes('ios') && platforms.includes('macos')) {
+          result.type = 'xcode';
+        } else if (platforms.includes('ios')) {
+          result.type = 'ios-native';
+        } else if (platforms.includes('macos')) {
+          result.type = 'macos-native';
+        } else {
+          result.type = 'xcode';
+        }
+      } else {
+        result.type = 'xcode';
+      }
+
+      // Extract build command
+      result.buildCommand = 'xcodebuild -scheme ' + result.name + ' build';
+    } else if (hasPackageSwift) {
+      result.type = 'swift';
+      result.buildCommand = 'swift build';
+    } else {
+      // .xcodeproj without project.yml
+      const xcodeprojDir = files.find(f => f.endsWith('.xcodeproj'));
+      const schemeName = xcodeprojDir?.replace('.xcodeproj', '') || result.name;
+      result.type = 'xcode';
+      result.buildCommand = 'xcodebuild -scheme ' + schemeName + ' build';
+    }
+
+    result.startCommands = [];
+    result.pm2ProcessNames = [];
+  }
+
   // Step 3: Read package.json
   emit('package', 'running', { message: 'Reading package.json...' });
   const pkgPath = join(dirPath, 'package.json');
@@ -542,55 +594,59 @@ export async function streamDetection(socket, dirPath) {
     configFiles
   });
 
-  // Step 5: Check PM2 status
-  emit('pm2', 'running', { message: 'Checking PM2 processes...' });
-  // Use custom PM2_HOME if detected from ecosystem config
-  const pm2Env = result.pm2Home ? { ...process.env, PM2_HOME: result.pm2Home } : undefined;
-  const { stdout } = await execPm2(['jlist'], pm2Env ? { env: pm2Env } : {}).catch(() => ({ stdout: '[]' }));
-  // pm2 jlist may output ANSI codes and warnings before JSON
-  let jsonStart = stdout.indexOf('[{');
-  if (jsonStart < 0) {
-    const emptyMatch = stdout.match(/\[\](?![0-9])/);
-    jsonStart = emptyMatch ? stdout.indexOf(emptyMatch[0]) : -1;
-  }
-  const pm2Json = jsonStart >= 0 ? stdout.slice(jsonStart) : '[]';
-  const pm2Processes = safeJSONParse(pm2Json, []);
-
-  // Look for processes that might be this app
-  const possibleNames = [
-    result.name,
-    result.name.toLowerCase(),
-    result.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-    `${result.name}-ui`,
-    `${result.name}-api`
-  ];
-
-  const matchingProcesses = pm2Processes.filter(p =>
-    possibleNames.some(name => p.name.includes(name) || name.includes(p.name))
-  );
-
-  if (matchingProcesses.length > 0) {
-    result.pm2Status = matchingProcesses.map(p => ({
-      name: p.name,
-      status: p.pm2_env?.status,
-      pid: p.pid
-    }));
-    // Use actual found PM2 process names
-    result.pm2ProcessNames = matchingProcesses.map(p => p.name);
-    emit('pm2', 'done', {
-      message: `Found ${matchingProcesses.length} running process(es)`,
-      pm2Status: result.pm2Status,
-      pm2ProcessNames: result.pm2ProcessNames
-    });
+  // Step 5: Check PM2 status (skip for non-PM2 app types)
+  if (!usesPm2(result.type)) {
+    emit('pm2', 'skipped', { message: `Not applicable for ${result.type} apps` });
   } else {
-    emit('pm2', 'done', { message: 'No matching PM2 processes found' });
-    // Generate PM2 process names only if none found from ecosystem.config
-    if (result.pm2ProcessNames.length === 0) {
-      const baseName = result.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-      if (result.type === 'vite+express') {
-        result.pm2ProcessNames = [`${baseName}-ui`, `${baseName}-api`];
-      } else {
-        result.pm2ProcessNames = [baseName];
+    emit('pm2', 'running', { message: 'Checking PM2 processes...' });
+    // Use custom PM2_HOME if detected from ecosystem config
+    const pm2Env = result.pm2Home ? { ...process.env, PM2_HOME: result.pm2Home } : undefined;
+    const { stdout } = await execPm2(['jlist'], pm2Env ? { env: pm2Env } : {}).catch(() => ({ stdout: '[]' }));
+    // pm2 jlist may output ANSI codes and warnings before JSON
+    let jsonStart = stdout.indexOf('[{');
+    if (jsonStart < 0) {
+      const emptyMatch = stdout.match(/\[\](?![0-9])/);
+      jsonStart = emptyMatch ? stdout.indexOf(emptyMatch[0]) : -1;
+    }
+    const pm2Json = jsonStart >= 0 ? stdout.slice(jsonStart) : '[]';
+    const pm2Processes = safeJSONParse(pm2Json, []);
+
+    // Look for processes that might be this app
+    const possibleNames = [
+      result.name,
+      result.name.toLowerCase(),
+      result.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+      `${result.name}-ui`,
+      `${result.name}-api`
+    ];
+
+    const matchingProcesses = pm2Processes.filter(p =>
+      possibleNames.some(name => p.name.includes(name) || name.includes(p.name))
+    );
+
+    if (matchingProcesses.length > 0) {
+      result.pm2Status = matchingProcesses.map(p => ({
+        name: p.name,
+        status: p.pm2_env?.status,
+        pid: p.pid
+      }));
+      // Use actual found PM2 process names
+      result.pm2ProcessNames = matchingProcesses.map(p => p.name);
+      emit('pm2', 'done', {
+        message: `Found ${matchingProcesses.length} running process(es)`,
+        pm2Status: result.pm2Status,
+        pm2ProcessNames: result.pm2ProcessNames
+      });
+    } else {
+      emit('pm2', 'done', { message: 'No matching PM2 processes found' });
+      // Generate PM2 process names only if none found from ecosystem.config
+      if (result.pm2ProcessNames.length === 0) {
+        const baseName = result.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        if (result.type === 'vite+express') {
+          result.pm2ProcessNames = [`${baseName}-ui`, `${baseName}-api`];
+        } else {
+          result.pm2ProcessNames = [baseName];
+        }
       }
     }
   }

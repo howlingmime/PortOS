@@ -14,7 +14,7 @@ import { validateRequest, appSchema, appUpdateSchema, sanitizeTaskMetadata } fro
 import * as git from '../services/git.js';
 import { asyncHandler, ServerError } from '../lib/errorHandler.js';
 import { safeJSONParse } from '../lib/fileUtils.js';
-import { parseEcosystemFromPath } from '../services/streamingDetect.js';
+import { parseEcosystemFromPath, usesPm2 } from '../services/streamingDetect.js';
 
 const router = Router();
 
@@ -66,6 +66,11 @@ router.get('/', asyncHandler(async (req, res) => {
 
   // Enrich with PM2 status and auto-populate processes if needed
   const enriched = await Promise.all(apps.map(async (app) => {
+    // Non-PM2 apps skip PM2 enrichment entirely
+    if (!usesPm2(app.type)) {
+      return { ...app, pm2Status: {}, overallStatus: 'n/a' };
+    }
+
     const pm2Home = app.pm2Home || null;
     const pm2Map = pm2Maps.get(pm2Home) || new Map();
 
@@ -127,22 +132,27 @@ router.get('/', asyncHandler(async (req, res) => {
 router.get('/:id', loadApp, asyncHandler(async (req, res) => {
   const app = req.loadedApp;
 
-  // Get PM2 status for each process (using app's custom PM2_HOME if set)
-  const statuses = {};
-  for (const processName of app.pm2ProcessNames || []) {
-    const status = await pm2Service.getAppStatus(processName, app.pm2Home).catch(() => ({ status: 'unknown' }));
-    statuses[processName] = status;
-  }
+  // Non-PM2 apps skip PM2 status
+  let statuses = {};
+  let overallStatus = 'n/a';
 
-  // Compute overall status (same logic as list endpoint)
-  const statusValues = Object.values(statuses);
-  let overallStatus = 'unknown';
-  if (statusValues.some(s => s.status === 'online')) {
-    overallStatus = 'online';
-  } else if (statusValues.some(s => s.status === 'stopped')) {
-    overallStatus = 'stopped';
-  } else if (statusValues.every(s => s.status === 'not_found')) {
-    overallStatus = 'not_started';
+  if (usesPm2(app.type)) {
+    // Get PM2 status for each process (using app's custom PM2_HOME if set)
+    for (const processName of app.pm2ProcessNames || []) {
+      const status = await pm2Service.getAppStatus(processName, app.pm2Home).catch(() => ({ status: 'unknown' }));
+      statuses[processName] = status;
+    }
+
+    // Compute overall status (same logic as list endpoint)
+    const statusValues = Object.values(statuses);
+    overallStatus = 'unknown';
+    if (statusValues.some(s => s.status === 'online')) {
+      overallStatus = 'online';
+    } else if (statusValues.some(s => s.status === 'stopped')) {
+      overallStatus = 'stopped';
+    } else if (statusValues.every(s => s.status === 'not_found')) {
+      overallStatus = 'not_started';
+    }
   }
 
   // Auto-derive uiPort/apiPort/devUiPort from processes when not explicitly set
@@ -303,6 +313,10 @@ router.put('/:id/task-types/:taskType', asyncHandler(async (req, res) => {
 router.post('/:id/start', loadApp, asyncHandler(async (req, res) => {
   const app = req.loadedApp;
 
+  if (!usesPm2(app.type)) {
+    throw new ServerError(`${app.type} apps cannot be started via PM2`, { status: 400, code: 'NOT_PM2_APP' });
+  }
+
   const processNames = app.pm2ProcessNames || [app.name.toLowerCase().replace(/\s+/g, '-')];
 
   // Check if ecosystem config exists - prefer using it for proper env var handling
@@ -342,6 +356,11 @@ router.post('/:id/start', loadApp, asyncHandler(async (req, res) => {
 // POST /api/apps/:id/stop - Stop app
 router.post('/:id/stop', loadApp, asyncHandler(async (req, res) => {
   const app = req.loadedApp;
+
+  if (!usesPm2(app.type)) {
+    throw new ServerError(`${app.type} apps cannot be stopped via PM2`, { status: 400, code: 'NOT_PM2_APP' });
+  }
+
   const results = {};
 
   for (const name of app.pm2ProcessNames || []) {
@@ -360,6 +379,10 @@ router.post('/:id/stop', loadApp, asyncHandler(async (req, res) => {
 // POST /api/apps/:id/restart - Restart app
 router.post('/:id/restart', loadApp, asyncHandler(async (req, res) => {
   const app = req.loadedApp;
+
+  if (!usesPm2(app.type)) {
+    throw new ServerError(`${app.type} apps cannot be restarted via PM2`, { status: 400, code: 'NOT_PM2_APP' });
+  }
 
   // Self-restart: respond first, then restart after a delay so the response reaches the client
   if (app.id === PORTOS_APP_ID) {
@@ -425,15 +448,15 @@ router.post('/:id/build', loadApp, asyncHandler(async (req, res) => {
   const buildCommand = app.buildCommand || 'npm run build';
   const [cmd, ...args] = buildCommand.split(/\s+/);
 
-  // Only allow npm/npx as build commands
-  if (!['npm', 'npx'].includes(cmd)) {
-    throw new ServerError('Build command must start with npm or npx', { status: 400, code: 'INVALID_BUILD_COMMAND' });
+  if (!ALLOWED_BUILD_CMDS.has(cmd)) {
+    throw new ServerError(`Build command '${cmd}' is not allowed. Allowed: ${[...ALLOWED_BUILD_CMDS].join(', ')}`, { status: 400, code: 'INVALID_BUILD_COMMAND' });
   }
 
   console.log(`🔨 Building ${app.name}: ${buildCommand}`);
 
-  // Install dependencies before building (root + common subdirs)
-  for (const sub of ['', 'client', 'server', 'admin']) {
+  // Install dependencies before building (root + common subdirs) - skip for non-Node apps
+  const isNodeApp = ['npm', 'npx'].includes(cmd);
+  for (const sub of isNodeApp ? ['', 'client', 'server', 'admin'] : []) {
     const subDir = sub ? join(app.repoPath, sub) : app.repoPath;
     if (existsSync(join(subDir, 'package.json'))) {
       const label = sub || 'root';
@@ -508,6 +531,11 @@ router.post('/:id/build', loadApp, asyncHandler(async (req, res) => {
 // GET /api/apps/:id/status - Get PM2 status
 router.get('/:id/status', loadApp, asyncHandler(async (req, res) => {
   const app = req.loadedApp;
+
+  if (!usesPm2(app.type)) {
+    return res.json({});
+  }
+
   const statuses = {};
 
   for (const name of app.pm2ProcessNames || []) {
@@ -534,6 +562,16 @@ router.get('/:id/logs', loadApp, asyncHandler(async (req, res) => {
 
   res.json({ processName, lines, logs });
 }));
+
+// Allowlist of safe build commands
+const ALLOWED_BUILD_CMDS = new Set([
+  'npm',        // Node.js
+  'npx',        // Node.js
+  'xcodebuild', // Xcode
+  'swift',      // Swift Package Manager
+  'make',       // Make
+  'cargo'       // Rust
+]);
 
 // Allowlist of safe editor commands
 // Security: Only allow known-safe editor commands to prevent arbitrary code execution
@@ -660,6 +698,10 @@ router.post('/:id/open-folder', loadApp, asyncHandler(async (req, res) => {
 // POST /api/apps/:id/refresh-config - Re-parse ecosystem config for PM2 processes
 router.post('/:id/refresh-config', loadApp, asyncHandler(async (req, res) => {
   const app = req.loadedApp;
+
+  if (!usesPm2(app.type)) {
+    return res.json({ success: true, updated: false, app, processes: [] });
+  }
 
   if (!existsSync(app.repoPath)) {
     throw new ServerError('App path does not exist', { status: 400, code: 'PATH_NOT_FOUND' });

@@ -182,7 +182,7 @@ export const appSchema = z.object({
   apiPort: z.number().int().min(1).max(65535).nullable().optional(),
   buildCommand: z.string().max(200).optional(),
   uiUrl: z.string().url().optional(),
-  startCommands: z.array(z.string()).min(1).optional(),
+  startCommands: z.array(z.string()).optional(),
   pm2ProcessNames: z.array(z.string()).optional(),
   processes: z.array(processSchema).optional(), // Per-process port configs from ecosystem.config
   envFile: z.string().optional(),
