@@ -16,6 +16,7 @@ import { brainEvents } from './brainStorage.js';
 import { moltworldWsEvents } from './moltworldWs.js';
 import { queueEvents } from './moltworldQueue.js';
 import { instanceEvents } from './instanceEvents.js';
+import { reviewEvents } from './review.js';
 import * as shellService from './shell.js';
 import {
   validateSocketData,
@@ -472,6 +473,9 @@ export function initSocket(io) {
   // Set up instance event forwarding
   setupInstanceEventForwarding();
 
+  // Set up review hub event forwarding
+  setupReviewEventForwarding();
+
   // Set up peer agent event forwarding
   setupPeerAgentEventForwarding();
 
@@ -675,6 +679,22 @@ function setupPeerAgentEventForwarding() {
   instanceEvents.on('peer:agent:updated', (data) => broadcastToInstances('instances:peer:agent:updated', data));
   instanceEvents.on('peer:agent:output', (data) => broadcastToInstances('instances:peer:agent:output', data));
   instanceEvents.on('peer:agent:completed', (data) => broadcastToInstances('instances:peer:agent:completed', data));
+}
+
+// Set up review event forwarding (idempotent — safe if called more than once)
+let reviewForwardingSetup = false;
+function setupReviewEventForwarding() {
+  if (reviewForwardingSetup) return;
+  reviewForwardingSetup = true;
+  reviewEvents.on('item:created', (data) => {
+    if (ioInstance) ioInstance.emit('review:item:created', data);
+  });
+  reviewEvents.on('item:updated', (data) => {
+    if (ioInstance) ioInstance.emit('review:item:updated', data);
+  });
+  reviewEvents.on('item:deleted', (data) => {
+    if (ioInstance) ioInstance.emit('review:item:deleted', data);
+  });
 }
 
 // Set up update event forwarding (idempotent — safe if called more than once)

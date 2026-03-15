@@ -201,6 +201,7 @@ const navItems = [
     ]
   },
   { to: '/post', label: 'POST', icon: Zap, single: true },
+  { to: '/review', label: 'Review Hub', icon: ClipboardList, single: true },
   { to: '/security', label: 'Security', icon: Camera, single: true },
   { to: '/settings', label: 'Settings', icon: Settings, single: true },
   { to: '/shell', label: 'Shell', icon: SquareTerminal, single: true },
@@ -638,6 +639,7 @@ export default function Layout() {
             location.pathname.startsWith('/meatspace') ||
             location.pathname.startsWith('/messages') ||
             location.pathname === '/post' ||
+            location.pathname === '/review' ||
             location.pathname.startsWith('/agents') ||
             location.pathname === '/shell' ||
             location.pathname.startsWith('/city') ||

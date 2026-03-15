@@ -21,6 +21,7 @@ import Insights from './pages/Insights';
 import Instances from './pages/Instances';
 import MeatSpace from './pages/MeatSpace';
 import Post from './pages/Post';
+import Review from './pages/Review';
 
 // Auto-reload on stale chunk errors (e.g., after a rebuild changes chunk hashes)
 // Uses sessionStorage to prevent infinite reload loops (max 1 reload per session)
@@ -117,6 +118,7 @@ export default function App() {
           <Route path="meatspace" element={<Navigate to="/meatspace/overview" replace />} />
           <Route path="meatspace/:tab" element={<MeatSpace />} />
           <Route path="post" element={<Post />} />
+          <Route path="review" element={<Review />} />
           <Route path="messages" element={<Navigate to="/messages/inbox" replace />} />
           <Route path="messages/:tab" element={<Messages />} />
           <Route path="datadog" element={<Navigate to="/devtools/datadog" replace />} />

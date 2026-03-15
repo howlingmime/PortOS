@@ -11,6 +11,7 @@ import DecisionLogWidget from '../components/DecisionLogWidget';
 import DeathClockWidget from '../components/DeathClockWidget';
 import QuickBrainCapture from '../components/QuickBrainCapture';
 import QuickTaskWidget from '../components/QuickTaskWidget';
+import ReviewHubCard from '../components/ReviewHubCard';
 import * as api from '../services/api';
 import socket from '../services/socket';
 
@@ -132,6 +133,7 @@ export default function Dashboard() {
 
       {/* Row 4 — Status, stats, decisions */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <ReviewHubCard />
         <SystemHealthWidget />
         <BackupWidget />
         <DeathClockWidget />
