@@ -13,6 +13,7 @@ import {
   XCircle
 } from 'lucide-react';
 import BrailleSpinner from '../components/BrailleSpinner';
+import MarkdownOutput from '../components/cos/MarkdownOutput';
 import * as api from '../services/api';
 import socket from '../services/socket';
 
@@ -163,8 +164,8 @@ export default function Review() {
               <FileText size={18} className="text-gray-400" />
               Daily Briefing
             </h3>
-            <div className="text-gray-400 text-sm whitespace-pre-wrap max-h-48 overflow-y-auto">
-              {briefing.content}
+            <div className="text-gray-400 text-sm max-h-48 overflow-y-auto">
+              <MarkdownOutput content={briefing.content} />
             </div>
             <p className="text-gray-600 text-xs mt-2">
               Source: {briefing.source} &middot; {new Date(briefing.generatedAt).toLocaleString()}
@@ -299,7 +300,9 @@ function ReviewItem({ item, config, isEditing, onComplete, onDismiss, onDelete, 
               {item.title}
             </p>
             {item.description && (
-              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{item.description}</p>
+              <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                <MarkdownOutput content={item.description} />
+              </div>
             )}
             <p className="text-xs text-gray-600 mt-1">
               {new Date(item.createdAt).toLocaleString()}
