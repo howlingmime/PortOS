@@ -380,9 +380,9 @@ export default function TaskAddForm({ providers, apps, onTaskAdded, compact = fa
               onChange={(e) => setUseWorktree(e.target.checked)}
               className="w-4 h-4 rounded border-port-border bg-port-bg text-port-accent focus:ring-port-accent focus:ring-offset-0"
             />
-            <span className="flex items-center gap-1.5 text-sm text-gray-400">
+            <span className="flex items-center gap-1.5 text-sm text-gray-400" title="Work in an isolated git worktree on a feature branch, then open a PR. If unchecked, commits directly to the default branch.">
               <GitBranch size={14} className="text-emerald-400" />
-              Branch + PR
+              Worktree + PR
             </span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer select-none whitespace-nowrap min-h-[44px]">

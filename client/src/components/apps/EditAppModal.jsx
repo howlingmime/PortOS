@@ -246,7 +246,7 @@ export default function EditAppModal({ app, onClose, onSave }) {
               className="rounded border-port-border bg-port-bg text-port-accent focus:ring-port-accent"
             />
             <GitBranch size={14} className="text-emerald-400" />
-            <span className="text-sm text-white">Default to Branch + PR for new tasks</span>
+            <span className="text-sm text-white" title="When checked, new tasks default to working in an isolated git worktree on a feature branch, then opening a PR. When unchecked, agents commit directly to the default branch.">Default to Worktree + PR for new tasks</span>
           </label>
 
           {/* JIRA Integration Section */}

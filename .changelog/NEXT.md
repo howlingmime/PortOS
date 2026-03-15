@@ -13,3 +13,4 @@
 
 - **Apps page crash** — Fixed `Cannot access 'isNonPm2' before initialization` error caused by self-referencing variable declaration in Apps.jsx
 - **Memory display truncation** — Show full memory text in CoS Memory tab and Telegram notifications instead of truncating to 100-200 characters
+- **CoS task form clarity** — Renamed "Branch + PR" to "Worktree + PR" across task form, schedule tab, and app settings with descriptive tooltips explaining that unchecked means commits go directly to the default branch

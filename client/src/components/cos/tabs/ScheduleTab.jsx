@@ -42,7 +42,7 @@ function toggleMetadataField(metadata, field) {
 }
 
 const AGENT_OPTIONS = [
-  { field: 'useWorktree', label: 'Use Worktree', shortLabel: 'WT', description: 'Run in isolated git worktree with branch + PR' },
+  { field: 'useWorktree', label: 'Worktree + PR', shortLabel: 'WT', description: 'Work in an isolated git worktree on a feature branch, then open a PR. If unchecked, commits directly to the default branch.' },
   { field: 'simplify', label: 'Run /simplify', shortLabel: '/s', description: 'Review code for reuse and quality before committing' }
 ];
 
