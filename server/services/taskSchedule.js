@@ -540,6 +540,40 @@ Summarize:
 
 IMPORTANT: Always use \`git pull --rebase --autostash\` before pushing (dev branch gets auto-bumped by CI). Never use \`git push\` alone.`,
 
+  'jira-sprint-manager': `[Improvement: {appName}] JIRA Sprint Manager
+
+Triage and implement JIRA tickets for {appName}:
+
+Repository: {repoPath}
+
+## Phase 1 — Triage
+
+1. Call GET /api/apps to find the app config for {appName} (match by name or repoPath)
+2. Get the app's JIRA config: jira.instanceId and jira.projectKey
+3. Call GET /api/jira/instances/:instanceId/my-sprint-tickets/:projectKey to get tickets assigned to me in current sprint
+4. For each ticket, evaluate what needs to be done next:
+   a) Needs clarification or better requirements? Create a Review Hub todo via POST /api/review/todo with title "[TICKET-KEY] Needs clarification" and description listing the questions
+   b) Blocked or needs discussion? Create a Review Hub todo with title "[TICKET-KEY] Blocked" and description explaining the blockers
+   c) Well-defined and ready to work? Mark it as a candidate for implementation
+5. Prioritize tickets marked as HIGH or Blocker
+
+Do NOT comment on JIRA tickets directly — all action items go to the Review Hub so the user can review them in one place.
+
+## Phase 2 — Implement
+
+6. From the triage results, select the highest priority ticket in "To Do" or "Ready" status that is well-defined
+7. For the selected ticket:
+   - Implement the ticket requirements in {repoPath}
+   - Commit changes and push the branch
+   - Create a merge request using gh CLI or glab CLI (detect from git remote)
+   - Transition the ticket to "In Review" status
+   - Add a comment to JIRA with the MR link
+8. If no tickets are ready to implement, skip Phase 2
+
+## Phase 3 — Report
+
+9. Generate a summary report covering triage actions taken and implementation work completed`,
+
   'pr-reviewer': `[Improvement: {appName}] PR Review — Check Open PRs
 
 Review open pull requests / merge requests on {appName} from other contributors and post code reviews on any that lack a review since the last commit.
@@ -709,7 +743,7 @@ export const SELF_IMPROVEMENT_TASK_TYPES = [
   'security', 'code-quality', 'test-coverage', 'performance',
   'accessibility', 'console-errors', 'dependency-updates', 'documentation',
   'ui-bugs', 'mobile-responsive', 'feature-ideas', 'error-handling',
-  'typing', 'release-check', 'pr-reviewer'
+  'typing', 'release-check', 'pr-reviewer', 'jira-sprint-manager'
 ];
 
 const DEFAULT_TASK_INTERVALS = {
@@ -727,7 +761,8 @@ const DEFAULT_TASK_INTERVALS = {
   'error-handling':      { type: INTERVAL_TYPES.ROTATION, enabled: false, providerId: null, model: null, prompt: null },
   'typing':              { type: INTERVAL_TYPES.ONCE, enabled: false, providerId: null, model: null, prompt: null },
   'release-check':       { type: INTERVAL_TYPES.ON_DEMAND, enabled: false, providerId: null, model: null, prompt: null },
-  'pr-reviewer':         { type: INTERVAL_TYPES.CUSTOM, intervalMs: 7200000, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null }
+  'pr-reviewer':         { type: INTERVAL_TYPES.CUSTOM, intervalMs: 7200000, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null },
+  'jira-sprint-manager': { type: INTERVAL_TYPES.DAILY, enabled: false, weekdaysOnly: true, optIn: true, providerId: null, model: null, prompt: null, taskMetadata: { useWorktree: true, simplify: true } }
 };
 
 /**
@@ -1045,9 +1080,17 @@ export async function shouldRunTask(taskType, appId = null) {
 
   // Check per-app override
   if (appId) {
-    const enabledForApp = await isTaskTypeEnabledForApp(appId, taskType);
-    if (!enabledForApp) {
-      return { shouldRun: false, reason: 'disabled-for-app' };
+    if (interval.optIn) {
+      // Opt-in tasks require explicit per-app enablement (default: disabled)
+      const overrides = await getAppTaskTypeOverrides(appId);
+      if (overrides[taskType]?.enabled !== true) {
+        return { shouldRun: false, reason: 'opt-in-not-enabled' };
+      }
+    } else {
+      const enabledForApp = await isTaskTypeEnabledForApp(appId, taskType);
+      if (!enabledForApp) {
+        return { shouldRun: false, reason: 'disabled-for-app' };
+      }
     }
   }
 
@@ -1325,6 +1368,10 @@ export async function getScheduleStatus() {
     const check = await shouldRunTask(taskType);
 
     // Build per-app overrides map and count enabled apps
+    // Opt-in tasks default to disabled; standard tasks default to enabled
+    const isEnabledForApp = interval.optIn
+      ? (override) => override?.enabled === true
+      : (override) => !override || override.enabled !== false;
     const appOverrides = {};
     let enabledAppCount = 0;
     const allOverrides = await Promise.all(activeApps.map(app => getAppTaskTypeOverrides(app.id)));
@@ -1332,12 +1379,12 @@ export async function getScheduleStatus() {
       const override = allOverrides[i][taskType];
       if (override) {
         appOverrides[activeApps[i].id] = {
-          enabled: override.enabled !== false,
+          enabled: isEnabledForApp(override),
           interval: override.interval || null,
           ...(override.taskMetadata && { taskMetadata: override.taskMetadata })
         };
       }
-      if (!override || override.enabled !== false) {
+      if (isEnabledForApp(override)) {
         enabledAppCount++;
       }
     }
@@ -1509,7 +1556,8 @@ function getTaskTypeDescription(taskType) {
     'release-check': 'Check dev for release readiness',
     'error-handling': 'Improve error handling',
     'typing': 'Improve TypeScript types',
-    'pr-reviewer': 'Review open PRs from contributors'
+    'pr-reviewer': 'Review open PRs from contributors',
+    'jira-sprint-manager': 'Triage and implement JIRA sprint tickets'
   };
   return descriptions[taskType] || taskType.replace(/-/g, ' ');
 }

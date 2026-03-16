@@ -1237,11 +1237,14 @@ async function queueEligibleImprovementTasks(state, cosTaskData) {
   if (!improvementEnabled) return;
 
   // Get existing pending/in_progress system tasks to avoid duplicates
+  // Also skip task types where a user-terminated blocked task exists (user intentionally killed it)
   const existingTasks = cosTaskData.tasks || [];
   const existingTaskTypes = new Set();
 
   for (const task of existingTasks) {
-    if (task.status === 'pending' || task.status === 'in_progress') {
+    const isActive = task.status === 'pending' || task.status === 'in_progress';
+    const isUserTerminated = task.status === 'blocked' && task.metadata?.blockedCategory === 'user-terminated';
+    if (isActive || isUserTerminated) {
       const analysisType = task.metadata?.analysisType ||
         task.metadata?.selfImprovementType ||
         task.description?.match(/\[(?:self-improvement|improvement)\]\s*(\w[\w-]*)/i)?.[1];
@@ -1316,7 +1319,8 @@ function getSelfImprovementTaskDescription(taskType) {
     'dependency-updates': 'Check for and safely update outdated dependencies',
     'error-handling': 'Improve error handling patterns and recovery logic',
     'typing': 'Add or fix TypeScript/JSDoc type annotations',
-    'release-check': 'Verify release readiness (changelog, version, tests)'
+    'release-check': 'Verify release readiness (changelog, version, tests)',
+    'jira-sprint-manager': 'Triage and implement JIRA sprint tickets (worktree+PR)'
   };
   return descriptions[taskType] || null;
 }
@@ -1339,7 +1343,8 @@ function getAppImprovementTaskDescription(taskType, app) {
     'ui-bugs': `Review UI for visual bugs in ${app.name}`,
     'mobile-responsive': `Check mobile responsiveness of ${app.name}`,
     'feature-ideas': `Implement a feature idea for ${app.name} aligned with GOALS.md (worktree+PR)`,
-    'release-check': `Verify release readiness for ${app.name}`
+    'release-check': `Verify release readiness for ${app.name}`,
+    'jira-sprint-manager': `Triage and implement JIRA sprint tickets for ${app.name} (worktree+PR)`
   };
   return descriptions[taskType] || null;
 }
