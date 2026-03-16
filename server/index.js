@@ -49,6 +49,7 @@ import datadogRoutes from './routes/datadog.js';
 import jiraRoutes from './routes/jira.js';
 import autobiographyRoutes from './routes/autobiography.js';
 import backupRoutes from './routes/backup.js';
+import databaseRoutes from './routes/database.js';
 import searchRoutes from './routes/search.js';
 import identityRoutes from './routes/identity.js';
 import instancesRoutes from './routes/instances.js';
@@ -210,6 +211,7 @@ app.use('/api/screenshots', screenshotsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/attachments', attachmentsRoutes);
 app.use('/api/backup', backupRoutes);
+app.use('/api/database', databaseRoutes);
 app.use('/api/uploads', uploadsRoutes);
 // Agent Personalities feature routes (must be before /api/agents to avoid route conflicts)
 app.use('/api/agents/personalities', agentPersonalitiesRoutes);

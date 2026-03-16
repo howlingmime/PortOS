@@ -1825,3 +1825,13 @@ export default {
   }),
   delete: (endpoint, options) => request(endpoint, { method: 'DELETE', ...options })
 };
+
+// Database
+export const getDatabaseStatus = () => request('/database/status');
+export const switchDatabase = (target, migrate = false) => request('/database/switch', {
+  method: 'POST',
+  body: JSON.stringify({ target, migrate })
+});
+export const setupNativeDatabase = () => request('/database/setup-native', { method: 'POST' });
+export const exportDatabase = () => request('/database/export', { method: 'POST' });
+export const fixDatabase = () => request('/database/fix', { method: 'POST' });

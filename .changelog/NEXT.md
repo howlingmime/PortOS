@@ -11,6 +11,8 @@
 
 - **Review Briefing Fullscreen** — Daily Briefing section in Review Hub now has a fullscreen toggle button and increased default content height for better readability
 
+- **Database Management UI** — Switch between Docker and native PostgreSQL from the Settings page. Shows live status of both backends with connection health and memory count. Migrate data between backends with one click. Export database, install/setup native PostgreSQL, and fix stale PID files — all from the UI with real-time progress via WebSocket
+
 ## Changed
 
 - **CoS feature-ideas task** — Agents now implement the next unchecked PLAN.md item instead of inventing features. When user clarification is needed, agents create a `.plan-questions.md` marker and a `plan_question` notification linking to the Documents tab. Added `{appId}` template variable for prompt linking.

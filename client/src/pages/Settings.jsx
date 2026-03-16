@@ -1,8 +1,13 @@
-import { useState, useEffect } from 'react';
-import { Save, Plus, X, Eye, EyeOff, Trash2, Send } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Save, Plus, X, Eye, EyeOff, Trash2, Send, Database, Container, HardDrive, Download, ArrowRightLeft, Wrench, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import BrailleSpinner from '../components/BrailleSpinner';
-import { getSettings, updateSettings, getTelegramStatus, updateTelegramConfig, deleteTelegramConfig, testTelegram, updateTelegramForwardTypes } from '../services/api';
+import {
+  getSettings, updateSettings, getTelegramStatus, updateTelegramConfig,
+  deleteTelegramConfig, testTelegram, updateTelegramForwardTypes,
+  getDatabaseStatus, switchDatabase, setupNativeDatabase, exportDatabase, fixDatabase
+} from '../services/api';
+import socket from '../services/socket';
 
 const NOTIFICATION_TYPES = [
   { key: 'memory_approval', label: 'Memory Approvals' },
@@ -13,6 +18,274 @@ const NOTIFICATION_TYPES = [
   { key: 'autobiography_prompt', label: 'Autobiography Prompts' },
   { key: 'plan_question', label: 'Plan Questions' }
 ];
+
+function DatabaseSection() {
+  const [dbStatus, setDbStatus] = useState(null);
+  const [dbLoading, setDbLoading] = useState(true);
+  const [switching, setSwitching] = useState(false);
+  const [settingUp, setSettingUp] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [fixing, setFixing] = useState(false);
+  const [progressMsg, setProgressMsg] = useState('');
+  const [confirmSwitch, setConfirmSwitch] = useState(null); // { target, migrate }
+  const progressTimer = useRef(null);
+
+  const loadStatus = useCallback(() => {
+    setDbLoading(true);
+    getDatabaseStatus()
+      .then(setDbStatus)
+      .catch(() => toast.error('Failed to load database status'))
+      .finally(() => setDbLoading(false));
+  }, []);
+
+  useEffect(() => {
+    loadStatus();
+
+    const handleProgress = (data) => {
+      clearTimeout(progressTimer.current);
+      setProgressMsg(data.message || '');
+      if (data.event === 'complete') {
+        progressTimer.current = setTimeout(() => setProgressMsg(''), 3000);
+        loadStatus();
+      }
+      if (data.event === 'error') {
+        progressTimer.current = setTimeout(() => setProgressMsg(''), 5000);
+      }
+    };
+
+    socket.on('database:progress', handleProgress);
+    return () => {
+      socket.off('database:progress', handleProgress);
+      clearTimeout(progressTimer.current);
+    };
+  }, [loadStatus]);
+
+  const handleSwitch = async (target, migrate) => {
+    setConfirmSwitch(null);
+    setSwitching(true);
+    switchDatabase(target, migrate)
+      .then(() => {
+        toast.success(`Switched to ${target}${migrate ? ' with data migration' : ''}`);
+        loadStatus();
+      })
+      .catch(() => toast.error(`Failed to switch to ${target}`))
+      .finally(() => setSwitching(false));
+  };
+
+  const handleSetupNative = () => {
+    setSettingUp(true);
+    setupNativeDatabase()
+      .then(() => {
+        toast.success('Native PostgreSQL installed and configured');
+        loadStatus();
+      })
+      .catch(() => toast.error('Native setup failed'))
+      .finally(() => setSettingUp(false));
+  };
+
+  const handleExport = () => {
+    setExporting(true);
+    exportDatabase()
+      .then((result) => toast.success(`Exported to ${result.dumpFile}`))
+      .catch(() => toast.error('Export failed'))
+      .finally(() => setExporting(false));
+  };
+
+  const handleFix = () => {
+    setFixing(true);
+    fixDatabase()
+      .then((result) => {
+        toast.success(result.success ? 'Database fixed' : 'Fix attempt completed');
+        loadStatus();
+      })
+      .catch(() => toast.error('Fix failed'))
+      .finally(() => setFixing(false));
+  };
+
+  const isDoingWork = switching || settingUp || exporting || fixing;
+  const currentMode = dbStatus?.mode;
+  const targetMode = currentMode === 'docker' ? 'native' : 'docker';
+  const targetAvailable = targetMode === 'docker'
+    ? dbStatus?.docker?.installed && dbStatus?.docker?.daemonRunning
+    : dbStatus?.native?.configured;
+
+  return (
+    <div className="bg-port-card border border-port-border rounded-xl p-6 space-y-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+          <Database size={20} />
+          Database
+        </h2>
+        <button
+          onClick={loadStatus}
+          disabled={dbLoading}
+          className="p-1.5 text-gray-400 hover:text-white transition-colors"
+          title="Refresh status"
+        >
+          <RefreshCw size={14} className={dbLoading ? 'animate-spin' : ''} />
+        </button>
+      </div>
+
+      {dbLoading && !dbStatus ? (
+        <BrailleSpinner text="Loading database status" />
+      ) : dbStatus ? (
+        <>
+          {/* Status overview */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-port-bg border border-port-border rounded-lg p-3 space-y-1.5">
+              <div className="flex items-center gap-2 text-sm text-gray-400">
+                <Container size={14} />
+                Docker
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${dbStatus.docker?.containerRunning ? 'bg-port-success' : dbStatus.docker?.installed ? 'bg-port-warning' : 'bg-gray-600'}`} />
+                <span className="text-sm text-white">
+                  {dbStatus.docker?.containerRunning ? 'Running' : dbStatus.docker?.installed ? 'Stopped' : 'Not installed'}
+                </span>
+              </div>
+              {currentMode === 'docker' && (
+                <span className="inline-block text-xs px-1.5 py-0.5 bg-port-accent/20 text-port-accent rounded">Active</span>
+              )}
+            </div>
+
+            <div className="bg-port-bg border border-port-border rounded-lg p-3 space-y-1.5">
+              <div className="flex items-center gap-2 text-sm text-gray-400">
+                <HardDrive size={14} />
+                Native
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${dbStatus.native?.running ? 'bg-port-success' : dbStatus.native?.configured ? 'bg-port-warning' : 'bg-gray-600'}`} />
+                <span className="text-sm text-white">
+                  {dbStatus.native?.running ? 'Running' : dbStatus.native?.configured ? 'Stopped' : dbStatus.native?.installed ? 'Not configured' : 'Not installed'}
+                </span>
+              </div>
+              {currentMode === 'native' && (
+                <span className="inline-block text-xs px-1.5 py-0.5 bg-port-accent/20 text-port-accent rounded">Active</span>
+              )}
+            </div>
+          </div>
+
+          {/* Connection info */}
+          <div className="flex items-center gap-3 text-sm">
+            <span className={`w-2 h-2 rounded-full ${dbStatus.connected ? 'bg-port-success' : 'bg-port-error'}`} />
+            <span className="text-gray-300">
+              {dbStatus.connected ? 'Connected' : 'Disconnected'}
+              {dbStatus.memoryCount != null && ` \u2014 ${dbStatus.memoryCount.toLocaleString()} memories`}
+            </span>
+          </div>
+
+          {/* Progress indicator */}
+          {progressMsg && (
+            <div className="flex items-center gap-2 text-sm text-port-accent bg-port-accent/10 border border-port-accent/20 rounded-lg px-3 py-2">
+              <BrailleSpinner />
+              {progressMsg}
+            </div>
+          )}
+
+          {/* Confirmation dialog */}
+          {confirmSwitch && (
+            <div className="bg-port-bg border border-port-warning/30 rounded-lg p-4 space-y-3">
+              <p className="text-sm text-white">
+                Switch to <strong>{confirmSwitch.target}</strong>
+                {confirmSwitch.migrate ? ' and migrate all data' : ' without migrating data'}?
+              </p>
+              {confirmSwitch.migrate && (
+                <p className="text-xs text-gray-400">
+                  This will export data from the current database, stop it, start the target, and import the data. The process may take a moment.
+                </p>
+              )}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleSwitch(confirmSwitch.target, confirmSwitch.migrate)}
+                  disabled={isDoingWork}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-port-warning/20 hover:bg-port-warning/30 text-port-warning text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {switching ? <BrailleSpinner /> : <ArrowRightLeft size={14} />}
+                  Confirm
+                </button>
+                <button
+                  onClick={() => setConfirmSwitch(null)}
+                  className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          {!confirmSwitch && (
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Switch with migration */}
+              {targetAvailable && (
+                <button
+                  onClick={() => setConfirmSwitch({ target: targetMode, migrate: true })}
+                  disabled={isDoingWork}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-port-accent hover:bg-port-accent/80 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                  title={`Switch to ${targetMode} and migrate data`}
+                >
+                  <ArrowRightLeft size={14} />
+                  Migrate to {targetMode === 'docker' ? 'Docker' : 'Native'}
+                </button>
+              )}
+
+              {/* Switch without migration */}
+              {targetAvailable && (
+                <button
+                  onClick={() => setConfirmSwitch({ target: targetMode, migrate: false })}
+                  disabled={isDoingWork}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-port-border hover:bg-port-border/70 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                  title={`Switch to ${targetMode} without migrating data`}
+                >
+                  <ArrowRightLeft size={14} />
+                  Switch only
+                </button>
+              )}
+
+              {/* Setup/install native */}
+              {!dbStatus.native?.configured && (
+                <button
+                  onClick={handleSetupNative}
+                  disabled={isDoingWork}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-port-border hover:bg-port-border/70 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {settingUp ? <BrailleSpinner /> : <HardDrive size={14} />}
+                  {dbStatus.native?.installed ? 'Setup' : 'Install'} Native
+                </button>
+              )}
+
+              {/* Export */}
+              <button
+                onClick={handleExport}
+                disabled={isDoingWork || !dbStatus.connected}
+                className="flex items-center gap-2 px-3 py-1.5 bg-port-border hover:bg-port-border/70 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                title="Export database to SQL dump"
+              >
+                {exporting ? <BrailleSpinner /> : <Download size={14} />}
+                Export
+              </button>
+
+              {/* Fix */}
+              {!dbStatus.connected && (
+                <button
+                  onClick={handleFix}
+                  disabled={isDoingWork}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-port-error/20 hover:bg-port-error/30 text-port-error text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                  title="Fix stale PID files and other issues"
+                >
+                  {fixing ? <BrailleSpinner /> : <Wrench size={14} />}
+                  Fix
+                </button>
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="text-sm text-gray-500">Unable to load database status</p>
+      )}
+    </div>
+  );
+}
 
 export default function Settings() {
   const [loading, setLoading] = useState(true);
@@ -209,6 +482,9 @@ export default function Settings() {
           Save
         </button>
       </div>
+
+      {/* Database */}
+      <DatabaseSection />
 
       {/* Telegram */}
       <div className="bg-port-card border border-port-border rounded-xl p-6 space-y-5">
