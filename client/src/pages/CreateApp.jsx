@@ -17,6 +17,7 @@ const DETECTION_STEPS_PM2 = [
   { id: 'config', label: 'Checking configs' },
   { id: 'pm2', label: 'Checking PM2' },
   { id: 'readme', label: 'Reading README' },
+  { id: 'icon', label: 'Detecting app icon' },
   { id: 'standardize', label: 'Standardizing PM2 config' }
 ];
 
@@ -25,7 +26,8 @@ const DETECTION_STEPS_NON_PM2 = [
   { id: 'files', label: 'Scanning files' },
   { id: 'package', label: 'Reading project config' },
   { id: 'config', label: 'Checking configs' },
-  { id: 'readme', label: 'Reading README' }
+  { id: 'readme', label: 'Reading README' },
+  { id: 'icon', label: 'Detecting app icon' }
 ];
 
 export default function CreateApp() {
@@ -52,6 +54,7 @@ export default function CreateApp() {
   const [pm2Names, setPm2Names] = useState('');
   const [pm2Status, setPm2Status] = useState(null);
   const [icon, setIcon] = useState('package');
+  const [appIconPath, setAppIconPath] = useState(null);
   const [appType, setAppType] = useState('unknown');
 
   // Submit state
@@ -116,6 +119,7 @@ export default function CreateApp() {
         if (result.buildCommand) setBuildCommand(result.buildCommand);
         if (result.startCommands?.length) setStartCommands(result.startCommands.join('\n'));
         if (result.pm2ProcessNames?.length) setPm2Names(result.pm2ProcessNames.join(', '));
+        if (result.appIconPath) setAppIconPath(result.appIconPath);
       } else if (err) {
         setError(err);
       }
@@ -185,6 +189,7 @@ export default function CreateApp() {
       repoPath,
       type: appType !== 'unknown' ? appType : undefined,
       icon,
+      appIconPath: appIconPath || undefined,
       uiPort: uiPort ? parseInt(uiPort, 10) : null,
       devUiPort: devUiPort ? parseInt(devUiPort, 10) : null,
       apiPort: apiPort ? parseInt(apiPort, 10) : null,
@@ -221,6 +226,7 @@ export default function CreateApp() {
     setPm2Names('');
     setPm2Status(null);
     setIcon('package');
+    setAppIconPath(null);
     setError(null);
     setStandardizing(false);
     setStandardizeResult(null);

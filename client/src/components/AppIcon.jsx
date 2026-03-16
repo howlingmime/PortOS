@@ -1,6 +1,8 @@
 // App icons - SVG icons for different app types
 // Each icon follows the 24x24 viewBox pattern used by lucide-react
 
+import { useState } from 'react';
+
 const icons = {
   // PortOS - portal/gateway logo (from Logo.jsx)
   portos: ({ size, className }) => (
@@ -166,10 +168,42 @@ const icons = {
 // List of available icon names for the picker
 export const iconNames = Object.keys(icons);
 
-export default function AppIcon({ icon, size = 24, className = '', ariaLabel }) {
+/**
+ * Construct the API URL for an app's icon image.
+ * Uses window.location to work across Tailscale.
+ */
+function getAppIconUrl(appId) {
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname;
+  const port = window.location.port;
+  const base = port ? `${protocol}//${hostname}:${port}` : `${protocol}//${hostname}`;
+  return `${base}/api/apps/${appId}/icon`;
+}
+
+export default function AppIcon({ icon, appId, hasAppIcon, size = 24, className = '', ariaLabel }) {
+  const [imgError, setImgError] = useState(false);
+
+  // Show real app icon image if the app has one detected
+  // Image fills its parent container completely (parent controls size)
+  if (hasAppIcon && appId && !imgError) {
+    const imgEl = (
+      <img
+        src={getAppIconUrl(appId)}
+        alt={ariaLabel || ''}
+        className={`w-full h-full rounded object-cover ${className}`}
+        onError={() => setImgError(true)}
+      />
+    );
+
+    if (ariaLabel) {
+      return <span role="img" aria-label={ariaLabel}>{imgEl}</span>;
+    }
+    return <span aria-hidden="true">{imgEl}</span>;
+  }
+
+  // Fall back to SVG icon
   const IconComponent = icons[icon] || icons.package;
 
-  // If ariaLabel is provided, make it accessible; otherwise treat as decorative
   if (ariaLabel) {
     return (
       <span role="img" aria-label={ariaLabel}>
@@ -178,7 +212,6 @@ export default function AppIcon({ icon, size = 24, className = '', ariaLabel }) 
     );
   }
 
-  // Decorative icon - hidden from assistive technology
   return (
     <span aria-hidden="true">
       <IconComponent size={size} className={className} />

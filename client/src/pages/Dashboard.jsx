@@ -48,9 +48,13 @@ export default function Dashboard() {
     };
   }, [fetchData]);
 
-  // Sort apps: active first, archived last
+  // Sort apps: active first, archived last, alphabetical within each group
   const sortedApps = useMemo(() =>
-    [...apps].sort((a, b) => (a.archived ? 1 : 0) - (b.archived ? 1 : 0)),
+    [...apps].sort((a, b) => {
+      const archiveDiff = (a.archived ? 1 : 0) - (b.archived ? 1 : 0);
+      if (archiveDiff !== 0) return archiveDiff;
+      return a.name.localeCompare(b.name);
+    }),
     [apps]
   );
 

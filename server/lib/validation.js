@@ -187,6 +187,7 @@ export const appSchema = z.object({
   processes: z.array(processSchema).optional(), // Per-process port configs from ecosystem.config
   envFile: z.string().optional(),
   icon: z.string().nullable().optional(),
+  appIconPath: z.string().nullable().optional(), // Absolute path to detected app icon image
   editorCommand: z.string().optional(),
   description: z.string().optional(),
   archived: z.boolean().optional().default(false),

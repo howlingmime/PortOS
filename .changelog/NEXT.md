@@ -7,6 +7,8 @@
 
 - **POST Deep Routes & Elements Expansion** — POST section now uses deep-linkable routes (`/post/launcher`, `/post/memory`, `/post/history`, `/post/config`, `/post/memory/elements`) instead of internal state switching. Sidebar nav expanded to collapsible section with sub-pages. Added 16 missing elements (103-118, Lawrencium through Oganesson) to the periodic table and element map. New appendix verse set for memorizing the post-Lehrer elements. Fixed missing Mercury (Hg) in periodic table grid. Period 7 now shows all elements. Interactive periodic table with hover tooltips, click-to-highlight verse, search filter, mastery/category view toggle, and element category color coding.
 
+- **App Icon Detection** — Apps can now display their actual project icon (favicon, Xcode AppIcon, etc.) instead of generic SVG icons. Auto-detects icons from well-known paths during app import and config refresh. Supports Xcode/iOS AppIcon.appiconset, web favicons, logos, and common icon locations. Icon served via `GET /api/apps/:id/icon` with fallback to SVG icons. Bulk "Detect Icons" button on Apps page. Apps sorted alphabetically on both Dashboard and Apps pages. App icons shown in Apps list rows.
+
 ## Changed
 
 - **CoS feature-ideas task** — Agents now implement the next unchecked PLAN.md item instead of inventing features. When user clarification is needed, agents create a `.plan-questions.md` marker and a `plan_question` notification linking to the Documents tab. Added `{appId}` template variable for prompt linking.

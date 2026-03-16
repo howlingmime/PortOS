@@ -4,6 +4,7 @@ import { join, basename } from 'path';
 import { homedir } from 'os';
 import { execPm2 } from './pm2.js';
 import { safeJSONParse } from '../lib/fileUtils.js';
+import { detectAppIcon } from './appIconDetect.js';
 
 /** App types that do not use PM2 for process management */
 export const NON_PM2_TYPES = new Set(['ios-native', 'macos-native', 'xcode', 'swift']);
@@ -371,7 +372,8 @@ export async function streamDetection(socket, dirPath) {
     pm2Status: null,
     processes: [],
     pm2Home: null,
-    type: 'unknown'
+    type: 'unknown',
+    appIconPath: null
   };
 
   // Step 1: Validate path
@@ -676,6 +678,16 @@ export async function streamDetection(socket, dirPath) {
     }
   } else {
     emit('readme', 'skipped', { message: 'Description already found in package.json' });
+  }
+
+  // Step 7: Detect app icon
+  emit('icon', 'running', { message: 'Looking for app icon...' });
+  const detectedIcon = await detectAppIcon(dirPath, result.type);
+  if (detectedIcon) {
+    result.appIconPath = detectedIcon;
+    emit('icon', 'done', { message: `Found: ${basename(detectedIcon)}`, appIconPath: detectedIcon });
+  } else {
+    emit('icon', 'done', { message: 'No app icon found' });
   }
 
   // Complete

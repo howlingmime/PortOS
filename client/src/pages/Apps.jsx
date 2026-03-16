@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ExternalLink, Play, Square, RotateCcw, FolderOpen, Terminal, Code, RefreshCw, Wrench, Archive, ArchiveRestore, ChevronDown, ChevronUp, Ticket, GitBranch, Download, Hammer, Smartphone } from 'lucide-react';
+import { ExternalLink, Play, Square, RotateCcw, FolderOpen, Terminal, Code, RefreshCw, Wrench, Archive, ArchiveRestore, ChevronDown, ChevronUp, Ticket, GitBranch, Download, Hammer, Smartphone, Image } from 'lucide-react';
 import toast from 'react-hot-toast';
+import AppIcon from '../components/AppIcon';
 import BrailleSpinner from '../components/BrailleSpinner';
 import KanbanBoard from '../components/KanbanBoard';
 import StatusBadge from '../components/StatusBadge';
@@ -128,10 +129,21 @@ export default function Apps() {
     toast.success(`${app.name} unarchived - included in COS tasks`);
   };
 
+  const [detectingIcons, setDetectingIcons] = useState(false);
+  const handleDetectIcons = async () => {
+    setDetectingIcons(true);
+    const result = await api.detectAppIcons().catch(() => null);
+    setDetectingIcons(false);
+    if (result) {
+      toast.success(`Detected icons for ${result.detected} of ${result.total} apps`);
+    }
+  };
+
   // Filter apps based on archive status
   const activeApps = apps.filter(app => !app.archived);
   const archivedApps = apps.filter(app => app.archived);
-  const displayedApps = showArchived ? archivedApps : activeApps;
+  const displayedApps = (showArchived ? archivedApps : activeApps)
+    .slice().sort((a, b) => a.name.localeCompare(b.name));
 
   if (loading) {
     return (
@@ -150,6 +162,15 @@ export default function Apps() {
           <p className="text-gray-500 text-sm sm:text-base">Manage registered applications</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleDetectIcons}
+            disabled={detectingIcons}
+            className="px-3 py-2 rounded-lg text-sm flex items-center gap-2 bg-port-border text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+            title="Detect app icons from project directories"
+          >
+            <Image size={16} />
+            {detectingIcons ? 'Detecting...' : 'Detect Icons'}
+          </button>
           {/* Archive Toggle */}
           {archivedApps.length > 0 && (
             <button
@@ -214,6 +235,11 @@ export default function Apps() {
                     >
                       <span aria-hidden="true" className={`inline-block transition-transform ${expandedId === app.id ? 'rotate-90' : ''}`}>▶</span>
                     </button>
+                    <div className={`w-8 h-8 rounded shrink-0 overflow-hidden ${
+                      app.appIconPath ? '' : `flex items-center justify-center ${app.archived ? 'bg-port-border/50 text-gray-500' : 'bg-port-border text-port-accent'}`
+                    }`}>
+                      <AppIcon icon={app.icon || 'package'} appId={app.id} hasAppIcon={!!app.appIconPath} size={18} />
+                    </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link to={`/apps/${app.id}`} className={`font-medium hover:underline ${app.archived ? 'text-gray-400' : 'text-white'}`}>{app.name}</Link>

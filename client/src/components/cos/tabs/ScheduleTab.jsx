@@ -503,7 +503,7 @@ function AppOverrideRow({ app, taskType, globalIntervalType, globalTaskMetadata,
   return (
     <div className="flex items-center gap-3 py-2 px-3 rounded hover:bg-port-card/30">
       <div className="flex items-center gap-2 min-w-0 flex-1">
-        <AppIcon icon={app.icon || 'package'} size={16} className="text-gray-400 shrink-0" />
+        <AppIcon icon={app.icon || 'package'} appId={app.id} hasAppIcon={!!app.appIconPath} size={16} className="text-gray-400 shrink-0" />
         <span className="text-sm text-white truncate">{app.name}</span>
       </div>
 

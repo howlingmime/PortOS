@@ -15,6 +15,7 @@ import * as git from '../services/git.js';
 import { asyncHandler, ServerError } from '../lib/errorHandler.js';
 import { safeJSONParse } from '../lib/fileUtils.js';
 import { parseEcosystemFromPath, usesPm2 } from '../services/streamingDetect.js';
+import { detectAppIcon, getIconContentType } from '../services/appIconDetect.js';
 
 const router = Router();
 
@@ -182,6 +183,31 @@ router.get('/:id', loadApp, asyncHandler(async (req, res) => {
   res.json({ ...app, uiPort, devUiPort, apiPort, overallStatus, pm2Status: statuses, appVersion });
 }));
 
+// GET /api/apps/:id/icon - Serve the app's detected icon image
+router.get('/:id/icon', loadApp, asyncHandler(async (req, res) => {
+  const app = req.loadedApp;
+
+  // Use stored appIconPath, or detect on-the-fly
+  let iconPath = app.appIconPath;
+  if (!iconPath || !existsSync(iconPath)) {
+    iconPath = await detectAppIcon(app.repoPath, app.type);
+    // Persist the detected path for future requests
+    if (iconPath && iconPath !== app.appIconPath) {
+      await appsService.updateApp(app.id, { appIconPath: iconPath });
+    }
+  }
+
+  if (!iconPath || !existsSync(iconPath)) {
+    return res.status(404).json({ error: 'No app icon found' });
+  }
+
+  const contentType = getIconContentType(iconPath);
+  const iconData = await readFile(iconPath);
+  res.set('Content-Type', contentType);
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send(iconData);
+}));
+
 // POST /api/apps - Create new app
 router.post('/', asyncHandler(async (req, res, next) => {
   const data = validateRequest(appSchema, req.body);
@@ -256,6 +282,29 @@ router.put('/bulk-task-type/:taskType', asyncHandler(async (req, res) => {
   const result = await appsService.bulkUpdateAppTaskTypeOverride(req.params.taskType, { enabled });
   console.log(`📋 Bulk ${enabled ? 'enabled' : 'disabled'} task type ${req.params.taskType} for ${result.count} apps`);
   res.json({ success: true, taskType: req.params.taskType, enabled, appsUpdated: result.count });
+}));
+
+// POST /api/apps/detect-icons - Detect and persist app icons for all apps
+router.post('/detect-icons', asyncHandler(async (req, res) => {
+  const apps = await appsService.getAllApps();
+  let detected = 0;
+
+  for (const app of apps) {
+    if (!app.repoPath || !existsSync(app.repoPath)) continue;
+    // Skip apps that already have a valid icon path
+    if (app.appIconPath && existsSync(app.appIconPath)) continue;
+
+    const iconPath = await detectAppIcon(app.repoPath, app.type);
+    if (iconPath) {
+      await appsService.updateApp(app.id, { appIconPath: iconPath });
+      detected++;
+      console.log(`🎨 Detected icon for ${app.name}: ${iconPath.split('/').pop()}`);
+    }
+  }
+
+  if (detected > 0) notifyAppsChanged('detect-icons');
+  console.log(`🎨 Icon detection complete: ${detected}/${apps.length} apps`);
+  res.json({ success: true, detected, total: apps.length });
 }));
 
 // GET /api/apps/:id/task-types - Get per-app task type overrides
@@ -752,6 +801,12 @@ router.post('/:id/refresh-config', loadApp, asyncHandler(async (req, res) => {
     if (devUiProc) updates.devUiPort = devUiProc.ports.devUi;
 
     updates.uiPort = deriveUiPort(updates.uiPort, updates.apiPort, updates.devUiPort || app.devUiPort);
+  }
+
+  // Detect app icon if not already set
+  if (!app.appIconPath || !existsSync(app.appIconPath)) {
+    const detectedIcon = await detectAppIcon(app.repoPath, app.type);
+    if (detectedIcon) updates.appIconPath = detectedIcon;
   }
 
   // Only update if we have changes
