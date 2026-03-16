@@ -10,7 +10,9 @@ import {
   FileText,
   Pencil,
   Check,
-  XCircle
+  XCircle,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import BrailleSpinner from '../components/BrailleSpinner';
 import MarkdownOutput from '../components/cos/MarkdownOutput';
@@ -31,6 +33,7 @@ export default function Review() {
   const [newTodo, setNewTodo] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [filter, setFilter] = useState('pending');
+  const [briefingFullscreen, setBriefingFullscreen] = useState(false);
 
   const fetchItems = useCallback(async () => {
     const params = filter === 'all' ? {} : { status: filter };
@@ -159,12 +162,21 @@ export default function Review() {
 
         {/* Daily Briefing */}
         {briefing && briefing.source !== 'none' && (
-          <section className="bg-port-card border border-port-border rounded-lg p-4">
-            <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
-              <FileText size={18} className="text-gray-400" />
-              Daily Briefing
-            </h3>
-            <div className="text-gray-400 text-sm max-h-48 overflow-y-auto">
+          <section className={`bg-port-card border border-port-border rounded-lg p-4 ${briefingFullscreen ? 'fixed inset-0 z-50 overflow-y-auto m-0 rounded-none' : ''}`}>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <FileText size={18} className="text-gray-400" />
+                Daily Briefing
+              </h3>
+              <button
+                onClick={() => setBriefingFullscreen(prev => !prev)}
+                className="p-1.5 text-gray-500 hover:text-white transition-colors rounded-md hover:bg-white/5"
+                title={briefingFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              >
+                {briefingFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              </button>
+            </div>
+            <div className={`text-gray-400 text-sm overflow-y-auto ${briefingFullscreen ? '' : 'max-h-96'}`}>
               <MarkdownOutput content={briefing.content} />
             </div>
             <p className="text-gray-600 text-xs mt-2">

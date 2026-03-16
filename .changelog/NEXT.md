@@ -9,6 +9,8 @@
 
 - **App Icon Detection** — Apps can now display their actual project icon (favicon, Xcode AppIcon, etc.) instead of generic SVG icons. Auto-detects icons from well-known paths during app import and config refresh. Supports Xcode/iOS AppIcon.appiconset, web favicons, logos, and common icon locations. Icon served via `GET /api/apps/:id/icon` with fallback to SVG icons. Bulk "Detect Icons" button on Apps page. Apps sorted alphabetically on both Dashboard and Apps pages. App icons shown in Apps list rows.
 
+- **Review Briefing Fullscreen** — Daily Briefing section in Review Hub now has a fullscreen toggle button and increased default content height for better readability
+
 ## Changed
 
 - **CoS feature-ideas task** — Agents now implement the next unchecked PLAN.md item instead of inventing features. When user clarification is needed, agents create a `.plan-questions.md` marker and a `plan_question` notification linking to the Documents tab. Added `{appId}` template variable for prompt linking.
