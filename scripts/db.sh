@@ -237,8 +237,19 @@ start_native() {
     exit 1
   fi
 
-  # Clean stale pid if needed — use credential-free pg_ctl status to avoid
-  # false negatives from SCRAM auth when the server is actually running
+  # If already running and accepting connections, nothing to do
+  if [ -f "$datadir/postmaster.pid" ] && pg_ctl -D "$datadir" status >/dev/null 2>&1; then
+    if PGPASSWORD="$PGPASSWORD" pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" >/dev/null 2>&1; then
+      log "Native PostgreSQL already running on port $PGPORT"
+      return
+    fi
+    # Running but not accepting connections on our port — stop and restart
+    warn "Native PostgreSQL running but not accepting connections — restarting..."
+    pg_ctl -D "$datadir" stop -m fast 2>/dev/null || true
+    rm -f "$datadir/postmaster.pid"
+  fi
+
+  # Clean stale pid if process is gone
   if [ -f "$datadir/postmaster.pid" ]; then
     if ! pg_ctl -D "$datadir" status >/dev/null 2>&1; then
       warn "Removing stale postmaster.pid..."

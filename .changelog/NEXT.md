@@ -24,6 +24,8 @@
 
 ## Fixed
 
+- **Database sync/migrate failures** — Fixed `start_native` in db.sh crashing when native PostgreSQL was already running (pg_ctl "another server might be running" error). Rewrote sync route to use a temporary port (5562) for the target backend so the active database never goes down during sync — eliminates pool errors and connection drops
+
 - **Self-build crash** — Fixed PortOS build button killing the server mid-build. `npm install` in `server/` triggered PM2's file watcher restart (SIGINT) which killed the build child process. Self-builds now skip server install (already running) and use `shell: true` for proper PATH resolution. Build error messages now include exit code, signal, and stdout/stderr output.
 
 - **Apps page crash** — Fixed `Cannot access 'isNonPm2' before initialization` error caused by self-referencing variable declaration in Apps.jsx

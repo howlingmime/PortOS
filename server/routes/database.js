@@ -246,40 +246,73 @@ router.post('/switch', asyncHandler(async (req, res) => {
   res.json({ success: true, output: switchResult.stdout + '\n' + startResult.stdout });
 }));
 
+const SYNC_PORT = '5562';
+const pgPort = process.env.PGPORT || '5561';
+const pgUser = process.env.PGUSER || 'portos';
+const pgDb = process.env.PGDATABASE || 'portos';
+const pgPassword = process.env.PGPASSWORD || 'portos';
+
 /**
- * Stop both PostgreSQL backends directly (not mode-dependent).
- * Safe to call even if one or both are already stopped.
+ * Start the target backend on a temporary port for sync import.
+ * Returns a cleanup function to stop the temporary backend.
+ * The active backend stays running on the main port untouched.
  */
-async function stopAllBackends() {
-  await Promise.all([
-    runCmd('docker', ['compose', 'stop', 'db'], 15_000),
-    runCmd('bash', ['-c',
-      `[ -f "${nativeDataDir}/postmaster.pid" ] && pg_ctl -D "${nativeDataDir}" stop -m fast 2>/dev/null; true`
-    ], 15_000)
-  ]);
+async function startTargetOnTempPort(targetMode) {
+  if (targetMode === 'native') {
+    // Start native pg on temp port — won't conflict with active backend on main port
+    const pgCtl = process.env.PG_BIN ? join(process.env.PG_BIN, 'pg_ctl') : 'pg_ctl';
+    const result = await runCmd(pgCtl, [
+      '-D', nativeDataDir, '-l', join(nativeDataDir, 'server.log'),
+      '-o', `-p ${SYNC_PORT}`, 'start'
+    ], 30_000);
+    if (result.exitCode !== 0) return { ok: false, details: result.stderr || result.stdout };
+    // Wait for ready
+    for (let i = 0; i < 15; i++) {
+      const ready = await runCmd('bash', ['-c',
+        `PGPASSWORD=${pgPassword} pg_isready -h localhost -p ${SYNC_PORT} -U ${pgUser}`
+      ], 3_000);
+      if (ready.exitCode === 0) break;
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    return {
+      ok: true,
+      cleanup: () => runCmd(pgCtl, ['-D', nativeDataDir, 'stop', '-m', 'fast'], 15_000)
+    };
+  }
+
+  // Docker: start a temporary container on the temp port using the same volume
+  const syncContainer = 'portos-db-sync';
+  await runCmd('docker', ['rm', '-f', syncContainer], 5_000);
+  const result = await runCmd('docker', [
+    'compose', 'run', '-d', '--no-deps', '--name', syncContainer,
+    '-p', `${SYNC_PORT}:5432`, 'db'
+  ], 60_000);
+  if (result.exitCode !== 0) return { ok: false, details: result.stderr || result.stdout };
+  // Wait for ready
+  for (let i = 0; i < 30; i++) {
+    const ready = await runCmd('bash', ['-c',
+      `PGPASSWORD=${pgPassword} pg_isready -h localhost -p ${SYNC_PORT} -U ${pgUser}`
+    ], 3_000);
+    if (ready.exitCode === 0) break;
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  return {
+    ok: true,
+    cleanup: () => runCmd('docker', ['rm', '-f', syncContainer], 15_000)
+  };
 }
 
 // POST /api/database/sync — copy data from active to non-active backend
-// Does NOT change which backend is active. Preserves the target's running
-// state (if it was running before sync, it stays running after).
-// Both share port 5561, so we stop both, start target, import, then restore.
+// Uses a temporary port for the target so the active backend never goes down.
 router.post('/sync', asyncHandler(async (req, res) => {
   const io = req.app.get('io');
   const emit = (event, data) => io?.emit('database:progress', { event, ...data });
 
-  // Determine current mode and whether the target was running
   const statusResult = await runDbScript(['status']);
   const currentMode = parseDbMode(statusResult.stdout);
   const targetMode = currentMode === 'docker' ? 'native' : 'docker';
-  const restoreCmd = currentMode === 'docker' ? 'use-docker' : 'use-native';
-  const targetCmd = targetMode === 'docker' ? 'use-docker' : 'use-native';
 
-  // Check if target was running before we start so we can restore that state
-  const targetWasRunning = targetMode === 'docker'
-    ? /Container portos-db is running/.test(statusResult.stdout)
-    : /Native PostgreSQL is running/.test(statusResult.stdout);
-
-  // Step 1: Export from active database
+  // Step 1: Export from active database (stays running)
   emit('start', { message: 'Exporting from active database...' });
   const exportResult = await runDbScript(['export', `sync-${Date.now()}`]);
   if (exportResult.exitCode !== 0) {
@@ -290,44 +323,24 @@ router.post('/sync', asyncHandler(async (req, res) => {
   const dumpFile = exportLines[exportLines.length - 1]?.trim();
   console.log(`🗄️ Sync: exported to ${dumpFile}`);
 
-  // Step 2: Stop both (port conflict), switch to target, start, import
-  emit('start', { message: `Importing into ${targetMode}...` });
-  await stopAllBackends();
-  await runDbScript([targetCmd]);
-  const startResult = await runDbScript(['start']);
-  if (startResult.exitCode !== 0) {
-    await stopAllBackends();
-    await runDbScript([restoreCmd]);
-    await runDbScript(['start']);
+  // Step 2: Start target on temporary port (active backend untouched)
+  emit('start', { message: `Starting ${targetMode} for import...` });
+  const target = await startTargetOnTempPort(targetMode);
+  if (!target.ok) {
     emit('error', { message: `Failed to start ${targetMode}` });
-    return res.status(500).json({ error: `Failed to start ${targetMode}`, details: startResult.stderr || startResult.stdout });
+    return res.status(500).json({ error: `Failed to start ${targetMode}`, details: target.details });
   }
 
-  const importResult = await runDbScript(['import', dumpFile]);
-  const importFailed = importResult.exitCode !== 0;
-  if (importFailed) {
-    console.error(`🗄️ Sync: import into ${targetMode} failed`);
-  }
+  // Step 3: Import into target via temp port
+  emit('start', { message: `Importing into ${targetMode}...` });
+  const importResult = await runCmd('bash', ['-c',
+    `PGPASSWORD=${pgPassword} psql -h localhost -p ${SYNC_PORT} -U ${pgUser} -d ${pgDb} -v ON_ERROR_STOP=1 --single-transaction < "${dumpFile}"`
+  ], 120_000);
 
-  // Step 3: Restore — stop target, switch back to original, start original
-  emit('start', { message: `Restoring ${currentMode}...` });
-  await stopAllBackends();
-  await runDbScript([restoreCmd]);
-  const restoreResult = await runDbScript(['start']);
-  if (restoreResult.exitCode !== 0) {
-    emit('error', { message: `Failed to restart ${currentMode}` });
-    return res.status(500).json({ error: `Failed to restart ${currentMode}`, details: restoreResult.stderr || restoreResult.stdout });
-  }
+  // Step 4: Stop temp target regardless of import result
+  await target.cleanup();
 
-  // Step 4: If target was running before sync, restart it alongside active
-  // They can coexist briefly — target will be on a different process but same port
-  // Actually they share port 5561, so we can only restart target if active is stopped
-  // Since we just started active, we can't restart target. But we can log the state.
-  if (targetWasRunning) {
-    console.log(`🗄️ Sync: ${targetMode} was running before sync but cannot restart (port 5561 conflict with active ${currentMode})`);
-  }
-
-  if (importFailed) {
+  if (importResult.exitCode !== 0) {
     emit('error', { message: `Import into ${targetMode} failed` });
     return res.status(500).json({ error: `Import into ${targetMode} failed`, details: importResult.stderr || importResult.stdout });
   }
