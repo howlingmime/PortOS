@@ -16,9 +16,9 @@ const stripAnsi = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
 /**
  * Run a command and return { stdout, stderr, exitCode }.
  */
-function runCmd(cmd, args, timeout = 120_000) {
+function runCmd(cmd, args, timeout = 120_000, env = process.env) {
   return new Promise((resolve) => {
-    execFile(cmd, args, { cwd: rootDir, timeout, env: process.env }, (err, stdout, stderr) => {
+    execFile(cmd, args, { cwd: rootDir, timeout, env }, (err, stdout, stderr) => {
       const exitCode = err ? (typeof err.code === 'number' ? err.code : 1) : 0;
       if (exitCode !== 0) {
         const detail = stripAnsi(stderr || stdout || err.message || '');
@@ -131,9 +131,10 @@ async function getNativeStats() {
  */
 async function getNativeDiskUsage() {
   const nativePort = process.env.PGPORT || '5432';
-  const result = await runCmd('bash', ['-c',
-    `PGPASSWORD=${pgPassword} psql -h localhost -p ${nativePort} -U ${pgUser} -d ${pgDb} -tAc "SELECT pg_size_pretty(pg_database_size(current_database()))"`
-  ], 5_000);
+  const result = await runCmd('psql', [
+    '-h', 'localhost', '-p', nativePort, '-U', pgUser, '-d', pgDb,
+    '-tAc', 'SELECT pg_size_pretty(pg_database_size(current_database()))'
+  ], 5_000, pgEnv(nativePort));
   if (result.exitCode !== 0) return null;
   return result.stdout.trim() || null;
 }
@@ -256,6 +257,19 @@ const pgPassword = process.env.PGPASSWORD || 'portos';
 const NATIVE_PORT = '5432';
 const DOCKER_PORT = '5561';
 
+/**
+ * Build env object with PGPASSWORD for passing to child processes.
+ * Avoids interpolating password into shell strings (shell metacharacter safety).
+ */
+const pgEnv = (port) => ({
+  ...process.env,
+  PGPASSWORD: pgPassword,
+  PGHOST: 'localhost',
+  PGPORT: String(port),
+  PGUSER: pgUser,
+  PGDATABASE: pgDb
+});
+
 // POST /api/database/sync — copy data from active to non-active backend
 // Since native (5432) and Docker (5561) use different ports, both can be
 // running simultaneously. No need to stop the active backend.
@@ -266,7 +280,6 @@ router.post('/sync', asyncHandler(async (req, res) => {
   const statusResult = await runDbScript(['status']);
   const currentMode = parseDbMode(statusResult.stdout);
   const targetMode = currentMode === 'docker' ? 'native' : 'docker';
-  const sourcePort = currentMode === 'docker' ? DOCKER_PORT : NATIVE_PORT;
   const targetPort = targetMode === 'docker' ? DOCKER_PORT : NATIVE_PORT;
 
   // Step 1: Export from active database (stays running)
@@ -282,9 +295,9 @@ router.post('/sync', asyncHandler(async (req, res) => {
 
   // Step 2: Ensure target is running
   emit('start', { message: `Checking ${targetMode} is running...` });
-  const readyResult = await runCmd('bash', ['-c',
-    `PGPASSWORD=${pgPassword} pg_isready -h localhost -p ${targetPort} -U ${pgUser}`
-  ], 5_000);
+  const readyResult = await runCmd('pg_isready', [
+    '-h', 'localhost', '-p', targetPort, '-U', pgUser
+  ], 5_000, pgEnv(targetPort));
   if (readyResult.exitCode !== 0) {
     emit('error', { message: `${targetMode} database not running on port ${targetPort}. Start it first.` });
     return res.status(400).json({ error: `${targetMode} database not running on port ${targetPort}. Start it first.` });
@@ -293,8 +306,8 @@ router.post('/sync', asyncHandler(async (req, res) => {
   // Step 3: Import into target (active backend untouched — different port)
   emit('start', { message: `Importing into ${targetMode} (port ${targetPort})...` });
   const importResult = await runCmd('bash', ['-c',
-    `PGPASSWORD=${pgPassword} psql -h localhost -p ${targetPort} -U ${pgUser} -d ${pgDb} -v ON_ERROR_STOP=1 --single-transaction < "${dumpFile}"`
-  ], 120_000);
+    `psql -h localhost -p ${targetPort} -U ${pgUser} -d ${pgDb} -v ON_ERROR_STOP=1 --single-transaction < "${dumpFile}"`
+  ], 120_000, pgEnv(targetPort));
 
   if (importResult.exitCode !== 0) {
     emit('error', { message: `Import into ${targetMode} failed` });
@@ -366,8 +379,9 @@ router.post('/destroy', asyncHandler(async (req, res) => {
   // Native: drop the portos database (system pg stays running)
   const sysUser = process.env.USER || 'portos';
   const nativePort = process.env.PGPORT || '5432';
-  const result = await runCmd('bash', ['-c',
-    `psql -h localhost -p ${nativePort} -U ${sysUser} -d postgres -c "DROP DATABASE IF EXISTS ${pgDb}"`
+  const result = await runCmd('psql', [
+    '-h', 'localhost', '-p', nativePort, '-U', sysUser, '-d', 'postgres',
+    '-c', `DROP DATABASE IF EXISTS ${pgDb}`
   ], 15_000);
   res.json({ success: result.exitCode === 0, output: result.stdout });
 }));
@@ -400,9 +414,10 @@ router.post('/export', asyncHandler(async (req, res) => {
   if (backend && ['docker', 'native'].includes(backend)) {
     // Export from a specific backend by connecting directly to its port
     const port = backend === 'docker' ? DOCKER_PORT : NATIVE_PORT;
-    const readyResult = await runCmd('bash', ['-c',
-      `PGPASSWORD=${pgPassword} pg_isready -h localhost -p ${port} -U ${pgUser}`
-    ], 5_000);
+    const env = pgEnv(port);
+    const readyResult = await runCmd('pg_isready', [
+      '-h', 'localhost', '-p', port, '-U', pgUser
+    ], 5_000, env);
     if (readyResult.exitCode !== 0) {
       return res.status(400).json({ error: `${backend} database not running on port ${port}` });
     }
@@ -410,8 +425,8 @@ router.post('/export', asyncHandler(async (req, res) => {
     await runCmd('mkdir', ['-p', dumpDir], 5_000);
     const dumpFile = join(dumpDir, `portos-${backend}-${label}.sql`);
     const result = await runCmd('bash', ['-c',
-      `PGPASSWORD=${pgPassword} pg_dump -h localhost -p ${port} -U ${pgUser} -d ${pgDb} --no-owner --no-privileges --if-exists --clean > "${dumpFile}"`
-    ], 120_000);
+      `pg_dump -h localhost -p ${port} -U ${pgUser} -d ${pgDb} --no-owner --no-privileges --if-exists --clean > "${dumpFile}"`
+    ], 120_000, env);
     if (result.exitCode !== 0) {
       return res.status(500).json({ error: 'Export failed', details: result.stderr || result.stdout });
     }

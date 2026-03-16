@@ -474,7 +474,8 @@ cmd_setup_native() {
   sys_user="$(whoami)"
   if ! psql -h "$PGHOST" -p "$PGPORT" -U "$sys_user" -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='$PGUSER'" 2>/dev/null | grep -q 1; then
     info "Creating database user: $PGUSER"
-    psql -h "$PGHOST" -p "$PGPORT" -U "$sys_user" -d postgres -c "CREATE ROLE $PGUSER WITH LOGIN PASSWORD '$PGPASSWORD' CREATEDB;"
+    psql -h "$PGHOST" -p "$PGPORT" -U "$sys_user" -d postgres \
+      -v pw="$PGPASSWORD" -v user="$PGUSER" -c "CREATE ROLE :\"user\" WITH LOGIN PASSWORD :'pw' CREATEDB;"
     log "User $PGUSER created"
   else
     log "User $PGUSER already exists"
