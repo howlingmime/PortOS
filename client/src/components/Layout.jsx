@@ -212,7 +212,15 @@ const navItems = [
   },
   { to: '/review', label: 'Review Hub', icon: ClipboardList, single: true },
   { to: '/security', label: 'Security', icon: Camera, single: true },
-  { to: '/settings', label: 'Settings', icon: Settings, single: true },
+  {
+    label: 'Settings',
+    icon: Settings,
+    children: [
+      { to: '/settings/backup', label: 'Backup', icon: Download },
+      { to: '/settings/database', label: 'Database', icon: Database },
+      { to: '/settings/telegram', label: 'Telegram', icon: MessageSquare }
+    ]
+  },
   { to: '/shell', label: 'Shell', icon: SquareTerminal, single: true },
   { to: '/agents', label: 'Social Agents', icon: Users, single: true },
   { to: '/uploads', label: 'Uploads', icon: Upload, single: true }

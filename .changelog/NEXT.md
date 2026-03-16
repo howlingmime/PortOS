@@ -11,7 +11,11 @@
 
 - **Review Briefing Fullscreen** — Daily Briefing section in Review Hub now has a fullscreen toggle button and increased default content height for better readability
 
-- **Database Management UI** — Switch between Docker and native PostgreSQL from the Settings page. Shows live status of both backends with connection health and memory count. Migrate data between backends with one click. Export database, install/setup native PostgreSQL, and fix stale PID files — all from the UI with real-time progress via WebSocket
+- **Database Management UI** — Switch between Docker and native PostgreSQL from Settings > Database. Shows live status of both backends with connection health, memory count, database size, and table count. Migrate data between backends with one click. Export database, install/setup native PostgreSQL, and fix stale PID files — all from the UI with real-time progress via WebSocket
+
+- **Settings Sub-Tabs** — Settings page split into routed tabs: Backup (`/settings/backup`), Database (`/settings/database`), Telegram (`/settings/telegram`). Sidebar nav now shows Settings as a collapsible section with sub-pages
+
+- **Instance Sync Toggle & Probe Backoff** — Per-peer sync enable/disable toggle (independent of polling). Failing probes now use exponential backoff (30s → 1m → 5m → 15m → 1h → 24h max) instead of hammering offline peers every 30 seconds. Backoff resets when peer comes back online. UI shows consecutive failure count, next probe time, and sync disabled status
 
 ## Changed
 

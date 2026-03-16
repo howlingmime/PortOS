@@ -19,6 +19,17 @@ const PROBE_TIMEOUT_MS = 5000;
 const POLL_INTERVAL_MS = 30000;
 const INITIAL_PROBE_DELAY_MS = 2000;
 
+// Backoff tiers for consecutive probe failures (in ms)
+// 30s → 1m → 5m → 15m → 1h → 24h
+const BACKOFF_TIERS_MS = [
+  30_000,      // tier 0: normal (1 failure)
+  60_000,      // tier 1: 1 minute
+  300_000,     // tier 2: 5 minutes
+  900_000,     // tier 3: 15 minutes
+  3_600_000,   // tier 4: 1 hour
+  86_400_000   // tier 5: 24 hours (max)
+];
+
 const withLock = createMutex();
 let pollTimer = null;
 
@@ -117,6 +128,9 @@ export async function addPeer({ address, port = DEFAULT_PEER_PORT, name }) {
       lastHealth: null,
       status: 'unknown',
       enabled: true,
+      syncEnabled: true,
+      consecutiveFailures: 0,
+      nextProbeAt: null,
       directions: ['outbound']
     };
     data.peers.push(entry);
@@ -148,6 +162,7 @@ export async function updatePeer(id, updates) {
     if (!peer) return null;
     if (updates.name !== undefined) peer.name = validName(updates.name, peer.name);
     if (updates.enabled !== undefined) peer.enabled = updates.enabled;
+    if (updates.syncEnabled !== undefined) peer.syncEnabled = updates.syncEnabled;
     instanceEvents.emit('peers:updated', data.peers);
     return peer;
   });
@@ -212,6 +227,22 @@ export async function probePeer(peer) {
     if (remoteHostname && /^\d+\.\d+\.\d+\.\d+$/.test(entry.name)) {
       entry.name = remoteHostname;
     }
+
+    // Backoff tracking for failed probes
+    if (status === 'online') {
+      if (entry.consecutiveFailures > 0) {
+        console.log(`🌐 Peer ${entry.name} recovered after ${entry.consecutiveFailures} consecutive failures`);
+      }
+      entry.consecutiveFailures = 0;
+      entry.nextProbeAt = null;
+    } else {
+      entry.consecutiveFailures = (entry.consecutiveFailures ?? 0) + 1;
+      const tier = Math.min(entry.consecutiveFailures - 1, BACKOFF_TIERS_MS.length - 1);
+      const backoffMs = BACKOFF_TIERS_MS[tier];
+      entry.nextProbeAt = new Date(Date.now() + backoffMs).toISOString();
+      console.log(`⏳ Peer ${entry.name} backoff tier ${tier} (${backoffMs / 1000}s), failures: ${entry.consecutiveFailures}`);
+    }
+
     return entry;
   });
 
@@ -235,7 +266,13 @@ export async function probePeer(peer) {
 
 export async function probeAllPeers() {
   const data = await loadData();
-  const enabled = data.peers.filter(p => p.enabled);
+  const now = Date.now();
+  const enabled = data.peers.filter(p => {
+    if (!p.enabled) return false;
+    // Respect backoff: skip peers whose next probe time hasn't arrived
+    if (p.nextProbeAt && new Date(p.nextProbeAt).getTime() > now) return false;
+    return true;
+  });
   if (enabled.length === 0) return;
 
   await Promise.allSettled(enabled.map(p => probePeer(p)));
@@ -305,6 +342,9 @@ export async function handleAnnounce({ address, port, instanceId, name }) {
       lastHealth: null,
       status: 'online',
       enabled: true,
+      syncEnabled: true,
+      consecutiveFailures: 0,
+      nextProbeAt: null,
       directions: ['inbound']
     };
     data.peers.push(peer);

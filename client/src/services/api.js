@@ -1835,3 +1835,16 @@ export const switchDatabase = (target, migrate = false) => request('/database/sw
 export const setupNativeDatabase = () => request('/database/setup-native', { method: 'POST' });
 export const exportDatabase = () => request('/database/export', { method: 'POST' });
 export const fixDatabase = () => request('/database/fix', { method: 'POST' });
+export const syncDatabase = () => request('/database/sync', { method: 'POST' });
+export const startDatabase = (backend) => request('/database/start', {
+  method: 'POST',
+  body: JSON.stringify({ backend })
+});
+export const stopDatabase = (backend) => request('/database/stop', {
+  method: 'POST',
+  body: JSON.stringify({ backend })
+});
+export const destroyDatabase = (backend) => request('/database/destroy', {
+  method: 'POST',
+  body: JSON.stringify({ backend })
+});

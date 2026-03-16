@@ -3,41 +3,148 @@ import { execFile } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { asyncHandler } from '../lib/errorHandler.js';
-import { checkHealth } from '../lib/db.js';
+import { checkHealth, query } from '../lib/db.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..', '..');
 const dbScript = join(rootDir, 'scripts', 'db.sh');
+const nativeDataDir = join(rootDir, 'data', 'pgdata');
 
 const router = Router();
 
 const stripAnsi = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
 /**
- * Run db.sh with given args and return { stdout, stderr, exitCode }.
- * Timeout after 120s to cover slow Docker pulls or native setup.
+ * Run a command and return { stdout, stderr, exitCode }.
  */
-function runDbScript(args) {
+function runCmd(cmd, args, timeout = 120_000) {
   return new Promise((resolve) => {
-    execFile('bash', [dbScript, ...args], {
-      cwd: rootDir,
-      timeout: 120_000,
-      env: process.env
-    }, (err, stdout, stderr) => {
+    execFile(cmd, args, { cwd: rootDir, timeout, env: process.env }, (err, stdout, stderr) => {
+      const exitCode = err ? (typeof err.code === 'number' ? err.code : 1) : 0;
+      if (exitCode !== 0) {
+        const detail = stripAnsi(stderr || stdout || err.message || '');
+        console.error(`🗄️ ${cmd} ${args.join(' ')} exited ${exitCode}:\n${detail}`);
+      }
       resolve({
         stdout: stripAnsi(stdout || ''),
         stderr: stripAnsi(stderr || ''),
-        exitCode: err?.code ?? 0
+        exitCode
       });
     });
   });
 }
 
-// GET /api/database/status — current mode, connectivity, row counts
+const runDbScript = (args) => runCmd('bash', [dbScript, ...args]);
+
+function parseDbMode(stdout) {
+  const match = stdout.match(/Current mode:\s*(\w+)/);
+  if (!match) console.warn('🗄️ Failed to parse mode from db.sh output');
+  return match?.[1] || 'docker';
+}
+
+function emitProgress(io, event, message) {
+  io?.emit('database:progress', { event, message });
+}
+
+/**
+ * Get Docker container resource stats for portos-db.
+ */
+async function getDockerStats() {
+  const result = await runCmd('docker', [
+    'stats', 'portos-db', '--no-stream', '--format',
+    '{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}'
+  ], 10_000);
+  if (result.exitCode !== 0) return null;
+  const parts = result.stdout.trim().split('\t');
+  if (parts.length < 6) return null;
+  return {
+    cpu: parts[0],
+    memUsage: parts[1],
+    memPercent: parts[2],
+    netIO: parts[3],
+    blockIO: parts[4],
+    pids: parts[5]
+  };
+}
+
+/**
+ * Get Docker volume disk usage for portos-db data volume.
+ */
+async function getDockerDiskUsage() {
+  // Get volume name and disk usage in parallel
+  const [volResult, sizeResult] = await Promise.all([
+    runCmd('docker', [
+      'inspect', 'portos-db', '--format',
+      '{{ range .Mounts }}{{ if eq .Destination "/var/lib/postgresql/data" }}{{ .Name }}{{ end }}{{ end }}'
+    ], 5_000),
+    runCmd('docker', ['system', 'df', '-v'], 10_000)
+  ]);
+  if (volResult.exitCode !== 0 || sizeResult.exitCode !== 0) return null;
+  const volName = volResult.stdout.trim();
+  if (!volName) return null;
+  for (const line of sizeResult.stdout.split('\n')) {
+    if (line.includes(volName)) {
+      const match = line.match(/(\d+(?:\.\d+)?[KMGT]?B)/i);
+      return match?.[1] || null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Get native PostgreSQL process stats via ps.
+ */
+async function getNativeStats() {
+  const result = await runCmd('bash', ['-c',
+    'ps aux | grep "[p]ostgres.*-D" | head -1'
+  ], 5_000);
+  if (result.exitCode !== 0 || !result.stdout.trim()) return null;
+  const parts = result.stdout.trim().split(/\s+/);
+  // ps aux columns: USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND
+  if (parts.length < 6) return null;
+  const pid = parts[1];
+  // Get all postgres child processes
+  const childResult = await runCmd('bash', ['-c',
+    `ps -o pid=,pcpu=,pmem=,rss= -p $(pgrep -P ${pid} | tr '\\n' ',')${pid} 2>/dev/null`
+  ], 5_000);
+  let totalCpu = 0, totalMem = 0, totalRss = 0, pids = 0;
+  if (childResult.exitCode === 0) {
+    for (const line of childResult.stdout.trim().split('\n')) {
+      const cols = line.trim().split(/\s+/);
+      if (cols.length >= 4) {
+        totalCpu += parseFloat(cols[1]) || 0;
+        totalMem += parseFloat(cols[2]) || 0;
+        totalRss += parseInt(cols[3], 10) || 0;
+        pids++;
+      }
+    }
+  }
+  return {
+    cpu: `${totalCpu.toFixed(1)}%`,
+    memUsage: `${(totalRss / 1024).toFixed(1)} MiB`,
+    memPercent: `${totalMem.toFixed(1)}%`,
+    pids: String(pids)
+  };
+}
+
+/**
+ * Get native data directory disk usage.
+ */
+async function getNativeDiskUsage() {
+  const result = await runCmd('du', ['-sh', nativeDataDir], 5_000);
+  if (result.exitCode !== 0) return null;
+  return result.stdout.trim().split('\t')[0] || null;
+}
+
+// GET /api/database/status — current mode, connectivity, row counts, resource stats
 router.get('/status', asyncHandler(async (req, res) => {
-  const [scriptResult, health] = await Promise.all([
+  const [scriptResult, health, sizeResult] = await Promise.all([
     runDbScript(['status']),
-    checkHealth()
+    checkHealth(),
+    query(`SELECT pg_database_size(current_database()) AS db_bytes,
+                  (SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public') AS table_count`)
+      .then(r => r.rows[0])
+      .catch(() => null)
   ]);
 
   // Parse mode from script output
@@ -57,16 +164,37 @@ router.get('/status', asyncHandler(async (req, res) => {
   // Parse row count
   const rowMatch = scriptResult.stdout.match(/Memories table has (\d+|N\/A) rows/);
   const memoryCount = rowMatch?.[1] === 'N/A' ? null : parseInt(rowMatch?.[1] || '0', 10);
-
   const connected = /Database is accepting connections/.test(scriptResult.stdout);
+
+  // Fetch resource stats for running backends (in parallel)
+  const [dockerStats, dockerDisk, nativeStats, nativeDisk] = await Promise.all([
+    dockerRunning ? getDockerStats() : Promise.resolve(null),
+    dockerRunning ? getDockerDiskUsage() : Promise.resolve(null),
+    nativeRunning ? getNativeStats() : Promise.resolve(null),
+    nativeConfigured ? getNativeDiskUsage() : Promise.resolve(null)
+  ]);
 
   res.json({
     mode,
     connected,
     memoryCount,
+    dbBytes: sizeResult ? parseInt(sizeResult.db_bytes, 10) : null,
+    tableCount: sizeResult ? parseInt(sizeResult.table_count, 10) : null,
     health,
-    docker: { installed: dockerInstalled, daemonRunning: dockerDaemon, containerRunning: dockerRunning },
-    native: { installed: nativeInstalled, configured: nativeConfigured, running: nativeRunning }
+    docker: {
+      installed: dockerInstalled,
+      daemonRunning: dockerDaemon,
+      containerRunning: dockerRunning,
+      stats: dockerStats,
+      diskUsage: dockerDisk
+    },
+    native: {
+      installed: nativeInstalled,
+      configured: nativeConfigured,
+      running: nativeRunning,
+      stats: nativeStats,
+      diskUsage: nativeDisk
+    }
   });
 }));
 
@@ -78,14 +206,13 @@ router.post('/switch', asyncHandler(async (req, res) => {
   }
 
   const io = req.app.get('io');
-
   const emit = (event, data) => io?.emit('database:progress', { event, ...data });
 
   if (migrate) {
     emit('start', { message: `Migrating data to ${target}...` });
     const result = await runDbScript(['migrate']);
     if (result.exitCode !== 0) {
-      emit('error', { message: `Migration failed` });
+      emit('error', { message: 'Migration failed' });
       return res.status(500).json({
         error: 'Migration failed',
         details: result.stderr || result.stdout
@@ -99,14 +226,13 @@ router.post('/switch', asyncHandler(async (req, res) => {
   emit('start', { message: `Switching to ${target}...` });
   const switchResult = await runDbScript([target === 'docker' ? 'use-docker' : 'use-native']);
   if (switchResult.exitCode !== 0) {
-    emit('error', { message: `Switch failed` });
+    emit('error', { message: 'Switch failed' });
     return res.status(500).json({
       error: 'Switch failed',
       details: switchResult.stderr || switchResult.stdout
     });
   }
 
-  // Start the new mode
   const startResult = await runDbScript(['start']);
   if (startResult.exitCode !== 0) {
     emit('error', { message: `Failed to start ${target} database` });
@@ -120,21 +246,181 @@ router.post('/switch', asyncHandler(async (req, res) => {
   res.json({ success: true, output: switchResult.stdout + '\n' + startResult.stdout });
 }));
 
+/**
+ * Stop both PostgreSQL backends directly (not mode-dependent).
+ * Safe to call even if one or both are already stopped.
+ */
+async function stopAllBackends() {
+  await Promise.all([
+    runCmd('docker', ['compose', 'stop', 'db'], 15_000),
+    runCmd('bash', ['-c',
+      `[ -f "${nativeDataDir}/postmaster.pid" ] && pg_ctl -D "${nativeDataDir}" stop -m fast 2>/dev/null; true`
+    ], 15_000)
+  ]);
+}
+
+// POST /api/database/sync — copy data from active to non-active backend
+// Does NOT change which backend is active. Preserves the target's running
+// state (if it was running before sync, it stays running after).
+// Both share port 5561, so we stop both, start target, import, then restore.
+router.post('/sync', asyncHandler(async (req, res) => {
+  const io = req.app.get('io');
+  const emit = (event, data) => io?.emit('database:progress', { event, ...data });
+
+  // Determine current mode and whether the target was running
+  const statusResult = await runDbScript(['status']);
+  const currentMode = parseDbMode(statusResult.stdout);
+  const targetMode = currentMode === 'docker' ? 'native' : 'docker';
+  const restoreCmd = currentMode === 'docker' ? 'use-docker' : 'use-native';
+  const targetCmd = targetMode === 'docker' ? 'use-docker' : 'use-native';
+
+  // Check if target was running before we start so we can restore that state
+  const targetWasRunning = targetMode === 'docker'
+    ? /Container portos-db is running/.test(statusResult.stdout)
+    : /Native PostgreSQL is running/.test(statusResult.stdout);
+
+  // Step 1: Export from active database
+  emit('start', { message: 'Exporting from active database...' });
+  const exportResult = await runDbScript(['export', `sync-${Date.now()}`]);
+  if (exportResult.exitCode !== 0) {
+    emit('error', { message: 'Export failed' });
+    return res.status(500).json({ error: 'Export failed', details: exportResult.stderr || exportResult.stdout });
+  }
+  const exportLines = exportResult.stdout.trim().split('\n');
+  const dumpFile = exportLines[exportLines.length - 1]?.trim();
+  console.log(`🗄️ Sync: exported to ${dumpFile}`);
+
+  // Step 2: Stop both (port conflict), switch to target, start, import
+  emit('start', { message: `Importing into ${targetMode}...` });
+  await stopAllBackends();
+  await runDbScript([targetCmd]);
+  const startResult = await runDbScript(['start']);
+  if (startResult.exitCode !== 0) {
+    await stopAllBackends();
+    await runDbScript([restoreCmd]);
+    await runDbScript(['start']);
+    emit('error', { message: `Failed to start ${targetMode}` });
+    return res.status(500).json({ error: `Failed to start ${targetMode}`, details: startResult.stderr || startResult.stdout });
+  }
+
+  const importResult = await runDbScript(['import', dumpFile]);
+  const importFailed = importResult.exitCode !== 0;
+  if (importFailed) {
+    console.error(`🗄️ Sync: import into ${targetMode} failed`);
+  }
+
+  // Step 3: Restore — stop target, switch back to original, start original
+  emit('start', { message: `Restoring ${currentMode}...` });
+  await stopAllBackends();
+  await runDbScript([restoreCmd]);
+  const restoreResult = await runDbScript(['start']);
+  if (restoreResult.exitCode !== 0) {
+    emit('error', { message: `Failed to restart ${currentMode}` });
+    return res.status(500).json({ error: `Failed to restart ${currentMode}`, details: restoreResult.stderr || restoreResult.stdout });
+  }
+
+  // Step 4: If target was running before sync, restart it alongside active
+  // They can coexist briefly — target will be on a different process but same port
+  // Actually they share port 5561, so we can only restart target if active is stopped
+  // Since we just started active, we can't restart target. But we can log the state.
+  if (targetWasRunning) {
+    console.log(`🗄️ Sync: ${targetMode} was running before sync but cannot restart (port 5561 conflict with active ${currentMode})`);
+  }
+
+  if (importFailed) {
+    emit('error', { message: `Import into ${targetMode} failed` });
+    return res.status(500).json({ error: `Import into ${targetMode} failed`, details: importResult.stderr || importResult.stdout });
+  }
+
+  emit('complete', { message: `Data synced to ${targetMode}` });
+  res.json({ success: true, dumpFile });
+}));
+
+// POST /api/database/start — start a specific backend
+router.post('/start', asyncHandler(async (req, res) => {
+  const { backend } = req.body;
+  if (!backend || !['docker', 'native'].includes(backend)) {
+    return res.status(400).json({ error: 'backend must be "docker" or "native"' });
+  }
+
+  if (backend === 'docker') {
+    const result = await runCmd('docker', ['compose', 'up', '-d', 'db'], 60_000);
+    return res.json({ success: result.exitCode === 0, output: result.stdout });
+  }
+
+  // Native: use pg_ctl directly
+  const pgBin = process.env.PG_BIN || '';
+  const pgCtl = pgBin ? join(pgBin, 'pg_ctl') : 'pg_ctl';
+  const pgPort = process.env.PGPORT || '5561';
+  const result = await runCmd(pgCtl, [
+    '-D', nativeDataDir, '-l', join(nativeDataDir, 'server.log'),
+    '-o', `-p ${pgPort}`, 'start'
+  ], 30_000);
+  res.json({ success: result.exitCode === 0, output: result.stdout });
+}));
+
+// POST /api/database/stop — stop the non-active backend
+router.post('/stop', asyncHandler(async (req, res) => {
+  const { backend } = req.body;
+  if (!backend || !['docker', 'native'].includes(backend)) {
+    return res.status(400).json({ error: 'backend must be "docker" or "native"' });
+  }
+
+  if (backend === 'docker') {
+    const result = await runCmd('docker', ['compose', 'stop', 'db'], 30_000);
+    return res.json({ success: result.exitCode === 0, output: result.stdout });
+  }
+
+  // Native stop
+  const result = await runCmd('bash', [dbScript, 'stop'], 15_000);
+  res.json({ success: result.exitCode === 0, output: result.stdout });
+}));
+
+// POST /api/database/destroy — destroy the non-active backend's data
+router.post('/destroy', asyncHandler(async (req, res) => {
+  const { backend } = req.body;
+  if (!backend || !['docker', 'native'].includes(backend)) {
+    return res.status(400).json({ error: 'backend must be "docker" or "native"' });
+  }
+
+  // Safety: don't destroy the active backend
+  const statusResult = await runDbScript(['status']);
+  const currentMode = parseDbMode(statusResult.stdout);
+  if (backend === currentMode) {
+    return res.status(400).json({ error: 'Cannot destroy the active backend. Switch to the other backend first.' });
+  }
+
+  if (backend === 'docker') {
+    // Stop and remove container + volume
+    await runCmd('docker', ['compose', 'stop', 'db'], 15_000);
+    await runCmd('docker', ['compose', 'rm', '-f', 'db'], 15_000);
+    const result = await runCmd('docker', ['volume', 'rm', '-f', 'portos_portos-pgdata'], 15_000);
+    // Also try alternate volume name
+    await runCmd('docker', ['volume', 'rm', '-f', 'portos-pgdata'], 15_000);
+    return res.json({ success: true, output: result.stdout });
+  }
+
+  // Native: stop and remove data directory
+  await runCmd('bash', [dbScript, 'stop'], 15_000);
+  const result = await runCmd('rm', ['-rf', nativeDataDir], 10_000);
+  res.json({ success: result.exitCode === 0 });
+}));
+
 // POST /api/database/setup-native — install and configure native PostgreSQL
 router.post('/setup-native', asyncHandler(async (req, res) => {
   const io = req.app.get('io');
-  io?.emit('database:progress', { event: 'start', message: 'Setting up native PostgreSQL...' });
+  emitProgress(io, 'start', 'Setting up native PostgreSQL...');
 
   const result = await runDbScript(['setup-native']);
   if (result.exitCode !== 0) {
-    io?.emit('database:progress', { event: 'error', message: 'Native setup failed' });
+    emitProgress(io, 'error', 'Native setup failed');
     return res.status(500).json({
       error: 'Native PostgreSQL setup failed',
       details: result.stderr || result.stdout
     });
   }
 
-  io?.emit('database:progress', { event: 'complete', message: 'Native PostgreSQL ready' });
+  emitProgress(io, 'complete', 'Native PostgreSQL ready');
   res.json({ success: true, output: result.stdout });
 }));
 
@@ -147,9 +433,8 @@ router.post('/export', asyncHandler(async (req, res) => {
       details: result.stderr || result.stdout
     });
   }
-  // Last non-empty line of stdout is the dump file path
-  const lines = result.stdout.trim().split('\n');
-  const dumpFile = lines[lines.length - 1]?.trim();
+  const dumpLines = result.stdout.trim().split('\n');
+  const dumpFile = dumpLines[dumpLines.length - 1]?.trim();
   res.json({ success: true, dumpFile, output: result.stdout });
 }));
 

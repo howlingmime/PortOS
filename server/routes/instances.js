@@ -24,7 +24,8 @@ const addPeerSchema = z.object({
 
 const updatePeerSchema = z.object({
   name: z.string().optional(),
-  enabled: z.boolean().optional()
+  enabled: z.boolean().optional(),
+  syncEnabled: z.boolean().optional()
 });
 
 const announceSchema = z.object({

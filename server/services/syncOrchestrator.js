@@ -252,7 +252,7 @@ export async function syncWithPeer(peer) {
  */
 export async function syncAllPeers() {
   const peers = await getPeers();
-  const online = peers.filter(p => p.enabled && p.status === 'online' && p.instanceId);
+  const online = peers.filter(p => p.enabled && p.syncEnabled !== false && p.status === 'online' && p.instanceId);
 
   await Promise.allSettled(online.map(p => syncWithPeer(p)));
 
@@ -275,6 +275,7 @@ export async function syncAllPeers() {
 export function initSyncOrchestrator() {
   // Sync immediately when a peer comes online
   peerOnlineHandler = (peer) => {
+    if (peer.syncEnabled === false) return;
     syncWithPeer(peer).catch(err => {
       console.error(`❌ Sync with ${peer.name} failed: ${err.message}`);
     });

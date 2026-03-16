@@ -108,7 +108,8 @@ export default function App() {
           <Route path="apps/:appId/:tab" element={<AppDetail />} />
           <Route path="templates" element={<Templates />} />
           <Route path="security" element={<Security />} />
-          <Route path="settings" element={<Settings />} />
+          <Route path="settings" element={<Navigate to="/settings/backup" replace />} />
+          <Route path="settings/:tab" element={<Settings />} />
           <Route path="uploads" element={<Uploads />} />
           <Route path="shell" element={<Shell />} />
           <Route path="browser" element={<BrowserPage />} />
