@@ -1,28 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Zap, History, Settings, Play, Brain, BookOpen, Dumbbell, Timer } from 'lucide-react';
 import { getProviders } from '../../../services/api';
-import { DOMAINS, DRILL_TO_DOMAIN } from './constants';
-
-const DRILL_LABELS = {
-  'doubling-chain': 'Doubling Chain',
-  'serial-subtraction': 'Serial Subtraction',
-  'multiplication': 'Multiplication',
-  'powers': 'Powers',
-  'estimation': 'Estimation',
-  'word-association': 'Word Association',
-  'story-recall': 'Story Recall',
-  'verbal-fluency': 'Verbal Fluency',
-  'wit-comeback': 'Wit & Comeback',
-  'pun-wordplay': 'Pun & Wordplay',
-  'memory-fill-blank': 'Memory Fill Blank',
-  'memory-sequence': 'Memory Sequence',
-  'memory-element-flash': 'Element Flash',
-  'what-if': 'What If?',
-  'alternative-uses': 'Alternative Uses',
-  'story-prompt': 'Story Prompt',
-  'invention-pitch': 'Invention Pitch',
-  'reframe': 'Reframe',
-};
+import { DOMAINS, DRILL_TO_DOMAIN, DRILL_LABELS } from './constants';
 
 export default function PostSessionLauncher({ config, recentSessions, onStart, onViewHistory, onViewConfig, onViewMemory }) {
   const [tags, setTags] = useState({ sleep: '', caffeine: '', stress: '' });

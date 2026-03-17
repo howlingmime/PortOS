@@ -62,7 +62,8 @@ import {
   Inbox,
   RefreshCw,
   Dog,
-  FilePen
+  FilePen,
+  MessageCircle
 } from 'lucide-react';
 /* global __APP_VERSION__ */
 import Logo from './Logo';
@@ -208,6 +209,7 @@ const navItems = [
       { to: '/post/history', label: 'History', icon: History },
       { to: '/post/launcher', label: 'Launcher', icon: Play },
       { to: '/post/memory', label: 'Memory', icon: Brain },
+      { to: '/post/wordplay', label: 'Wordplay', icon: MessageCircle },
     ]
   },
   { to: '/review', label: 'Review Hub', icon: ClipboardList, single: true },

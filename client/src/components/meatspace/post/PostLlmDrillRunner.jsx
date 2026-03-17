@@ -1,19 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
 import { scorePostLlmDrill } from '../../../services/api';
-
-const DRILL_LABELS = {
-  'word-association': 'Word Association',
-  'story-recall': 'Story Recall',
-  'verbal-fluency': 'Verbal Fluency',
-  'wit-comeback': 'Wit & Comeback',
-  'pun-wordplay': 'Pun & Wordplay',
-  'what-if': 'What If?',
-  'alternative-uses': 'Alternative Uses',
-  'story-prompt': 'Story Prompt',
-  'invention-pitch': 'Invention Pitch',
-  'reframe': 'Reframe',
-};
+import { DRILL_LABELS } from './constants';
+import { CompoundChainUI, BridgeWordUI, DoubleMeaningUI, IdiomTwistUI } from './WordplayDrillUI';
 
 export default function PostLlmDrillRunner({ drill, timeLimitSec, drillIndex, drillCount, onComplete, isTraining, providerId, model }) {
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -111,14 +100,14 @@ export default function PostLlmDrillRunner({ drill, timeLimitSec, drillIndex, dr
         answers: items.length > 0 ? items : [inputValue.trim()],
         responseMs
       };
-    } else if (drillType === 'verbal-fluency') {
+    } else if (drillType === 'verbal-fluency' || drillType === 'compound-chain' || drillType === 'alternative-uses') {
       responseObj = {
         items: items,
         responseMs
       };
     } else {
       responseObj = {
-        prompt: currentPrompt?.prompt || currentPrompt?.setup || currentPrompt?.category || '',
+        prompt: currentPrompt?.prompt || currentPrompt?.setup || currentPrompt?.category || currentPrompt?.rootWord || currentPrompt?.word || currentPrompt?.idiom || '',
         response: inputValue.trim(),
         responseMs
       };
@@ -351,6 +340,59 @@ export default function PostLlmDrillRunner({ drill, timeLimitSec, drillIndex, dr
         />
       )}
 
+      {drillType === 'compound-chain' && (
+        <CompoundChainUI
+          challenge={currentPrompt}
+          items={items}
+          inputValue={inputValue}
+          setInputValue={setInputValue}
+          onAddItem={handleAddItem}
+          onRemoveItem={handleRemoveItem}
+          onSubmit={handleSubmit}
+          inputRef={inputRef}
+          questionIndex={questionIndex}
+          totalPrompts={totalPrompts}
+        />
+      )}
+
+      {drillType === 'bridge-word' && (
+        <BridgeWordUI
+          puzzle={currentPrompt}
+          inputValue={inputValue}
+          setInputValue={setInputValue}
+          onSubmit={handleSubmit}
+          inputRef={inputRef}
+          questionIndex={questionIndex}
+          totalPrompts={totalPrompts}
+        />
+      )}
+
+      {drillType === 'double-meaning' && (
+        <DoubleMeaningUI
+          challenge={currentPrompt}
+          inputValue={inputValue}
+          setInputValue={setInputValue}
+          onSubmit={handleSubmit}
+          inputRef={inputRef}
+          questionIndex={questionIndex}
+          totalPrompts={totalPrompts}
+          TextInput={TextInput}
+        />
+      )}
+
+      {drillType === 'idiom-twist' && (
+        <IdiomTwistUI
+          challenge={currentPrompt}
+          inputValue={inputValue}
+          setInputValue={setInputValue}
+          onSubmit={handleSubmit}
+          inputRef={inputRef}
+          questionIndex={questionIndex}
+          totalPrompts={totalPrompts}
+          TextInput={TextInput}
+        />
+      )}
+
       {drillType === 'what-if' && (
         <ImaginationUI
           label="Imagine this scenario"
@@ -440,6 +482,10 @@ function getPrompts(drill) {
     case 'verbal-fluency': return drill.categories || [];
     case 'wit-comeback': return drill.scenarios || [];
     case 'pun-wordplay': return drill.challenges || [];
+    case 'compound-chain': return drill.challenges || [];
+    case 'bridge-word': return drill.puzzles || [];
+    case 'double-meaning': return drill.challenges || [];
+    case 'idiom-twist': return drill.challenges || [];
     case 'what-if': return drill.scenarios || [];
     case 'alternative-uses': return drill.objects || [];
     case 'story-prompt': return drill.prompts || [];

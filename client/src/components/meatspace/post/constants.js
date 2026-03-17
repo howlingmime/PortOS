@@ -1,4 +1,4 @@
-export const LLM_DRILL_TYPES = ['word-association', 'story-recall', 'verbal-fluency', 'wit-comeback', 'pun-wordplay', 'what-if', 'alternative-uses', 'story-prompt', 'invention-pitch', 'reframe'];
+export const LLM_DRILL_TYPES = ['word-association', 'story-recall', 'verbal-fluency', 'wit-comeback', 'pun-wordplay', 'compound-chain', 'bridge-word', 'double-meaning', 'idiom-twist', 'what-if', 'alternative-uses', 'story-prompt', 'invention-pitch', 'reframe'];
 export const MEMORY_DRILL_TYPES = ['memory-sequence', 'memory-element-flash'];
 
 // Drill types valid elsewhere but not yet supported by the POST runner.
@@ -29,7 +29,7 @@ export const DOMAINS = {
     color: 'text-purple-400',
     bgColor: 'bg-purple-500/20',
     timeBudgetSec: 60,
-    drillTypes: ['pun-wordplay', 'word-association'],
+    drillTypes: ['pun-wordplay', 'word-association', 'compound-chain', 'bridge-word', 'double-meaning', 'idiom-twist'],
   },
   verbal: {
     label: 'Verbal Agility',
@@ -56,3 +56,36 @@ for (const [domainKey, domain] of Object.entries(DOMAINS)) {
     DRILL_TO_DOMAIN[dt] = domainKey;
   }
 }
+
+// Human-readable labels for all drill types
+export const DRILL_LABELS = {
+  'doubling-chain': 'Doubling Chain',
+  'serial-subtraction': 'Serial Subtraction',
+  'multiplication': 'Multiplication',
+  'powers': 'Powers',
+  'estimation': 'Estimation',
+  'word-association': 'Word Association',
+  'story-recall': 'Story Recall',
+  'verbal-fluency': 'Verbal Fluency',
+  'wit-comeback': 'Wit & Comeback',
+  'pun-wordplay': 'Pun & Wordplay',
+  'compound-chain': 'Compound Chain',
+  'bridge-word': 'Bridge Word',
+  'double-meaning': 'Double Meaning',
+  'idiom-twist': 'Idiom Twist',
+  'memory-fill-blank': 'Memory Fill Blank',
+  'memory-sequence': 'Memory Sequence',
+  'memory-element-flash': 'Element Flash',
+  'what-if': 'What If?',
+  'alternative-uses': 'Alternative Uses',
+  'story-prompt': 'Story Prompt',
+  'invention-pitch': 'Invention Pitch',
+  'reframe': 'Reframe',
+};
+
+// Difficulty badge color helper
+export const getDifficultyColor = (difficulty) => {
+  if (difficulty === 'hard') return 'bg-port-error/20 text-port-error';
+  if (difficulty === 'medium') return 'bg-port-warning/20 text-port-warning';
+  return 'bg-port-success/20 text-port-success';
+};

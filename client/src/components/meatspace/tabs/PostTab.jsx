@@ -12,6 +12,7 @@ import PostDrillConfig from '../post/PostDrillConfig';
 import MemoryBuilder from '../post/MemoryBuilder';
 import ElementsSong from '../post/ElementsSong';
 import DrillTransition from '../post/DrillTransition';
+import WordplayTrainer from '../post/WordplayTrainer';
 import { LLM_DRILL_TYPES } from '../post/constants';
 
 export default function PostTab({ tab = 'launcher', subtab }) {
@@ -141,6 +142,8 @@ export default function PostTab({ tab = 'launcher', subtab }) {
           onBack={() => navigate('/post/launcher')}
         />
       );
+    case 'wordplay':
+      return <WordplayTrainer config={config} onBack={() => navigate('/post/launcher')} />;
     case 'memory':
       if (subtab === 'elements') {
         return (

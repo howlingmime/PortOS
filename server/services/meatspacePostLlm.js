@@ -18,6 +18,10 @@ export const LLM_DRILL_TYPES = [
   'verbal-fluency',
   'wit-comeback',
   'pun-wordplay',
+  'compound-chain',
+  'bridge-word',
+  'double-meaning',
+  'idiom-twist',
   'what-if',
   'alternative-uses',
   'story-prompt',
@@ -322,6 +326,118 @@ Return ONLY valid JSON:
   };
 }
 
+export async function generateCompoundChain(config, providerId, model) {
+  const count = config.count || 5;
+  const prompt = `Generate ${count} compound word/phrase association challenges for verbal training.
+For each challenge, provide a root word that appears in many compound words or common phrases.
+Choose words with at least 10+ valid compound combinations (as prefix or suffix).
+Mix common roots (fire, back, hand) with less obvious ones (cross, break, light).
+
+Return ONLY valid JSON (no markdown, no explanation):
+{"challenges":[{"rootWord":"paper","position":"prefix","examples":["paperback","paper trail","paperweight","paper clip","paper thin"],"minExpected":8}]}
+
+position is "prefix" if the root starts the compound (firehouse), "suffix" if it ends it (campfire), or "both" if common either way (light→lighthouse, flashlight).
+The examples field should contain 5 sample answers. minExpected is the target count.`;
+
+  const response = await callAI(prompt, providerId, model);
+  const data = parseJsonFromAI(response);
+  return {
+    type: 'compound-chain',
+    config: { count },
+    challenges: (data.challenges || []).slice(0, count).map(c => ({
+      rootWord: c.rootWord,
+      position: c.position || 'both',
+      examples: c.examples || [],
+      minExpected: c.minExpected || 8,
+    }))
+  };
+}
+
+export async function generateBridgeWord(config, providerId, model) {
+  const count = config.count || 5;
+  const prompt = `Generate ${count} "bridge word" puzzles for verbal association training.
+In each puzzle, a single hidden word connects multiple given phrases or compound words.
+For example: "news___", "___back", "___weight" → answer is "paper" (newspaper, paperback, paperweight).
+
+Each puzzle should have 3-4 clue phrases with blanks where the bridge word goes.
+Choose bridge words that have many natural compound forms. Vary difficulty.
+
+Return ONLY valid JSON (no markdown, no explanation):
+{"puzzles":[{"clues":["news___","___back","___weight","___clip"],"answer":"paper","difficulty":"easy","hint":"Something you write on"}]}`;
+
+  const response = await callAI(prompt, providerId, model);
+  const data = parseJsonFromAI(response);
+  return {
+    type: 'bridge-word',
+    config: { count },
+    puzzles: (data.puzzles || []).slice(0, count).map(p => ({
+      clues: p.clues || [],
+      answer: p.answer,
+      difficulty: p.difficulty || 'medium',
+      hint: p.hint || '',
+    }))
+  };
+}
+
+export async function generateDoubleMeaning(config, providerId, model) {
+  const count = config.count || 5;
+  const prompt = `Generate ${count} "double meaning" wordplay challenges for verbal association training.
+Each challenge presents a word that has multiple unrelated meanings (homonyms/polysemy).
+The user must write a single sentence or short phrase that cleverly uses BOTH meanings at once.
+
+For example: "bark" (tree bark + dog bark) → "The dog's bark was louder than the oak's bark."
+"scale" (weight scale + fish scale + musical scale) → multiple meanings to play with.
+
+Choose words with clearly distinct meanings that are fun to combine.
+
+Return ONLY valid JSON (no markdown, no explanation):
+{"challenges":[{"word":"bark","meanings":["outer covering of a tree","sound a dog makes"],"example":"The dog's bark echoed off the bark of the old oak.","difficulty":"easy"}]}`;
+
+  const response = await callAI(prompt, providerId, model);
+  const data = parseJsonFromAI(response);
+  return {
+    type: 'double-meaning',
+    config: { count },
+    challenges: (data.challenges || []).slice(0, count).map(c => ({
+      word: c.word,
+      meanings: c.meanings || [],
+      example: c.example || '',
+      difficulty: c.difficulty || 'medium',
+    }))
+  };
+}
+
+export async function generateIdiomTwist(config, providerId, model) {
+  const count = config.count || 5;
+  const prompt = `Generate ${count} "idiom twist" challenges for creative wordplay training.
+Each challenge presents a well-known idiom/phrase AND a new domain/context.
+The user must adapt the idiom to the new domain using wordplay, puns, or clever substitution.
+
+For example:
+- Idiom: "Don't put all your eggs in one basket" + Domain: "Programming"
+  → "Don't put all your bugs in one branch"
+- Idiom: "The early bird catches the worm" + Domain: "Stock market"
+  → "The early trader catches the dip"
+
+Choose well-known idioms and fun, diverse domains. Mix easy and hard combinations.
+
+Return ONLY valid JSON (no markdown, no explanation):
+{"challenges":[{"idiom":"Don't put all your eggs in one basket","domain":"programming","example":"Don't push all your commits to one branch","difficulty":"easy"}]}`;
+
+  const response = await callAI(prompt, providerId, model);
+  const data = parseJsonFromAI(response);
+  return {
+    type: 'idiom-twist',
+    config: { count },
+    challenges: (data.challenges || []).slice(0, count).map(c => ({
+      idiom: c.idiom,
+      domain: c.domain,
+      example: c.example || '',
+      difficulty: c.difficulty || 'medium',
+    }))
+  };
+}
+
 export async function generateLlmDrill(type, config = {}, providerId, model) {
   switch (type) {
     case 'word-association':
@@ -334,6 +450,14 @@ export async function generateLlmDrill(type, config = {}, providerId, model) {
       return generateWitComeback(config, providerId, model);
     case 'pun-wordplay':
       return generatePunWordplay(config, providerId, model);
+    case 'compound-chain':
+      return generateCompoundChain(config, providerId, model);
+    case 'bridge-word':
+      return generateBridgeWord(config, providerId, model);
+    case 'double-meaning':
+      return generateDoubleMeaning(config, providerId, model);
+    case 'idiom-twist':
+      return generateIdiomTwist(config, providerId, model);
     case 'what-if':
       return generateWhatIf(config, providerId, model);
     case 'alternative-uses':
@@ -376,6 +500,18 @@ export async function scoreLlmDrill(type, drillData, userResponses, timeLimitMs,
       break;
     case 'pun-wordplay':
       scorePrompt = buildPunWordplayScorePrompt(drillData, userResponses);
+      break;
+    case 'compound-chain':
+      scorePrompt = buildCompoundChainScorePrompt(drillData, userResponses);
+      break;
+    case 'bridge-word':
+      scorePrompt = buildBridgeWordScorePrompt(drillData, userResponses);
+      break;
+    case 'double-meaning':
+      scorePrompt = buildDoubleMeaningScorePrompt(drillData, userResponses);
+      break;
+    case 'idiom-twist':
+      scorePrompt = buildIdiomTwistScorePrompt(drillData, userResponses);
       break;
     case 'what-if':
       scorePrompt = buildWhatIfScorePrompt(drillData, userResponses);
@@ -493,6 +629,78 @@ ${items}
 
 Return ONLY valid JSON:
 {"overallScore":75,"scores":[{"score":90,"feedback":"Excellent double meaning"}],"summary":"Overall wordplay assessment"}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WORDPLAY TRAINING SCORE PROMPTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildCompoundChainScorePrompt(drillData, responses) {
+  const items = responses.map((r, i) => {
+    const challenge = drillData.challenges?.[i];
+    return `Root word: "${challenge?.rootWord}" (position: ${challenge?.position}, target: ${challenge?.minExpected}+)\nUser's compounds: ${(r.items || []).join(', ') || '(none)'}`;
+  }).join('\n\n');
+
+  return `Score these compound word/phrase association responses. For each root word:
+1. Count valid compound words or common phrases that actually use the root word
+2. Remove duplicates, misspellings, and invalid entries (words that don't form real compounds with the root)
+3. Compare count to the target (minExpected)
+4. Bonus for creative or unusual but valid compounds
+
+${items}
+
+Return ONLY valid JSON:
+{"overallScore":75,"scores":[{"score":80,"feedback":"12 valid compounds, good variety","validCount":12,"invalidItems":["not-a-real-compound"]}],"summary":"Overall compound chain assessment"}`;
+}
+
+function buildBridgeWordScorePrompt(drillData, responses) {
+  const items = responses.map((r, i) => {
+    const puzzle = drillData.puzzles?.[i];
+    return `Clues: ${(puzzle?.clues || []).join(', ')}\nCorrect answer: "${puzzle?.answer}"\nUser's answer: "${r.response || '(no response)'}"`;
+  }).join('\n\n');
+
+  return `Score these bridge word puzzle responses. For each puzzle:
+1. Check if the user's answer matches the correct bridge word (allow minor spelling differences)
+2. If the user gave a different word that also validly fills all the blanks, give full credit
+3. Rate 0 for wrong answers, 100 for correct
+
+${items}
+
+Return ONLY valid JSON:
+{"overallScore":75,"scores":[{"score":100,"feedback":"Correct!"}],"summary":"Overall bridge word assessment"}`;
+}
+
+function buildDoubleMeaningScorePrompt(drillData, responses) {
+  const items = responses.map((r, i) => {
+    const challenge = drillData.challenges?.[i];
+    return `Word: "${challenge?.word}" (meanings: ${(challenge?.meanings || []).join(' / ')})\nUser's sentence: "${r.response || '(no response)'}"`;
+  }).join('\n\n');
+
+  return `Score these double meaning wordplay responses. For each challenge:
+1. Does the sentence use BOTH meanings of the word? (40%)
+2. Is it clever/witty? (30%)
+3. Is it grammatically correct and natural-sounding? (30%)
+Rate each 0-100. Penalize if only one meaning is used.
+
+${items}
+
+Return ONLY valid JSON:
+{"overallScore":75,"scores":[{"score":85,"feedback":"Both meanings used cleverly"}],"summary":"Overall double meaning assessment"}`;
+}
+
+function buildIdiomTwistScorePrompt(drillData, responses) {
+  const items = responses.map((r, i) => {
+    const challenge = drillData.challenges?.[i];
+    return `Idiom: "${challenge?.idiom}" → Domain: "${challenge?.domain}"\nUser's twist: "${r.response || '(no response)'}"`;
+  }).join('\n\n');
+
+  return `Score these idiom twist responses on: recognizable connection to original idiom (30%), relevance to new domain (30%), cleverness of wordplay (40%).
+Rate each 0-100. The best twists maintain the rhythm/structure of the original while making domain-specific substitutions.
+
+${items}
+
+Return ONLY valid JSON:
+{"overallScore":75,"scores":[{"score":85,"feedback":"Great structural parallel with clever domain substitution"}],"summary":"Overall idiom twist assessment"}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
