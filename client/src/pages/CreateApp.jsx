@@ -6,9 +6,7 @@ import toast from 'react-hot-toast';
 import * as api from '../services/api';
 import IconPicker from '../components/IconPicker';
 import FolderPicker from '../components/FolderPicker';
-
-/** App types that do not use PM2 for process management */
-const NON_PM2_TYPES = new Set(['ios-native', 'macos-native', 'xcode', 'swift']);
+import { NON_PM2_TYPES } from '../components/apps/constants';
 
 const DETECTION_STEPS_PM2 = [
   { id: 'validate', label: 'Validating path' },

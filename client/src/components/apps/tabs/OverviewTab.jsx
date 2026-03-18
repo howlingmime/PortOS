@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { FolderOpen, Terminal, Code, RefreshCw, Wrench, Archive, ArchiveRestore, Ticket, Download, Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { NON_PM2_TYPES } from '../constants';
 import BrailleSpinner from '../../BrailleSpinner';
 import KanbanBoard from '../../KanbanBoard';
 import EditAppModal from '../EditAppModal';
@@ -205,14 +206,16 @@ export default function OverviewTab({ app, onRefresh }) {
           <RefreshCw size={14} className={refreshingConfig ? 'animate-spin' : ''} />
           Refresh Config
         </button>
-        <button
-          onClick={handleStandardize}
-          disabled={isOperating}
-          className="px-3 py-1.5 bg-port-accent/20 text-port-accent hover:bg-port-accent/30 rounded-lg text-xs flex items-center gap-1 disabled:opacity-50"
-        >
-          <Wrench size={14} className={standardizing ? 'animate-spin' : ''} />
-          {standardizing ? 'Standardizing...' : 'Standardize PM2'}
-        </button>
+        {!NON_PM2_TYPES.has(app.type) && (
+          <button
+            onClick={handleStandardize}
+            disabled={isOperating}
+            className="px-3 py-1.5 bg-port-accent/20 text-port-accent hover:bg-port-accent/30 rounded-lg text-xs flex items-center gap-1 disabled:opacity-50"
+          >
+            <Wrench size={14} className={standardizing ? 'animate-spin' : ''} />
+            {standardizing ? 'Standardizing...' : 'Standardize PM2'}
+          </button>
+        )}
         <button
           onClick={() => setEditingApp(app)}
           className="px-3 py-1.5 bg-port-accent/20 text-port-accent hover:bg-port-accent/30 rounded-lg text-xs flex items-center gap-1"

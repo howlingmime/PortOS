@@ -10,9 +10,7 @@ import ActivityLog from '../components/apps/ActivityLog';
 import { useAppOperation } from '../hooks/useAppOperation';
 import * as api from '../services/api';
 import socket from '../services/socket';
-
-/** App types that do not use PM2 for process management */
-const NON_PM2_TYPES = new Set(['ios-native', 'macos-native', 'xcode', 'swift']);
+import { NON_PM2_TYPES } from '../components/apps/constants';
 
 export default function Apps() {
   const [apps, setApps] = useState([]);
