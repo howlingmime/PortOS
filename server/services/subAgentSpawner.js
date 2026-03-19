@@ -986,7 +986,7 @@ async function maybeCreateInvestigationTask(agentId, task, analysis) {
     return;
   }
   await createInvestigationTask(agentId, task, analysis).catch(err => {
-    emitLog('warn', `Failed to create investigation task: ${err.message}`, { agentId });
+    emitLog('warn', `Failed to create investigation task: ${err.message}`, { agentId, taskId: task.id, category: analysis?.category });
   });
 }
 
@@ -998,7 +998,7 @@ async function maybeCreateInvestigationTask(agentId, task, analysis) {
  * Returns { status, metadata } to apply to the task.
  */
 async function resolveFailedTaskUpdate(task, errorAnalysis, agentId) {
-  // Actionable errors get blocked immediately with investigation
+  // Actionable errors get blocked immediately (investigation task created unless API access is denied)
   if (errorAnalysis?.actionable) {
     emitLog('warn', `🚫 Task ${task.id} blocked: ${errorAnalysis.message} (${errorAnalysis.category})`, {
       taskId: task.id, category: errorAnalysis.category
