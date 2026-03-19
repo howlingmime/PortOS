@@ -22,9 +22,9 @@ export default function ResumeAgentModal({ agent, taskType = 'user', providers, 
 
   const [formData, setFormData] = useState({
     refinedInstructions: '',
-    provider: agent.metadata?.provider || '',
+    provider: agent.metadata?.providerId || agent.metadata?.provider || '',
     model: agent.metadata?.model || '',
-    app: agent.metadata?.app || ''
+    app: agent.metadata?.taskApp || agent.metadata?.app || ''
   });
   const [screenshots, setScreenshots] = useState([]);
   const fileInputRef = useRef(null);
