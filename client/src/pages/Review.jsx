@@ -133,7 +133,7 @@ export default function Review() {
   const pendingTodos = pendingItems.filter(i => i.type === 'todo');
 
   const actionableItems = pendingItems
-    .filter(item => ACTIONABLE_TYPES.includes(item.type))
+    .filter(isActionableItem)
     .sort((a, b) => {
       const priority = TYPE_PRIORITY[a.type] - TYPE_PRIORITY[b.type];
       if (priority !== 0) return priority;
