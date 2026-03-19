@@ -25,6 +25,10 @@ export default function GsdProjectHeader({ project, appId, repoPath, onRefresh }
     navigate(`/shell?cwd=${encodeURIComponent(repoPath)}&cmd=claude`);
   };
 
+  const handleOpenOpenClaw = () => {
+    navigate(`/shell?cwd=${encodeURIComponent(repoPath)}&cmd=${encodeURIComponent('openclaw tui')}`);
+  };
+
   const handleNewMilestone = async () => {
     await api.addCosTask({
       description: 'Run /gsd:new-milestone to start a new milestone cycle',
@@ -107,12 +111,20 @@ export default function GsdProjectHeader({ project, appId, repoPath, onRefresh }
             </button>
           )}
           {repoPath && (
-            <button
-              onClick={handleOpenClaude}
-              className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 rounded-lg text-xs flex items-center gap-1 border border-purple-600/30"
-            >
-              <Terminal size={14} /> Claude Code
-            </button>
+            <>
+              <button
+                onClick={handleOpenOpenClaw}
+                className="px-3 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 rounded-lg text-xs flex items-center gap-1 border border-cyan-600/30"
+              >
+                <Terminal size={14} /> OpenClaw
+              </button>
+              <button
+                onClick={handleOpenClaude}
+                className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 rounded-lg text-xs flex items-center gap-1 border border-purple-600/30"
+              >
+                <Terminal size={14} /> Claude Code
+              </button>
+            </>
           )}
           <button
             onClick={onRefresh}

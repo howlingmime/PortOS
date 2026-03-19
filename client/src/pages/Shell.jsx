@@ -12,6 +12,7 @@ const MAX_SESSIONS = 5;
 
 const QUICK_COMMANDS = [
   { label: 'claude', command: 'claude --dangerously-skip-permissions' },
+  { label: 'openclaw', command: 'openclaw tui' },
   { label: 'git status', command: 'git status' },
   { label: 'git pull', command: 'git pull --rebase --autostash' },
   { label: 'npm test', command: 'npm test' },

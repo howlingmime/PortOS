@@ -9,6 +9,7 @@ import CityCelestial from './CityCelestial';
 import BuildingCluster from './BuildingCluster';
 import CityDataStreams from './CityDataStreams';
 import CityTraffic from './CityTraffic';
+import CitySignalBeacons from './CitySignalBeacons';
 
 import CityWeather from './CityWeather';
 import CityBillboards from './CityBillboards';
