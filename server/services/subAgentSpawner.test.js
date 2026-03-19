@@ -477,12 +477,18 @@ describe('Spawn Arguments Building', () => {
 describe('Task Failure Retry Logic', () => {
   const MAX_TASK_RETRIES = 3;
 
+  const API_ACCESS_ERROR_CATEGORIES = new Set([
+    'auth-error',
+    'forbidden',
+    'usage-limit',
+  ]);
+
   /**
    * Inline copy of resolveFailedTaskUpdate decision logic (sans async I/O).
    * Returns { status, metadata, shouldCreateInvestigation }
    */
   function resolveFailedTaskStatus(task, errorAnalysis) {
-    // Actionable errors get blocked immediately
+    // Actionable errors get blocked immediately (skip investigation for API access errors)
     if (errorAnalysis?.actionable) {
       return {
         status: 'blocked',
@@ -492,7 +498,7 @@ describe('Task Failure Retry Logic', () => {
           blockedCategory: errorAnalysis.category,
           blockedAt: 'test-timestamp'
         },
-        shouldCreateInvestigation: true
+        shouldCreateInvestigation: !API_ACCESS_ERROR_CATEGORIES.has(errorAnalysis.category)
       };
     }
 
@@ -531,13 +537,23 @@ describe('Task Failure Retry Logic', () => {
   describe('Actionable errors', () => {
     it('should block immediately on actionable error (first failure)', () => {
       const task = { id: 'task-1', description: 'test', metadata: {} };
-      const errorAnalysis = { actionable: true, category: 'auth-error', message: 'Auth failed' };
+      const errorAnalysis = { actionable: true, category: 'model-not-found', message: 'Model not found' };
 
       const result = resolveFailedTaskStatus(task, errorAnalysis);
 
       expect(result.status).toBe('blocked');
-      expect(result.metadata.blockedCategory).toBe('auth-error');
+      expect(result.metadata.blockedCategory).toBe('model-not-found');
       expect(result.shouldCreateInvestigation).toBe(true);
+    });
+
+    it('should skip investigation for API access error categories', () => {
+      const task = { id: 'task-1', description: 'test', metadata: {} };
+
+      for (const category of ['auth-error', 'forbidden', 'usage-limit']) {
+        const result = resolveFailedTaskStatus(task, { actionable: true, category, message: `${category} error` });
+        expect(result.status).toBe('blocked');
+        expect(result.shouldCreateInvestigation).toBe(false);
+      }
     });
 
     it('should block immediately regardless of failure count', () => {
@@ -654,4 +670,5 @@ describe('Task Failure Retry Logic', () => {
       expect(result.status).toBe('blocked');
     });
   });
+
 });

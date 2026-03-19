@@ -972,6 +972,24 @@ Review the error, fix the configuration or code issue, and retry the original ta
   return investigationTask;
 }
 
+// Error categories where LLM API access is blocked or denied — spawning an
+// investigation agent would fail for the same reason, so skip it.
+const API_ACCESS_ERROR_CATEGORIES = new Set([
+  'auth-error',
+  'forbidden',
+  'usage-limit',
+]);
+
+async function maybeCreateInvestigationTask(agentId, task, analysis) {
+  if (API_ACCESS_ERROR_CATEGORIES.has(analysis?.category)) {
+    emitLog('debug', `⏭️ Skipping investigation task for ${task.id}: API access error (${analysis.category})`, { agentId, taskId: task.id, category: analysis.category });
+    return;
+  }
+  await createInvestigationTask(agentId, task, analysis).catch(err => {
+    emitLog('warn', `Failed to create investigation task: ${err.message}`, { agentId, taskId: task.id, category: analysis?.category });
+  });
+}
+
 /**
  * Handle task status update after agent failure.
  * Tracks retry count and blocks the task after MAX_TASK_RETRIES,
@@ -980,14 +998,12 @@ Review the error, fix the configuration or code issue, and retry the original ta
  * Returns { status, metadata } to apply to the task.
  */
 async function resolveFailedTaskUpdate(task, errorAnalysis, agentId) {
-  // Actionable errors get blocked immediately with investigation
+  // Actionable errors get blocked immediately (investigation task created unless API access is denied)
   if (errorAnalysis?.actionable) {
     emitLog('warn', `🚫 Task ${task.id} blocked: ${errorAnalysis.message} (${errorAnalysis.category})`, {
       taskId: task.id, category: errorAnalysis.category
     });
-    await createInvestigationTask(agentId, task, errorAnalysis).catch(err => {
-      emitLog('warn', `Failed to create investigation task: ${err.message}`, { agentId });
-    });
+    await maybeCreateInvestigationTask(agentId, task, errorAnalysis);
     return {
       status: 'blocked',
       metadata: {
@@ -1013,9 +1029,7 @@ async function resolveFailedTaskUpdate(task, errorAnalysis, agentId) {
       suggestedFix: `Task has failed ${failureCount} consecutive times with ${lastErrorCategory} errors. ${errorAnalysis?.suggestedFix || 'Investigate agent output logs.'}`,
       category: lastErrorCategory
     };
-    await createInvestigationTask(agentId, task, blockedAnalysis).catch(err => {
-      emitLog('warn', `Failed to create investigation task: ${err.message}`, { agentId });
-    });
+    await maybeCreateInvestigationTask(agentId, task, blockedAnalysis);
     return {
       status: 'blocked',
       metadata: {
