@@ -82,7 +82,7 @@ export async function checkHealth() {
         EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'memory_links') AS has_links,
         EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'memories' AND column_name = 'sync_sequence') AS has_sync
     `);
-    const { has_memories, has_links, has_sync } = result.rows[0];
+    const { has_memories, has_links, has_sync } = result.rows?.[0] ?? {};
     return { connected: true, hasSchema: has_memories && has_links && has_sync };
   } catch (err) {
     console.error(`🗄️ Database health check failed: ${err.message}`);

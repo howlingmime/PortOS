@@ -13,7 +13,6 @@ For project goals, see [GOALS.md](./GOALS.md). For completed work, see [DONE.md]
 ## Backlog
 
 - [ ] **God file decomposition** — Split cos.js (3,952 lines), subAgentSpawner.js (3,307 lines), digital-twin.js (2,823 lines), routes/scaffold.js (1,668 lines), routes/cos.js (1,355 lines), client/api.js (1,853 lines) into focused modules. Resolve cos.js ↔ subAgentSpawner.js circular dependency
-- [ ] **Fix unsafe data access** — Guard `rows[0]` in memorySync.js/db.js, fix 56 empty `.catch(() => {})` handlers in client code
 - [ ] **M50 P9**: CoS Automation & Rules — Automated email classification, rule-based pre-filtering, email-to-task pipeline, priority notifications
 - [ ] **M50 P10**: Auto-Send with AI Review Gate — Configurable per-account trust level, second LLM reviews drafts for prompt injection/tone drift. See [Messages Security](./docs/features/messages-security.md)
 
@@ -21,12 +20,8 @@ For project goals, see [GOALS.md](./GOALS.md). For completed work, see [DONE.md]
 
 **Known low-severity:** pm2 ReDoS (GHSA-x5gf-qvw8-r2rm) — no upstream fix, not exploitable via PortOS routes.
 
-### Bugs & Code Quality (still present)
-- [ ] `server/services/agentActionExecutor.js:137` — Complex array fallback logic
-- [ ] `server/services/memorySync.js` + `server/lib/db.js` — Unsafe `rows[0]` access without bounds check
-- [ ] Hardcoded localhost in `lmStudioManager.js`, `memoryClassifier.js`
-- [ ] Empty `.catch(() => {})` in several client files
-- [ ] Silent catch blocks in `runner.js`, `Settings.jsx`
+### Bugs & Code Quality
+_All bug items from 2026-03-05 audit resolved — see [DONE.md](./DONE.md)_
 
 ### DRY (still present)
 - [ ] Duplicate DATA_DIR/path constants in ~84 files

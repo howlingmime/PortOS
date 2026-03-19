@@ -134,7 +134,9 @@ async function executeComment(client, agent, params) {
     console.log(`🤖 AI generating comment for "${agent.name}" on post ${postId}`);
     const post = await client.getPost(postId);
     const commentsResponse = await client.getComments(postId);
-    const comments = Array.isArray(commentsResponse?.comments) ? commentsResponse.comments : Array.isArray(commentsResponse) ? commentsResponse : [];
+    const comments = Array.isArray(commentsResponse?.comments)
+      ? commentsResponse.comments
+      : Array.isArray(commentsResponse) ? commentsResponse : [];
     const contentConfig = agent.aiConfig?.content || agent.aiConfig;
 
     if (parentId) {

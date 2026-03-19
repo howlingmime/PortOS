@@ -9,6 +9,13 @@ Archive of completed work. For active roadmap, see [PLAN.md](./PLAN.md). For pro
 - Fixed PromptManager.jsx fetch calls — response.ok checks now present on all endpoints
 - Fixed memory.js sort comparison — now type-safe with NaN/Date.parse validation
 - Fixed silent catch in useTheme.js — now has console logging instead of swallowing errors
+- Fixed agentActionExecutor.js:137 — reformatted complex ternary for readability
+- Fixed memorySync.js `rows[0]` — added optional chaining with nullish coalescing fallback
+- Fixed db.js `rows[0]` — added optional chaining with empty object fallback
+- Resolved hardcoded localhost in lmStudioManager.js/memoryClassifier.js — server-side connections to local LM Studio with env var overrides, not a bug
+- Resolved empty `.catch(() => {})` in client files — `request()` in api.js already shows `toast.error()` centrally; catches just prevent unhandled rejection warnings
+- Resolved silent catches in runner.js — intentional best-effort writes during error handling
+- Resolved Settings.jsx:366 catch — error toast already fires via centralized `request()` handler
 
 ---
 

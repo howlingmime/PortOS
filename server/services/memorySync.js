@@ -153,5 +153,5 @@ export async function applyRemoteChanges(incomingMemories) {
  */
 export async function getMaxSequence() {
   const result = await query('SELECT COALESCE(MAX(sync_sequence), 0)::text AS max_seq FROM memories');
-  return result.rows[0].max_seq;
+  return result.rows?.[0]?.max_seq ?? '0';
 }
