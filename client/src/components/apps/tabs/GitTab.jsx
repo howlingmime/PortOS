@@ -51,7 +51,7 @@ ${reviewStep}. **Wait for Copilot review**:
 ${feedbackStep}. **Address review feedback** (if any):
    - Fetch unresolved threads via GraphQL:
      \`\`\`
-     gh api graphql -f query='query(\$owner: String!, \$repo: String!, \$pr: Int!) { repository(owner: \$owner, name: \$repo) { pullRequest(number: \$pr) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 10) { nodes { body path line author { login } } } } } } } }'
+     gh api graphql -f query='query($owner: String!, $repo: String!, $pr: Int!) { repository(owner: $owner, name: $repo) { pullRequest(number: $pr) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 10) { nodes { body path line author { login } } } } } } } }'
      \`\`\`
    - Make requested changes, commit, push (\`git pull --rebase --autostash && git push\`)
    - Resolve addressed threads via GraphQL mutation

@@ -20,7 +20,6 @@ import toast from 'react-hot-toast';
 
 import {
   DESTINATIONS,
-  STATUS_COLORS,
   getConfidenceColor,
   formatRelativeTime
 } from '../constants';
@@ -29,7 +28,6 @@ export default function InboxTab({ onRefresh, settings }) {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [entries, setEntries] = useState([]);
-  const [counts, setCounts] = useState({});
   const [loading, setLoading] = useState(true);
   const [showNeedsReview, setShowNeedsReview] = useState(true);
   const [showFiled, setShowFiled] = useState(true);
@@ -43,9 +41,8 @@ export default function InboxTab({ onRefresh, settings }) {
   const inputRef = useRef(null);
 
   const fetchInbox = useCallback(async () => {
-    const data = await api.getBrainInbox().catch(() => ({ entries: [], counts: {} }));
+    const data = await api.getBrainInbox().catch(() => ({ entries: [] }));
     setEntries(data.entries || []);
-    setCounts(data.counts || {});
     setLoading(false);
   }, []);
 

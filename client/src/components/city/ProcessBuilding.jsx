@@ -11,16 +11,7 @@ const STATUS_COLORS = {
   error: '#ef4444',
 };
 
-const hashString = (str) => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-};
-
-export default function ProcessBuilding({ process, pm2Status, position, accentColor, seed }) {
+export default function ProcessBuilding({ process, pm2Status, position, seed }) {
   const blinkRef = useRef();
   const glowRef = useRef();
 

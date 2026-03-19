@@ -92,7 +92,6 @@ export default function InboxTab({ accounts }) {
           new Date(b.date || 0) - new Date(a.date || 0)
         );
       });
-      setTotal(prev => prev + incoming.length);
     };
     socket.on('messages:sync:message', onSyncMessage);
     return () => socket.off('messages:sync:message', onSyncMessage);

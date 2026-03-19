@@ -28,14 +28,6 @@ const STATUS_ICONS = {
   unknown: CircleDot
 };
 
-function formatBytes(bytes) {
-  if (!bytes) return '—';
-  const gb = bytes / (1024 * 1024 * 1024);
-  if (gb >= 1) return `${gb.toFixed(1)} GB`;
-  const mb = bytes / (1024 * 1024);
-  return `${Math.round(mb)} MB`;
-}
-
 function timeAgo(iso) {
   if (!iso) return 'Never';
   const diff = Date.now() - new Date(iso).getTime();
@@ -257,7 +249,7 @@ function DirectionBadge({ directions = [] }) {
   return null;
 }
 
-function SyncStatusBadge({ label, icon: Icon, localSeq, peerSeq, cursorSeq }) {
+function SyncStatusBadge({ label, icon: Icon, localSeq: _localSeq, peerSeq, cursorSeq }) {
   // cursorSeq = how far we've pulled from them (our cursor for their data)
   // localSeq = our local max seq for this data type
   // peerSeq = their max seq for this data type (from their sync-status endpoint)

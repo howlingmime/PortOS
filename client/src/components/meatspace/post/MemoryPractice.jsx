@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { ChevronLeft, Play, Check, X, SkipForward, RotateCcw, Target, ChevronDown } from 'lucide-react';
+import { ChevronLeft, Check, X, SkipForward, RotateCcw, Target, ChevronDown } from 'lucide-react';
 import { submitMemoryPractice, getChunkMastery } from '../../../services/api';
 
 const MODES = [
@@ -10,7 +10,7 @@ const MODES = [
   { id: 'spaced', label: 'Spaced Repetition', desc: 'Focus on your weakest chunks with graduated hints' },
 ];
 
-export default function MemoryPractice({ item, onBack, onComplete }) {
+export default function MemoryPractice({ item, onBack, onComplete: _onComplete }) {
   const [mode, setMode] = useState(null);
   const [results, setResults] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -27,6 +27,18 @@ export default function MemoryPractice({ item, onBack, onComplete }) {
 
   const lines = item.content?.lines || [];
   const chunks = item.content?.chunks || [];
+  const fillBlankLine = lines[currentIdx] || null;
+  const fillBlankWords = fillBlankLine?.text.split(/\s+/) || [];
+  // Blank out ~40% of words — recompute when line changes
+  const blanks = useMemo(() => {
+    if (mode !== 'fill-blank' || !fillBlankWords.length) return new Set();
+    const blankSet = new Set();
+    const count = Math.max(1, Math.floor(fillBlankWords.length * 0.4));
+    while (blankSet.size < count && blankSet.size < fillBlankWords.length) {
+      blankSet.add(Math.floor(Math.random() * fillBlankWords.length));
+    }
+    return blankSet;
+  }, [mode, fillBlankWords.length]);
 
   useEffect(() => {
     if (mode && inputRef.current) inputRef.current.focus();
@@ -419,19 +431,7 @@ export default function MemoryPractice({ item, onBack, onComplete }) {
     );
   }
 
-  // FILL-IN-THE-BLANK mode — compute blanks outside conditional to respect Rules of Hooks
-  const fillBlankLine = mode === 'fill-blank' ? lines[currentIdx] : null;
-  const fillBlankWords = fillBlankLine?.text.split(/\s+/) || [];
-  // Blank out ~40% of words — recompute when line changes
-  const blanks = useMemo(() => {
-    if (!fillBlankWords.length) return new Set();
-    const blankSet = new Set();
-    const count = Math.max(1, Math.floor(fillBlankWords.length * 0.4));
-    while (blankSet.size < count && blankSet.size < fillBlankWords.length) {
-      blankSet.add(Math.floor(Math.random() * fillBlankWords.length));
-    }
-    return blankSet;
-  }, [currentIdx, mode, fillBlankWords.length]);
+  // FILL-IN-THE-BLANK mode
 
   if (mode === 'fill-blank') {
     const line = fillBlankLine;

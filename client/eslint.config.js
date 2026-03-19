@@ -46,8 +46,8 @@ export default [
         caughtErrorsIgnorePattern: '^_'
       }],
       'no-undef': 'error',
-      'no-useless-escape': 'warn',
-      'react-hooks/rules-of-hooks': 'warn',
+      'no-useless-escape': 'error',
+      'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
     },
   },

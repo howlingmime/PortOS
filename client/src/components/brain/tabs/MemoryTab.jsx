@@ -7,8 +7,6 @@ import {
   Trash2,
   X,
   Save,
-  ChevronDown,
-  ChevronRight,
   CheckCircle2,
   Search,
   AlertTriangle

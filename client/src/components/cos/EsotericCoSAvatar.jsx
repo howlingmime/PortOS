@@ -66,7 +66,7 @@ function EsotericCore({ color, state, speaking }) {
 function RunicShards({ color, state }) {
   const groupRef = useRef();
   const shards = useMemo(() => {
-    return Array.from({ length: 5 }).map((_, i) => ({
+    return Array.from({ length: 5 }).map(() => ({
       rotationSpeed: (Math.random() - 0.5) * 2,
       orbitSpeed: 0.5 + Math.random() * 0.5,
       orbitRadius: 1.5 + Math.random() * 0.5,
@@ -119,7 +119,7 @@ function RunicShards({ color, state }) {
 }
 
 // Ancient halo rings
-function AncientHalo({ color, state }) {
+function AncientHalo({ color }) {
     const ringRef = useRef();
     const ring2Ref = useRef();
 

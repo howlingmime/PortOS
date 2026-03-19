@@ -1,6 +1,5 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import * as THREE from 'three';
 import { CITY_COLORS } from './cityConstants';
 
 // A single flying hover vehicle
@@ -8,17 +7,6 @@ function HoverVehicle({ path, color, speed, offset, altitude }) {
   const groupRef = useRef();
   const lightRef = useRef();
   const bodyRef = useRef();
-
-  const pathLength = useMemo(() => {
-    let len = 0;
-    for (let i = 1; i < path.length; i++) {
-      len += Math.sqrt(
-        (path[i][0] - path[i-1][0]) ** 2 +
-        (path[i][2] - path[i-1][2]) ** 2
-      );
-    }
-    return len;
-  }, [path]);
 
   useFrame(({ clock }) => {
     if (!groupRef.current || path.length < 2) return;

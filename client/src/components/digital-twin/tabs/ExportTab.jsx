@@ -13,9 +13,9 @@ import {
 import * as api from '../../../services/api';
 import toast from 'react-hot-toast';
 
-import { EXPORT_FORMATS, DOCUMENT_CATEGORIES } from '../constants';
+import { DOCUMENT_CATEGORIES } from '../constants';
 
-export default function ExportTab({ onRefresh }) {
+export default function ExportTab({ onRefresh: _onRefresh }) {
   const [documents, setDocuments] = useState([]);
   const [formats, setFormats] = useState([]);
   const [loading, setLoading] = useState(true);

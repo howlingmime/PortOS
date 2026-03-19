@@ -12,8 +12,6 @@ export default function HealthCategorySection({ category, from, to, expanded, on
 
   // Filter to only metrics that have data
   const activeMetrics = category.metrics.filter(m => availableMetrics.has(m.key));
-  if (activeMetrics.length === 0) return null;
-
   const rangeKey = `${from}|${to}`;
 
   useEffect(() => {

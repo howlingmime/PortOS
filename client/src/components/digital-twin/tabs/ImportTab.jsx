@@ -7,10 +7,8 @@ import {
   Calendar,
   RefreshCw,
   Check,
-  AlertCircle,
   FileText,
   ChevronRight,
-  ExternalLink,
   Save,
   Trash2
 } from 'lucide-react';
