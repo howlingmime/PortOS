@@ -8,6 +8,8 @@ export const useCityData = () => {
   const [cosStatus, setCosStatus] = useState({ running: false });
   const [runningAgents, setRunningAgents] = useState([]);
   const [eventLogs, setEventLogs] = useState([]);
+  const [reviewCounts, setReviewCounts] = useState({ total: 0, alert: 0, todo: 0, briefing: 0, cos: 0 });
+  const [instances, setInstances] = useState({ self: null, peers: [], syncStatus: null });
   const [loading, setLoading] = useState(true);
   const pollRef = useRef(null);
 
@@ -18,12 +20,15 @@ export const useCityData = () => {
   }, []);
 
   const fetchAll = useCallback(async () => {
-    const [appsData, agents, cosAgentsData, status] = await Promise.all([
+    const [appsData, agents, cosAgentsData, status, reviewData, instanceData] = await Promise.all([
       api.getApps().catch(() => []),
       api.getRunningAgents().catch(() => []),
       api.getCosAgents().catch(() => []),
       api.getCosStatus().catch(() => ({ running: false })),
+      api.getReviewCounts().catch(() => ({ total: 0, alert: 0, todo: 0, briefing: 0, cos: 0 })),
+      api.getInstances().catch(() => ({ self: null, peers: [], syncStatus: null })),
     ]);
+
     setApps(appsData);
     setRunningAgents(agents);
     setCosAgents(cosAgentsData);
@@ -33,7 +38,6 @@ export const useCityData = () => {
     setLoading(false);
   }, []);
 
-  // Build agent-to-app mapping
   const agentMap = useMemo(() => {
     const map = new Map();
     const allAgents = [...(cosAgents || [])];
@@ -56,16 +60,13 @@ export const useCityData = () => {
   useEffect(() => {
     fetchAll();
 
-    // Subscribe to CoS events
     const subscribe = () => socket.emit('cos:subscribe');
     if (socket.connected) subscribe();
     socket.on('connect', subscribe);
 
-    // App changes
     const handleAppsChanged = () => fetchApps();
     socket.on('apps:changed', handleAppsChanged);
 
-    // CoS agent events
     const handleAgentSpawned = (data) => {
       setCosAgents(prev => [...prev, data]);
       fetchAll();
@@ -82,19 +83,16 @@ export const useCityData = () => {
     };
     socket.on('cos:agent:completed', handleAgentCompleted);
 
-    // CoS log events
     const handleCosLog = (data) => {
       setEventLogs(prev => [...prev, { ...data, timestamp: data.timestamp || Date.now() }].slice(-50));
     };
     socket.on('cos:log', handleCosLog);
 
-    // CoS status
     const handleCosStatus = (data) => {
       setCosStatus(prev => ({ ...prev, running: data.running }));
     };
     socket.on('cos:status', handleCosStatus);
 
-    // Poll running agents (no socket events for system agents)
     pollRef.current = setInterval(async () => {
       const agents = await api.getRunningAgents().catch(() => []);
       setRunningAgents(agents);
