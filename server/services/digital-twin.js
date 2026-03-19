@@ -9,10 +9,9 @@
  * - CoS integration (digital twin context injection)
  */
 
-import { readFile, writeFile, unlink, readdir, mkdir, stat } from 'fs/promises';
+import { readFile, writeFile, unlink, readdir, stat } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join, dirname, basename } from 'path';
-import { fileURLToPath } from 'url';
+import { join, basename } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import EventEmitter from 'events';
 import { getActiveProvider, getProviderById } from './providers.js';
@@ -22,11 +21,9 @@ import {
   documentMetaSchema,
   testHistoryEntrySchema
 } from '../lib/digitalTwinValidation.js';
-import { safeJSONParse } from '../lib/fileUtils.js';
+import { ensureDir, safeJSONParse, PATHS } from '../lib/fileUtils.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const DIGITAL_TWIN_DIR = join(__dirname, '../../data/digital-twin');
+const DIGITAL_TWIN_DIR = PATHS.digitalTwin;
 const META_FILE = join(DIGITAL_TWIN_DIR, 'meta.json');
 
 // Event emitter for digital twin data changes
@@ -271,7 +268,7 @@ function now() {
 
 async function ensureSoulDir() {
   if (!existsSync(DIGITAL_TWIN_DIR)) {
-    await mkdir(DIGITAL_TWIN_DIR, { recursive: true });
+    await ensureDir(DIGITAL_TWIN_DIR);
     console.log(`🧬 Created soul data directory: ${DIGITAL_TWIN_DIR}`);
   }
 }

@@ -4,22 +4,17 @@
  * Stores config in data/browser-config.json
  */
 
-import { readFile, writeFile, mkdir } from 'fs/promises';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readFile, writeFile } from 'fs/promises';
+import { join } from 'path';
 import { EventEmitter } from 'events';
-import { safeJSONParse } from '../lib/fileUtils.js';
+import { ensureDir, safeJSONParse, PATHS } from '../lib/fileUtils.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const PROJECT_ROOT = join(__dirname, '..', '..');
-const DATA_DIR = join(PROJECT_ROOT, 'data');
-const CONFIG_FILE = join(DATA_DIR, 'browser-config.json');
-const ECOSYSTEM_FILE = join(PROJECT_ROOT, 'ecosystem.config.cjs');
+const CONFIG_FILE = join(PATHS.data, 'browser-config.json');
+const ECOSYSTEM_FILE = join(PATHS.root, 'ecosystem.config.cjs');
 
 export const browserEvents = new EventEmitter();
 
-const DEFAULT_PROFILE_DIR = join(DATA_DIR, 'browser-profile');
+const DEFAULT_PROFILE_DIR = PATHS.browserProfile;
 
 const DEFAULT_CONFIG = {
   cdpPort: 5556,
@@ -43,7 +38,7 @@ export async function loadConfig() {
 }
 
 export async function saveConfig(config) {
-  await mkdir(DATA_DIR, { recursive: true });
+  await ensureDir(DATA_DIR);
   cachedConfig = { ...DEFAULT_CONFIG, ...config };
   await writeFile(CONFIG_FILE, JSON.stringify(cachedConfig, null, 2));
   browserEvents.emit('config:changed', cachedConfig);

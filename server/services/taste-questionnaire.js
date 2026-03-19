@@ -6,19 +6,16 @@
  * with branching follow-up questions based on responses.
  */
 
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { safeJSONParse } from '../lib/fileUtils.js';
+import { ensureDir, safeJSONParse, PATHS } from '../lib/fileUtils.js';
 import { getActiveProvider, getProviderById } from './providers.js';
 import { buildPrompt } from './promptService.js';
 import { digitalTwinEvents } from './digital-twin.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const DIGITAL_TWIN_DIR = join(__dirname, '../../data/digital-twin');
+const DIGITAL_TWIN_DIR = PATHS.digitalTwin;
 const TASTE_PROFILE_FILE = join(DIGITAL_TWIN_DIR, 'taste-profile.json');
 
 function now() {
@@ -415,7 +412,7 @@ async function loadTasteProfile() {
 
 async function saveTasteProfile(profile) {
   if (!existsSync(DIGITAL_TWIN_DIR)) {
-    await mkdir(DIGITAL_TWIN_DIR, { recursive: true });
+    await ensureDir(DIGITAL_TWIN_DIR);
   }
   profile.updatedAt = now();
   await writeFile(TASTE_PROFILE_FILE, JSON.stringify(profile, null, 2));

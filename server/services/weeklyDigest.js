@@ -6,17 +6,13 @@
  * error patterns, and accomplishments.
  */
 
-import { writeFile, mkdir, readdir } from 'fs/promises';
+import { writeFile, readdir } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import { cosEvents, emitLog, getAgents, getAgentDates, getAgentsByDate } from './cos.js';
-import { readJSONFile, formatDuration } from '../lib/fileUtils.js';
+import { ensureDir, readJSONFile, formatDuration, PATHS } from '../lib/fileUtils.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const DATA_DIR = join(__dirname, '../../data/cos');
-const DIGESTS_DIR = join(DATA_DIR, 'digests');
+const DIGESTS_DIR = PATHS.digests;
 
 /**
  * Get the start of a week (Monday) for a given date
@@ -53,7 +49,7 @@ function getWeekId(date = new Date()) {
  */
 async function ensureDigestDir() {
   if (!existsSync(DIGESTS_DIR)) {
-    await mkdir(DIGESTS_DIR, { recursive: true });
+    await ensureDir(DIGESTS_DIR);
   }
 }
 

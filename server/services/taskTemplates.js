@@ -5,15 +5,12 @@
  * Helps users quickly create tasks for frequently needed operations.
  */
 
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { readJSONFile } from '../lib/fileUtils.js';
+import { join } from 'path';
+import { ensureDir, readJSONFile, PATHS } from '../lib/fileUtils.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const DATA_DIR = join(__dirname, '../../data/cos');
+const DATA_DIR = PATHS.cos;
 const TEMPLATES_FILE = join(DATA_DIR, 'task-templates.json');
 
 // Built-in templates based on common task patterns
@@ -116,7 +113,7 @@ async function saveState(state) {
   state.lastUpdated = new Date().toISOString();
 
   if (!existsSync(DATA_DIR)) {
-    await mkdir(DATA_DIR, { recursive: true });
+    await ensureDir(DATA_DIR);
   }
 
   await writeFile(TEMPLATES_FILE, JSON.stringify(state, null, 2));

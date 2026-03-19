@@ -13,19 +13,16 @@
  * - 'custom': Custom interval in milliseconds
  */
 
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import { cosEvents, emitLog } from './cos.js';
-import { DAY, HOUR, readJSONFile } from '../lib/fileUtils.js';
+import { DAY, ensureDir, HOUR, readJSONFile, PATHS } from '../lib/fileUtils.js';
 import { getAdaptiveCooldownMultiplier } from './taskLearning.js';
 import { isTaskTypeEnabledForApp, getAppTaskTypeInterval, getActiveApps, getAppTaskTypeOverrides } from './apps.js';
 import { PORTOS_UI_URL } from '../lib/ports.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const DATA_DIR = join(__dirname, '../../data/cos');
+const DATA_DIR = PATHS.cos;
 const SCHEDULE_FILE = join(DATA_DIR, 'task-schedule.json');
 
 // Interval type constants
@@ -855,9 +852,9 @@ const DEFAULT_SCHEDULE = {
   templates: []
 };
 
-async function ensureDir() {
+async function ensureDataDir() {
   if (!existsSync(DATA_DIR)) {
-    await mkdir(DATA_DIR, { recursive: true });
+    await ensureDir(DATA_DIR);
   }
 }
 
@@ -950,7 +947,7 @@ function migrateScheduleV1toV2(schedule) {
  * Load schedule data (auto-migrates from v1 if needed)
  */
 export async function loadSchedule() {
-  await ensureDir();
+  await ensureDataDir();
 
   const loaded = await readJSONFile(SCHEDULE_FILE, null);
   if (!loaded) {
@@ -1047,7 +1044,7 @@ export async function loadSchedule() {
 }
 
 async function saveSchedule(schedule) {
-  await ensureDir();
+  await ensureDataDir();
   schedule.lastUpdated = new Date().toISOString();
   await writeFile(SCHEDULE_FILE, JSON.stringify(schedule, null, 2));
 }

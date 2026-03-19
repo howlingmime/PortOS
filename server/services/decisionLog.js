@@ -6,16 +6,13 @@
  * This helps users understand CoS behavior and identify patterns.
  */
 
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { readJSONFile } from '../lib/fileUtils.js';
+import { join } from 'path';
+import { ensureDir, readJSONFile, PATHS } from '../lib/fileUtils.js';
 import { cosEvents } from './cosEvents.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const DATA_DIR = join(__dirname, '../../data/cos');
+const DATA_DIR = PATHS.cos;
 const DECISION_FILE = join(DATA_DIR, 'decisions.json');
 
 // In-memory cache for recent decisions (avoid excessive file I/O)
@@ -58,7 +55,7 @@ async function loadDecisions() {
   }
 
   if (!existsSync(DATA_DIR)) {
-    await mkdir(DATA_DIR, { recursive: true });
+    await ensureDir(DATA_DIR);
   }
 
   decisionCache = await readJSONFile(DECISION_FILE, { ...DEFAULT_DATA });
