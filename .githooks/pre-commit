@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT"
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+run_client=false
+run_server=false
+
+while IFS= read -r file; do
+  [ -z "$file" ] && continue
+  case "$file" in
+    client/*)
+      run_client=true
+      ;;
+    server/*)
+      run_server=true
+      ;;
+    package.json|package-lock.json)
+      run_client=true
+      run_server=true
+      ;;
+  esac
+done <<< "$STAGED"
+
+if [ "$run_server" = false ] && [ "$run_client" = false ]; then
+  exit 0
+fi
+
+printf -- "\n🔎 pre-commit: validating staged PortOS changes\n"
+
+if [ "$run_server" = true ]; then
+  printf -- "- running server tests...\n"
+  npm test --prefix server
+fi
+
+if [ "$run_client" = true ]; then
+  printf -- "- running client build...\n"
+  npm run build --prefix client
+fi
+
+printf -- "✅ pre-commit checks passed\n"
