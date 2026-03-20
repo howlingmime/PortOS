@@ -143,8 +143,12 @@ export default function DayView({ accounts }) {
   const layout = useMemo(() => layoutEvents(timedEvents), [timedEvents]);
   const colorMap = useMemo(() => buildSubcalendarColorMap(accounts), [accounts]);
 
-  // Current time indicator
-  const now = new Date();
+  // Current time indicator — update every 60s so the red line moves
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
   const isToday = date.toDateString() === now.toDateString();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const nowTop = ((nowMinutes - START_MINUTES) / 60) * PX_PER_HOUR;

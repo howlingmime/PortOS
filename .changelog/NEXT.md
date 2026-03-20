@@ -22,6 +22,7 @@
 - Alcohol page summary compressed into a single compact stat bar row to maximize above-the-fold content
 
 ## Fixed
+- Calendar day view current-time red line now updates every 60 seconds instead of only on page load
 - Stokes Pick default nicotine amount corrected from 3mg to 5mg
 - UTC timezone shift showing tomorrow's date in alcohol/nicotine forms — replaced `toISOString()` with local `localDateStr()` utility
 - Server-side rolling averages and summary use local dates instead of UTC — fixes today showing 0mg despite logged entries
