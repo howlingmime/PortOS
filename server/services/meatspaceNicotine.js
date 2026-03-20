@@ -14,7 +14,7 @@ const DAILY_LOG_FILE = join(MEATSPACE_DIR, 'daily-log.json');
 const CUSTOM_PRODUCTS_FILE = join(MEATSPACE_DIR, 'custom-nicotine-products.json');
 
 const DEFAULT_PRODUCTS = [
-  { name: 'Stokes Pick (3mg)', mgPerUnit: 3 },
+  { name: 'Stokes Pick (5mg)', mgPerUnit: 5 },
 ];
 
 // Cache for rolling averages (invalidated on writes)

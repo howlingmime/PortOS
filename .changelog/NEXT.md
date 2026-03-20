@@ -12,5 +12,6 @@
 - NicotineHealthCorrelation tooltip uses Tailwind classes instead of inline styles for consistency
 
 ## Fixed
+- Stokes Pick default nicotine amount corrected from 3mg to 5mg
 
 ## Removed
