@@ -204,7 +204,13 @@ export async function logDrink({ name, oz, abv, count = 1, date }) {
     entry.alcohol = { drinks: [], standardDrinks: 0 };
   }
 
-  entry.alcohol.drinks.push(drink);
+  // Combine with existing matching drink on same date
+  const existing = entry.alcohol.drinks.find(d => d.name === drink.name && d.oz === drink.oz && d.abv === drink.abv);
+  if (existing) {
+    existing.count = (existing.count || 1) + count;
+  } else {
+    entry.alcohol.drinks.push(drink);
+  }
 
   recalcAlcoholTotal(entry);
 

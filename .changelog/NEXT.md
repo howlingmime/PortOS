@@ -12,6 +12,7 @@
 - Interactive storage backend chooser during setup: Docker PostgreSQL, Native PostgreSQL, or file-based JSON (deprecated) when Docker is unavailable
 
 ## Changed
+- Quick-add buttons for alcohol and nicotine now combine duplicate entries on the same date by incrementing count instead of stacking separate rows
 - Extracted shared `dayOfWeek` utility and `DAY_LABELS` constant to meatspace constants (deduplicated from AlcoholTab)
 - Health correlation endpoint now includes heart rate, resting heart rate, and nicotine data alongside existing HRV/alcohol/steps
 - NicotineHealthCorrelation tooltip uses Tailwind classes instead of inline styles for consistency

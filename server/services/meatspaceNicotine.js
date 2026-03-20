@@ -160,7 +160,13 @@ export async function logNicotine({ product, mgPerUnit, count = 1, date }) {
     entry.nicotine = { items: [], totalMg: 0 };
   }
 
-  entry.nicotine.items.push(item);
+  // Combine with existing matching product on same date
+  const existing = entry.nicotine.items.find(i => i.product === item.product && i.mgPerUnit === item.mgPerUnit);
+  if (existing) {
+    existing.count = (existing.count || 1) + count;
+  } else {
+    entry.nicotine.items.push(item);
+  }
   recalcDayTotal(entry);
 
   // Re-sort and update lastEntryDate
