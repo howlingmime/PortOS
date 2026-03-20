@@ -5,7 +5,7 @@ import * as api from '../../../services/api';
 import BrailleSpinner from '../../BrailleSpinner';
 import NicotineChart from '../NicotineChart';
 import NicotineHealthCorrelation from '../NicotineHealthCorrelation';
-import { dayOfWeek } from '../constants';
+import { dayOfWeek, localDateStr } from '../constants';
 
 const DAYS_PER_PAGE = 50;
 
@@ -24,9 +24,9 @@ export default function NicotineTab() {
   const [buttonForm, setButtonForm] = useState({ name: '', mgPerUnit: '' });
 
   // Form state
-  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const today = useMemo(() => localDateStr(), []);
   const [product, setProduct] = useState('');
-  const [mgPerUnit, setMgPerUnit] = useState('3');
+  const [mgPerUnit, setMgPerUnit] = useState('');
   const [count, setCount] = useState(1);
   const [date, setDate] = useState(today);
 
@@ -68,7 +68,7 @@ export default function NicotineTab() {
     const days = { '7d': 7, '30d': 30, '90d': 90 }[chartView] || 30;
     const d = new Date();
     d.setDate(d.getDate() - days);
-    return { correlationFrom: d.toISOString().split('T')[0], correlationTo: new Date().toISOString().split('T')[0] };
+    return { correlationFrom: localDateStr(d), correlationTo: localDateStr() };
   }, [chartView]);
 
   useEffect(() => {
@@ -101,7 +101,7 @@ export default function NicotineTab() {
     }).catch(() => null);
     setLogging(false);
     setProduct('');
-    setMgPerUnit('3');
+    setMgPerUnit('');
     setCount(1);
     setRefreshKey(k => k + 1);
   };
@@ -116,7 +116,8 @@ export default function NicotineTab() {
     setEditForm({
       product: item.product || '',
       mgPerUnit: String(item.mgPerUnit || ''),
-      count: item.count || 1
+      count: item.count || 1,
+      date: entryDate
     });
   };
 
@@ -131,7 +132,8 @@ export default function NicotineTab() {
     await api.updateNicotineEntry(entryDate, index, {
       product: editForm.product,
       mgPerUnit: parseFloat(editForm.mgPerUnit),
-      count: parseInt(editForm.count, 10) || 1
+      count: parseInt(editForm.count, 10) || 1,
+      date: editForm.date !== entryDate ? editForm.date : undefined
     }).catch(() => null);
     setEditingKey(null);
     setRefreshKey(k => k + 1);
@@ -373,6 +375,7 @@ export default function NicotineTab() {
               value={mgPerUnit}
               onChange={e => setMgPerUnit(e.target.value)}
               className="w-full bg-port-bg border border-port-border rounded px-3 py-2 text-sm text-white"
+              placeholder="5"
               step="0.1"
               min="0.1"
               required
@@ -431,14 +434,20 @@ export default function NicotineTab() {
                   const isEditing = editingKey === key;
 
                   return (
-                    <div key={idx} className="flex items-center gap-2 py-1 pl-4 text-sm">
+                    <div key={idx} className="flex flex-wrap items-center gap-2 py-1 pl-4 text-sm">
                       {isEditing ? (
                         <>
+                          <input
+                            type="date"
+                            value={editForm.date}
+                            onChange={e => setEditForm({ ...editForm, date: e.target.value })}
+                            className="bg-port-bg border border-port-border rounded px-2 py-1 text-sm text-white"
+                          />
                           <input
                             type="text"
                             value={editForm.product}
                             onChange={e => setEditForm({ ...editForm, product: e.target.value })}
-                            className="flex-1 bg-port-bg border border-port-border rounded px-2 py-1 text-sm text-white"
+                            className="flex-1 min-w-[80px] bg-port-bg border border-port-border rounded px-2 py-1 text-sm text-white"
                           />
                           <input
                             type="number"

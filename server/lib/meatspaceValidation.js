@@ -74,7 +74,8 @@ export const drinkUpdateSchema = z.object({
   name: z.string().max(200).optional(),
   oz: z.number().min(0.1).max(1000).optional(),
   abv: z.number().min(0).max(100).optional(),
-  count: z.number().int().min(1).max(100).optional()
+  count: z.number().int().min(1).max(100).optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
 });
 
 export const customDrinkSchema = z.object({
@@ -99,7 +100,8 @@ export const nicotineLogSchema = z.object({
 export const nicotineUpdateSchema = z.object({
   product: z.string().max(200).optional(),
   mgPerUnit: z.number().min(0.1).max(100).optional(),
-  count: z.number().int().min(1).max(100).optional()
+  count: z.number().int().min(1).max(100).optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
 });
 
 export const customNicotineProductSchema = z.object({

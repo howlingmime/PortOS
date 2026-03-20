@@ -45,6 +45,7 @@ import {
   Ticket,
   Network,
   Flame,
+  Cigarette,
   Skull,
   HeartPulse,
   ClipboardList,
@@ -188,6 +189,7 @@ const navItems = [
       { to: '/meatspace/health', label: 'Health', icon: Heart },
       { to: '/meatspace/import', label: 'Import', icon: Upload },
       { to: '/meatspace/lifestyle', label: 'Lifestyle', icon: ClipboardList },
+      { to: '/meatspace/nicotine', label: 'Nicotine', icon: Cigarette },
       { to: '/meatspace/overview', label: 'Overview', icon: Activity },
     ]
   },

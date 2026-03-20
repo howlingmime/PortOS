@@ -183,6 +183,37 @@ export async function updateNicotine(date, index, updates) {
   if (updates.mgPerUnit !== undefined) item.mgPerUnit = updates.mgPerUnit;
   if (updates.count !== undefined) item.count = updates.count;
 
+  // Move to different date if requested
+  const newDate = updates.date;
+  if (newDate && newDate !== date) {
+    entry.nicotine.items.splice(index, 1);
+    if (entry.nicotine.items.length === 0) {
+      delete entry.nicotine;
+      // Remove entry entirely if no other data keys remain
+      if (Object.keys(entry).length <= 1) {
+        log.entries = log.entries.filter(e => e !== entry);
+      }
+    } else {
+      recalcDayTotal(entry);
+    }
+
+    let targetEntry = log.entries.find(e => e.date === newDate);
+    if (!targetEntry) {
+      targetEntry = { date: newDate };
+      log.entries.push(targetEntry);
+    }
+    if (!targetEntry.nicotine) targetEntry.nicotine = { items: [], totalMg: 0 };
+    targetEntry.nicotine.items.push(item);
+    recalcDayTotal(targetEntry);
+
+    log.entries.sort((a, b) => a.date.localeCompare(b.date));
+    log.lastEntryDate = log.entries[log.entries.length - 1].date;
+
+    await saveDailyLog(log);
+    console.log(`📝 Moved nicotine from ${date}[${index}] to ${newDate}: ${item.product || 'unnamed'} ${item.mgPerUnit}mg x${item.count}`);
+    return { item, dayTotal: targetEntry.nicotine.totalMg, date: newDate };
+  }
+
   recalcDayTotal(entry);
 
   await saveDailyLog(log);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Beer, Plus, Trash2, AlertTriangle, TrendingDown, TrendingUp, Pencil, Check, X, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as api from '../../../services/api';
@@ -6,7 +6,7 @@ import BrailleSpinner from '../../BrailleSpinner';
 import AlcoholChart from '../AlcoholChart';
 import AlcoholHrvCorrelation from '../AlcoholHrvCorrelation';
 import StandardDrinkCalculator from '../StandardDrinkCalculator';
-import { dayOfWeek } from '../constants';
+import { dayOfWeek, localDateStr } from '../constants';
 
 const ML_PER_OZ = 29.5735;
 
@@ -59,7 +59,7 @@ export default function AlcoholTab() {
   const [oz, setOz] = useState('');
   const [abv, setAbv] = useState('');
   const [count, setCount] = useState(1);
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(localDateStr());
   const [volumeUnit, setVolumeUnit] = useState('oz');
 
   // Inline edit state
@@ -99,9 +99,12 @@ export default function AlcoholTab() {
   }, [fetchData, refreshKey]);
 
   // Fetch correlation data for HRV chart
-  const chartDays = { '7d': 7, '30d': 30, '90d': 90 }[chartView] || 30;
-  const correlationFrom = (() => { const d = new Date(); d.setDate(d.getDate() - chartDays); return d.toISOString().split('T')[0]; })();
-  const correlationTo = new Date().toISOString().split('T')[0];
+  const { correlationFrom, correlationTo } = useMemo(() => {
+    const days = { '7d': 7, '30d': 30, '90d': 90 }[chartView] || 30;
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return { correlationFrom: localDateStr(d), correlationTo: localDateStr() };
+  }, [chartView]);
 
   useEffect(() => {
     api.getAppleHealthCorrelation(correlationFrom, correlationTo)
@@ -153,7 +156,8 @@ export default function AlcoholTab() {
       name: drink.name || '',
       oz: String(drink.oz || ''),
       abv: String(drink.abv || ''),
-      count: drink.count || 1
+      count: drink.count || 1,
+      date: entryDate
     });
   };
 
@@ -169,7 +173,8 @@ export default function AlcoholTab() {
       name: editForm.name,
       oz: Math.round(toOz(parseFloat(editForm.oz), editVolumeUnit) * 100) / 100,
       abv: parseFloat(editForm.abv),
-      count: parseInt(editForm.count, 10) || 1
+      count: parseInt(editForm.count, 10) || 1,
+      date: editForm.date !== entryDate ? editForm.date : undefined
     }).catch(() => null);
     setEditingKey(null);
     setRefreshKey(k => k + 1);
@@ -567,7 +572,14 @@ export default function AlcoholTab() {
                         }`}
                       >
                         <td className="px-3 py-1.5">
-                          {idx === 0 ? (
+                          {isEditing ? (
+                            <input
+                              type="date"
+                              value={editForm.date}
+                              onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))}
+                              className="bg-port-bg border border-port-border rounded px-2 py-1 text-xs text-white"
+                            />
+                          ) : idx === 0 ? (
                             <div>
                               <span className="text-gray-500 text-xs w-7 inline-block">{dayOfWeek(entry.date)}</span>
                               <span className="text-gray-300 font-medium">{entry.date}</span>

@@ -205,11 +205,7 @@ export async function logDrink({ name, oz, abv, count = 1, date }) {
 
   entry.alcohol.drinks.push(drink);
 
-  // Recalculate total standard drinks for the day
-  entry.alcohol.standardDrinks = entry.alcohol.drinks.reduce((sum, d) => {
-    return sum + computeStandardDrinks((d.oz || 0) * (d.count || 1), d.abv || 0);
-  }, 0);
-  entry.alcohol.standardDrinks = Math.round(entry.alcohol.standardDrinks * 100) / 100;
+  recalcAlcoholTotal(entry);
 
   // Re-sort and update lastEntryDate
   log.entries.sort((a, b) => a.date.localeCompare(b.date));
@@ -219,6 +215,13 @@ export async function logDrink({ name, oz, abv, count = 1, date }) {
   console.log(`🍺 Logged drink: ${name || 'unnamed'} ${oz}oz @ ${abv}% (${standardDrinks} std drinks) on ${targetDate}`);
 
   return { drink, standardDrinks, date: targetDate, dayTotal: entry.alcohol.standardDrinks };
+}
+
+function recalcAlcoholTotal(entry) {
+  entry.alcohol.standardDrinks = entry.alcohol.drinks.reduce((sum, d) => {
+    return sum + computeStandardDrinks((d.oz || 0) * (d.count || 1), d.abv || 0);
+  }, 0);
+  entry.alcohol.standardDrinks = Math.round(entry.alcohol.standardDrinks * 100) / 100;
 }
 
 export async function updateDrink(date, index, updates) {
@@ -232,11 +235,38 @@ export async function updateDrink(date, index, updates) {
   if (updates.abv !== undefined) drink.abv = updates.abv;
   if (updates.count !== undefined) drink.count = updates.count;
 
-  // Recalculate total
-  entry.alcohol.standardDrinks = entry.alcohol.drinks.reduce((sum, d) => {
-    return sum + computeStandardDrinks((d.oz || 0) * (d.count || 1), d.abv || 0);
-  }, 0);
-  entry.alcohol.standardDrinks = Math.round(entry.alcohol.standardDrinks * 100) / 100;
+  // Move to different date if requested
+  const newDate = updates.date;
+  if (newDate && newDate !== date) {
+    entry.alcohol.drinks.splice(index, 1);
+    if (entry.alcohol.drinks.length === 0) {
+      delete entry.alcohol;
+      // Remove entry entirely if no other data keys remain
+      if (Object.keys(entry).length <= 1) {
+        log.entries = log.entries.filter(e => e !== entry);
+      }
+    } else {
+      recalcAlcoholTotal(entry);
+    }
+
+    let targetEntry = log.entries.find(e => e.date === newDate);
+    if (!targetEntry) {
+      targetEntry = { date: newDate };
+      log.entries.push(targetEntry);
+    }
+    if (!targetEntry.alcohol) targetEntry.alcohol = { drinks: [], standardDrinks: 0 };
+    targetEntry.alcohol.drinks.push(drink);
+    recalcAlcoholTotal(targetEntry);
+
+    log.entries.sort((a, b) => a.date.localeCompare(b.date));
+    log.lastEntryDate = log.entries[log.entries.length - 1].date;
+
+    await saveDailyLog(log);
+    console.log(`📝 Moved drink from ${date}[${index}] to ${newDate}: ${drink.name || 'unnamed'} ${drink.oz}oz @ ${drink.abv}%`);
+    return { drink, dayTotal: targetEntry.alcohol.standardDrinks, date: newDate };
+  }
+
+  recalcAlcoholTotal(entry);
 
   await saveDailyLog(log);
   console.log(`📝 Updated drink on ${date}[${index}]: ${drink.name || 'unnamed'} ${drink.oz}oz @ ${drink.abv}%`);
@@ -250,15 +280,11 @@ export async function removeDrink(date, index) {
 
   const removed = entry.alcohol.drinks.splice(index, 1)[0];
 
-  // Recalculate total
-  entry.alcohol.standardDrinks = entry.alcohol.drinks.reduce((sum, d) => {
-    return sum + computeStandardDrinks((d.oz || 0) * (d.count || 1), d.abv || 0);
-  }, 0);
-  entry.alcohol.standardDrinks = Math.round(entry.alcohol.standardDrinks * 100) / 100;
-
-  // Remove alcohol section if empty
+  // Remove alcohol section if empty, else recalculate total
   if (entry.alcohol.drinks.length === 0) {
     delete entry.alcohol;
+  } else {
+    recalcAlcoholTotal(entry);
   }
 
   await saveDailyLog(log);

@@ -4,6 +4,7 @@ import {
 } from 'recharts';
 import * as api from '../../services/api';
 import BrailleSpinner from '../BrailleSpinner';
+import { localDateStr } from './constants';
 
 const VIEWS = [
   { id: '7d', label: '7 Days', days: 7 },
@@ -25,8 +26,8 @@ export default function AlcoholChart({ sex = 'male', onRefreshKey, onViewChange 
     const days = VIEWS.find(v => v.id === view)?.days || 30;
     const from = new Date();
     from.setDate(from.getDate() - days);
-    const fromStr = from.toISOString().split('T')[0];
-    const toStr = new Date().toISOString().split('T')[0];
+    const fromStr = localDateStr(from);
+    const toStr = localDateStr();
 
     const entries = await api.getDailyAlcohol(fromStr, toStr).catch(() => []);
 
@@ -40,7 +41,7 @@ export default function AlcoholChart({ sex = 'male', onRefreshKey, onViewChange 
     const cursor = new Date(from);
     const end = new Date(toStr);
     while (cursor <= end) {
-      const dateStr = cursor.toISOString().split('T')[0];
+      const dateStr = localDateStr(cursor);
       const drinks = dateMap[dateStr] || 0;
       chartData.push({
         date: dateStr,
