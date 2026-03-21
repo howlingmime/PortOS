@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Brain, Cpu, Package, History, HeartPulse, Search, Loader2 } from 'lucide-react';
 import { useCmdKSearch } from '../hooks/useCmdKSearch';
+import { useScrollLock } from '../hooks/useScrollLock';
 import { search } from '../services/api';
 
 const ICON_MAP = { Brain, Cpu, Package, History, HeartPulse };
@@ -40,10 +41,7 @@ export default function CmdKSearch() {
   }, [open]);
 
   // Lock body scroll when open
-  useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [open]);
+  useScrollLock(open);
 
   // Clear state when overlay closes
   useEffect(() => {

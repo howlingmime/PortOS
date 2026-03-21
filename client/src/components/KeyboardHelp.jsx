@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Keyboard, X } from 'lucide-react';
 import { useKeyboardHelp } from '../hooks/useKeyboardHelp';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac');
 const mod = isMac ? '\u2318' : 'Ctrl';
@@ -43,14 +44,44 @@ function Kbd({ children }) {
 
 export default function KeyboardHelp() {
   const { open, setOpen } = useKeyboardHelp();
+  const dialogRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const previousFocusRef = useRef(null);
 
-  const close = () => setOpen(false);
+  const close = useCallback(() => setOpen(false), [setOpen]);
 
   // Lock body scroll when open
+  useScrollLock(open);
+
+  // Focus management: capture previous focus, focus close button on open, restore on close
   useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    if (open) {
+      previousFocusRef.current = document.activeElement;
+      // Defer focus to after portal render
+      requestAnimationFrame(() => closeButtonRef.current?.focus());
+    } else if (previousFocusRef.current) {
+      previousFocusRef.current.focus();
+      previousFocusRef.current = null;
+    }
   }, [open]);
+
+  // Focus trap: keep Tab/Shift+Tab within the dialog
+  const handleKeyDown = useCallback((e) => {
+    if (e.key !== 'Tab') return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const focusable = dialog.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }, []);
 
   if (!open) return null;
 
@@ -64,14 +95,22 @@ export default function KeyboardHelp() {
       />
 
       {/* Modal */}
-      <div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" className="relative w-full max-w-lg mx-4 bg-port-card rounded-xl border border-port-border shadow-2xl overflow-hidden">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="keyboard-help-title"
+        className="relative w-full max-w-lg mx-4 bg-port-card rounded-xl border border-port-border shadow-2xl overflow-hidden"
+        onKeyDown={handleKeyDown}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-port-border">
           <div className="flex items-center gap-2.5">
             <Keyboard size={18} className="text-port-accent" />
-            <h2 className="text-sm font-semibold text-white">Keyboard Shortcuts</h2>
+            <h2 id="keyboard-help-title" className="text-sm font-semibold text-white">Keyboard Shortcuts</h2>
           </div>
           <button
+            ref={closeButtonRef}
             onClick={close}
             className="p-1 text-gray-500 hover:text-white transition-colors rounded"
             aria-label="Close keyboard shortcuts"
