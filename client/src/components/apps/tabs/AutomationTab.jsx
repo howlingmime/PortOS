@@ -34,8 +34,8 @@ export default function AutomationTab({ appId, appName }) {
     fetchData();
   }, [fetchData]);
 
-  const handleToggle = async (taskType, currentEnabled) => {
-    const newEnabled = currentEnabled === false;
+  const handleToggle = async (taskType, isEnabled) => {
+    const newEnabled = !isEnabled;
     await api.updateAppTaskTypeOverride(appId, taskType, { enabled: newEnabled }).catch(err => {
       toast.error(err.message);
       return null;
@@ -124,7 +124,7 @@ export default function AutomationTab({ appId, appName }) {
                 {taskTypes.map(taskType => {
                   const override = overrides[taskType] || {};
                   const globalConfig = schedule.tasks[taskType] || {};
-                  const isEnabled = override.enabled !== false;
+                  const isEnabled = override.enabled === true;
                   const overrideInterval = override.interval || null;
 
                   return (
@@ -137,7 +137,7 @@ export default function AutomationTab({ appId, appName }) {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button
-                          onClick={() => handleToggle(taskType, override.enabled)}
+                          onClick={() => handleToggle(taskType, isEnabled)}
                           className={`w-10 h-5 rounded-full transition-colors relative ${
                             isEnabled ? 'bg-port-success' : 'bg-gray-600'
                           }`}

@@ -345,7 +345,7 @@ function GlobalConfigControls({ taskType, config, onUpdate, onTrigger, onReset, 
 
 function AppOverrideRow({ app, taskType, globalIntervalType, globalTaskMetadata, override, onUpdate }) {
   const [updating, setUpdating] = useState(false);
-  const isEnabled = override?.enabled !== false;
+  const isEnabled = override?.enabled === true;
   const currentInterval = override?.interval || null;
 
   const handleToggle = async () => {
@@ -434,8 +434,8 @@ function PerAppOverrideList({ taskType, config, apps, onUpdateOverride, onBulkTo
 
   if (activeApps.length === 0) return null;
 
-  const allEnabled = activeApps.every(app => appOverrides[app.id]?.enabled !== false);
-  const allDisabled = activeApps.every(app => appOverrides[app.id]?.enabled === false);
+  const allEnabled = activeApps.every(app => appOverrides[app.id]?.enabled === true);
+  const allDisabled = activeApps.every(app => appOverrides[app.id]?.enabled !== true);
 
   const handleBulkToggle = async () => {
     setBulkUpdating(true);

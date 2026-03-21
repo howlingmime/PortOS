@@ -873,7 +873,7 @@ const DEFAULT_TASK_INTERVALS = {
   'typing':              { type: INTERVAL_TYPES.ONCE, enabled: false, providerId: null, model: null, prompt: null },
   'release-check':       { type: INTERVAL_TYPES.ON_DEMAND, enabled: false, providerId: null, model: null, prompt: null },
   'pr-reviewer':         { type: INTERVAL_TYPES.CUSTOM, intervalMs: 7200000, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null },
-  'jira-sprint-manager': { type: INTERVAL_TYPES.DAILY, enabled: false, weekdaysOnly: true, optIn: true, providerId: null, model: null, prompt: null, taskMetadata: { useWorktree: true, simplify: true } }
+  'jira-sprint-manager': { type: INTERVAL_TYPES.DAILY, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null, taskMetadata: { useWorktree: true, simplify: true } }
 };
 
 /**
@@ -1189,19 +1189,10 @@ export async function shouldRunTask(taskType, appId = null) {
     }
   }
 
-  // Check per-app override
   if (appId) {
-    if (interval.optIn) {
-      // Opt-in tasks require explicit per-app enablement (default: disabled)
-      const overrides = await getAppTaskTypeOverrides(appId);
-      if (overrides[taskType]?.enabled !== true) {
-        return { shouldRun: false, reason: 'opt-in-not-enabled' };
-      }
-    } else {
-      const enabledForApp = await isTaskTypeEnabledForApp(appId, taskType);
-      if (!enabledForApp) {
-        return { shouldRun: false, reason: 'disabled-for-app' };
-      }
+    const enabledForApp = await isTaskTypeEnabledForApp(appId, taskType);
+    if (!enabledForApp) {
+      return { shouldRun: false, reason: 'disabled-for-app' };
     }
   }
 
@@ -1478,11 +1469,7 @@ export async function getScheduleStatus() {
     // Check global shouldRun status
     const check = await shouldRunTask(taskType);
 
-    // Build per-app overrides map and count enabled apps
-    // Opt-in tasks default to disabled; standard tasks default to enabled
-    const isEnabledForApp = interval.optIn
-      ? (override) => override?.enabled === true
-      : (override) => !override || override.enabled !== false;
+    const isEnabledForApp = (override) => override?.enabled === true;
     const appOverrides = {};
     let enabledAppCount = 0;
     const allOverrides = await Promise.all(activeApps.map(app => getAppTaskTypeOverrides(app.id)));
