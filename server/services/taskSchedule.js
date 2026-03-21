@@ -107,7 +107,7 @@ async function getPerformanceAdjustedInterval(taskType, baseIntervalMs) {
 }
 
 // ============================================================
-// Unified DEFAULT_TASK_PROMPTS (15 task types)
+// Unified DEFAULT_TASK_PROMPTS (17 task types)
 // All prompts use {appName} and {repoPath} template variables
 // ============================================================
 
@@ -574,6 +574,49 @@ Do NOT comment on JIRA tickets directly — all action items go to the Review Hu
 
 9. Generate a summary report covering triage actions taken and implementation work completed`,
 
+  'branch-cleanup': `[Improvement: {appName}] Branch Cleanup — Delete Merged Branches
+
+Clean up stale branches in {appName} that have already been merged into the default branch.
+
+Repository: {repoPath}
+
+## Phase 1 — Identify Merged Branches
+
+1. cd into {repoPath}
+2. Run \`git fetch origin --prune\` to sync remote refs and remove stale tracking references
+3. Detect the default branch: \`git branch --list\` — look for main, then master
+4. List all local branches: \`git branch --format='%(refname:short)'\`
+5. List merged branches: \`git branch --merged <defaultBranch> --format='%(refname:short)'\`
+6. Filter out protected branches that must NEVER be deleted:
+   - main, master (default branches)
+   - release (release branch)
+   - dev, develop (development branches)
+   - The currently checked-out branch
+
+## Phase 2 — Delete Merged Local Branches
+
+7. For each merged branch that is NOT protected:
+   - Delete locally: \`git branch -d <branch>\`
+   - Log the branch name and result
+
+## Phase 3 — Clean Up Merged Remote Branches
+
+8. List remote branches merged into the default branch: \`git branch -r --merged origin/<defaultBranch> --format='%(refname:short)'\`
+9. Filter out protected remote branches (origin/main, origin/master, origin/release, origin/dev, origin/develop, origin/HEAD)
+10. For each merged remote branch:
+    - Delete remotely: \`git push origin --delete <branch>\`
+    - Log the branch name and result
+
+## Phase 4 — Report
+
+11. Summarize:
+    - Total branches found (local and remote)
+    - Branches deleted (local and remote)
+    - Branches skipped (protected or unmerged)
+    - Any errors encountered
+
+IMPORTANT: Never delete unmerged branches. Only delete branches fully merged into the default branch. Use \`git branch -d\` (not -D) for local branches to ensure safety.`,
+
   'pr-reviewer': `[Improvement: {appName}] PR Review — Check Open PRs
 
 Review open pull requests / merge requests on {appName} from other contributors and post code reviews on any that lack a review since the last commit.
@@ -805,10 +848,10 @@ When PLAN.md is missing, empty, or fully completed, brainstorm and implement a n
   ]
 };
 
-// Unified default interval settings for all 15 task types
+// Unified default interval settings for all 17 task types
 export const SELF_IMPROVEMENT_TASK_TYPES = [
   'security', 'code-quality', 'test-coverage', 'performance',
-  'accessibility', 'console-errors', 'dependency-updates', 'documentation',
+  'accessibility', 'branch-cleanup', 'console-errors', 'dependency-updates', 'documentation',
   'ui-bugs', 'mobile-responsive', 'feature-ideas', 'error-handling',
   'typing', 'release-check', 'pr-reviewer', 'jira-sprint-manager'
 ];
@@ -819,6 +862,7 @@ const DEFAULT_TASK_INTERVALS = {
   'test-coverage':       { type: INTERVAL_TYPES.WEEKLY, enabled: false, providerId: null, model: null, prompt: null },
   'performance':         { type: INTERVAL_TYPES.WEEKLY, enabled: false, providerId: null, model: null, prompt: null },
   'accessibility':       { type: INTERVAL_TYPES.ONCE, enabled: false, providerId: null, model: null, prompt: null },
+  'branch-cleanup':      { type: INTERVAL_TYPES.WEEKLY, enabled: false, providerId: null, model: null, prompt: null },
   'console-errors':      { type: INTERVAL_TYPES.ROTATION, enabled: false, providerId: null, model: null, prompt: null },
   'dependency-updates':  { type: INTERVAL_TYPES.WEEKLY, enabled: false, providerId: null, model: null, prompt: null },
   'documentation':       { type: INTERVAL_TYPES.ONCE, enabled: false, providerId: null, model: null, prompt: null },
@@ -1619,6 +1663,7 @@ function getTaskTypeDescription(taskType) {
     'documentation': 'Update documentation',
     'feature-ideas': 'Implement next planned feature or brainstorm new one',
     'accessibility': 'Accessibility audit',
+    'branch-cleanup': 'Clean up merged branches',
     'dependency-updates': 'Update dependencies',
     'release-check': 'Check dev for release readiness',
     'error-handling': 'Improve error handling',
