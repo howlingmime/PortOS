@@ -3,15 +3,13 @@ import { createPortal } from 'react-dom';
 import { Keyboard, X } from 'lucide-react';
 import { useKeyboardHelp } from '../hooks/useKeyboardHelp';
 import { useScrollLock } from '../hooks/useScrollLock';
-
-const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac');
-const mod = isMac ? '\u2318' : 'Ctrl';
+import { modKey } from '../utils/platform';
 
 const SHORTCUT_SECTIONS = [
   {
     title: 'Global',
     shortcuts: [
-      { keys: [`${mod}+K`], description: 'Open search' },
+      { keys: [`${modKey}+K`], description: 'Open search' },
       { keys: ['?'], description: 'Show keyboard shortcuts' },
       { keys: ['Esc'], description: 'Close overlays' },
     ],

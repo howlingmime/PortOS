@@ -11,13 +11,10 @@ export function useKeyboardHelp() {
         return;
       }
 
-      // Don't trigger shortcuts when typing in inputs/textareas/contenteditable
-      const tag = e.target.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return;
-      // Don't trigger with modifier keys
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-
+      // ? toggle — check key before modifiers so AltGr layouts (ctrlKey+altKey) still work
       if (e.key === '?' && !e.repeat) {
+        const tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return;
         e.preventDefault();
         setOpen(prev => !prev);
       }

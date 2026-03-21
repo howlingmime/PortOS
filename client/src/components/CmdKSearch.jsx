@@ -5,6 +5,7 @@ import { Brain, Cpu, Package, History, HeartPulse, Search, Loader2 } from 'lucid
 import { useCmdKSearch } from '../hooks/useCmdKSearch';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { search } from '../services/api';
+import { modKey } from '../utils/platform';
 
 const ICON_MAP = { Brain, Cpu, Package, History, HeartPulse };
 
@@ -144,7 +145,7 @@ export default function CmdKSearch() {
             aria-label="Search PortOS"
           />
           <span className="text-xs text-gray-500 border border-port-border rounded px-1.5 py-0.5 shrink-0">
-            {navigator.platform?.includes('Mac') ? '⌘K' : 'Ctrl+K'}
+            {`${modKey}+K`}
           </span>
         </div>
 
