@@ -76,9 +76,11 @@ export default function Ambient() {
       idleTimer.current = setTimeout(() => setIdle(true), IDLE_DELAY);
     };
     window.addEventListener('mousemove', resetIdle);
+    window.addEventListener('touchstart', resetIdle);
     idleTimer.current = setTimeout(() => setIdle(true), IDLE_DELAY);
     return () => {
       window.removeEventListener('mousemove', resetIdle);
+      window.removeEventListener('touchstart', resetIdle);
       if (idleTimer.current) clearTimeout(idleTimer.current);
     };
   }, []);
@@ -128,7 +130,8 @@ export default function Ambient() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-8 gap-8">
+      <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
+        <div className="min-h-full flex flex-col items-center justify-center p-8 gap-8">
         <div className="text-center">
           <div className="text-7xl sm:text-8xl md:text-9xl font-mono font-light tracking-wider text-white/90 tabular-nums">
             {formatClockTime(time)}
@@ -222,6 +225,7 @@ export default function Ambient() {
               </div>
             )}
           </AmbientPanel>
+        </div>
         </div>
       </div>
 
