@@ -1,13 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   cosineSimilarity,
-  euclideanDistance,
   normalize,
   findTopK,
   findAboveThreshold,
-  averageVectors,
-  clusterBySimilarity,
-  similarityMatrix
+  clusterBySimilarity
 } from './vectorMath.js';
 
 describe('vectorMath.js', () => {
@@ -57,39 +54,6 @@ describe('vectorMath.js', () => {
       const a = Array(768).fill(0.5);
       const b = Array(768).fill(0.5);
       expect(cosineSimilarity(a, b)).toBeCloseTo(1.0);
-    });
-  });
-
-  describe('euclideanDistance', () => {
-    it('should return 0 for identical vectors', () => {
-      const a = [1, 2, 3];
-      const b = [1, 2, 3];
-      expect(euclideanDistance(a, b)).toBe(0);
-    });
-
-    it('should calculate distance correctly', () => {
-      const a = [0, 0];
-      const b = [3, 4];
-      expect(euclideanDistance(a, b)).toBe(5); // 3-4-5 triangle
-    });
-
-    it('should return Infinity for null inputs', () => {
-      expect(euclideanDistance(null, [1, 2])).toBe(Infinity);
-      expect(euclideanDistance([1, 2], null)).toBe(Infinity);
-    });
-
-    it('should return Infinity for different length vectors', () => {
-      expect(euclideanDistance([1, 2], [1, 2, 3])).toBe(Infinity);
-    });
-
-    it('should return Infinity for empty vectors', () => {
-      expect(euclideanDistance([], [])).toBe(Infinity);
-    });
-
-    it('should be commutative', () => {
-      const a = [1, 2, 3];
-      const b = [4, 5, 6];
-      expect(euclideanDistance(a, b)).toBe(euclideanDistance(b, a));
     });
   });
 
@@ -226,42 +190,6 @@ describe('vectorMath.js', () => {
     });
   });
 
-  describe('averageVectors', () => {
-    it('should calculate average of vectors', () => {
-      const vectors = [
-        [1, 2, 3],
-        [3, 2, 1],
-        [2, 2, 2]
-      ];
-      const avg = averageVectors(vectors);
-      expect(avg).toEqual([2, 2, 2]);
-    });
-
-    it('should return empty for null input', () => {
-      expect(averageVectors(null)).toEqual([]);
-    });
-
-    it('should return empty for empty array', () => {
-      expect(averageVectors([])).toEqual([]);
-    });
-
-    it('should handle single vector', () => {
-      const vectors = [[1, 2, 3]];
-      const avg = averageVectors(vectors);
-      expect(avg).toEqual([1, 2, 3]);
-    });
-
-    it('should handle decimal results', () => {
-      const vectors = [
-        [1, 0],
-        [0, 1]
-      ];
-      const avg = averageVectors(vectors);
-      expect(avg[0]).toBeCloseTo(0.5);
-      expect(avg[1]).toBeCloseTo(0.5);
-    });
-  });
-
   describe('clusterBySimilarity', () => {
     it('should cluster similar items together', () => {
       const items = [
@@ -306,57 +234,6 @@ describe('vectorMath.js', () => {
       ];
       const clusters = clusterBySimilarity(items);
       expect(clusters.length).toBe(1);
-    });
-  });
-
-  describe('similarityMatrix', () => {
-    it('should compute pairwise similarity matrix', () => {
-      const vectors = {
-        'a': [1, 0],
-        'b': [0, 1],
-        'c': [1, 0]
-      };
-
-      const { ids, matrix } = similarityMatrix(vectors);
-
-      expect(ids).toHaveLength(3);
-      expect(matrix).toHaveLength(3);
-      expect(matrix[0]).toHaveLength(3);
-
-      // Diagonal should be 1
-      for (let i = 0; i < ids.length; i++) {
-        expect(matrix[i][i]).toBe(1);
-      }
-    });
-
-    it('should be symmetric', () => {
-      const vectors = {
-        'a': [1, 0],
-        'b': [0.5, 0.5],
-        'c': [0, 1]
-      };
-
-      const { matrix } = similarityMatrix(vectors);
-
-      for (let i = 0; i < matrix.length; i++) {
-        for (let j = 0; j < matrix.length; j++) {
-          expect(matrix[i][j]).toBeCloseTo(matrix[j][i]);
-        }
-      }
-    });
-
-    it('should handle single vector', () => {
-      const vectors = { 'a': [1, 0] };
-      const { ids, matrix } = similarityMatrix(vectors);
-
-      expect(ids).toEqual(['a']);
-      expect(matrix).toEqual([[1]]);
-    });
-
-    it('should handle empty vectors object', () => {
-      const { ids, matrix } = similarityMatrix({});
-      expect(ids).toEqual([]);
-      expect(matrix).toEqual([]);
     });
   });
 });

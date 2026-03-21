@@ -14,6 +14,9 @@
 - Interactive storage backend chooser during setup: Docker PostgreSQL, Native PostgreSQL, or file-based JSON (deprecated) when Docker is unavailable
 
 ## Changed
+- Consolidated 5 duplicate `timeAgo`/`formatTimeAgo` implementations into a single `timeAgo()` in `utils/formatters.js`
+- Deduplicated `stripCodeFences` from insightsService — now imports from shared `lib/aiProvider.js`
+- Added `MINUTE` time constant to `lib/fileUtils.js` alongside existing `HOUR`/`DAY`
 - Quick-add buttons for alcohol and nicotine now combine duplicate entries on the same date by incrementing count instead of stacking separate rows
 - Extracted shared `dayOfWeek` utility and `DAY_LABELS` constant to meatspace constants (deduplicated from AlcoholTab)
 - Health correlation endpoint now includes heart rate, resting heart rate, and nicotine data alongside existing HRV/alcohol/steps
@@ -36,3 +39,5 @@
 - README screenshot labels corrected to match actual screenshot content (all 6 were mislabeled)
 
 ## Removed
+- Dead code: `euclideanDistance`, `averageVectors`, `similarityMatrix` from `vectorMath.js` (unused outside tests)
+- Dead code: `rootPath` from `fileUtils.js`, `getClient` from `db.js` (never imported)

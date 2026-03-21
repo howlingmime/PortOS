@@ -20,6 +20,7 @@ import { MARKER_CATEGORIES } from '../lib/curatedGenomeMarkers.js';
 import { getTasteProfile } from './taste-questionnaire.js';
 import { getActiveProvider, getProviderById } from './providers.js';
 import { getCorrelationData } from './appleHealthQuery.js';
+import { stripCodeFences, parseLLMJSON } from '../lib/aiProvider.js';
 
 const INSIGHTS_DIR = join(PATHS.data, 'insights');
 const THEMES_FILE = join(INSIGHTS_DIR, 'themes.json');
@@ -168,13 +169,6 @@ async function callProviderAISimple(provider, model, prompt, { temperature = 0.3
   }
 
   return { error: 'Insights analysis requires an API-based provider' };
-}
-
-/**
- * Strip markdown code fences from LLM output before JSON.parse.
- */
-function stripCodeFences(raw) {
-  return raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 }
 
 // =============================================================================
@@ -359,7 +353,7 @@ Example format:
     return { available: false, reason: result.error };
   }
 
-  const themes = JSON.parse(stripCodeFences(result.text));
+  const themes = parseLLMJSON(result.text);
 
   await ensureDir(INSIGHTS_DIR);
   const output = {

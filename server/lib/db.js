@@ -40,15 +40,6 @@ export async function query(text, params) {
 }
 
 /**
- * Get a client from the pool for transactions.
- * Caller must call client.release() when done.
- * @returns {Promise<pg.PoolClient>}
- */
-export async function getClient() {
-  return pool.connect();
-}
-
-/**
  * Run a function inside a database transaction.
  * Auto-commits on success, rolls back on error.
  * @param {function(pg.PoolClient): Promise<T>} fn

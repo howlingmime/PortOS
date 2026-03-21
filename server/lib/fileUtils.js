@@ -96,20 +96,6 @@ export function dataPath(...segments) {
 }
 
 /**
- * Get a path relative to the project root.
- *
- * @param {...string} segments - Path segments to join
- * @returns {string} Full path under project root
- *
- * @example
- * const filePath = rootPath('data', 'TASKS.md');
- * // Returns: /path/to/project/data/TASKS.md
- */
-export function rootPath(...segments) {
-  return join(PATHS.root, ...segments);
-}
-
-/**
  * Check if a string is potentially valid JSON.
  * Performs quick structural validation before parsing.
  *
@@ -346,7 +332,8 @@ export function createCachedStore(filePath, defaultValue, { ttl = 2000, context 
   return { load, save, invalidateCache };
 }
 
-export const HOUR = 60 * 60 * 1000;
+export const MINUTE = 60 * 1000;
+export const HOUR = 60 * MINUTE;
 export const DAY = 24 * HOUR;
 
 /**
