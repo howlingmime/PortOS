@@ -1,71 +1,139 @@
 # PortOS
 
-A self-hosted operating system for your dev machine. Manage apps, orchestrate AI agents, build your digital twin, and capture knowledge — all from a single dashboard accessible anywhere via [Tailscale](https://tailscale.com).
+**Your self-hosted operating system for dev machines.** Manage apps, orchestrate AI agents, build your digital twin, capture knowledge, and track your health — all from a single dashboard accessible anywhere via [Tailscale](https://tailscale.com).
 
-Think Umbrel, but for your active git repos, AI workflows, and personal knowledge. Access everything from your phone, tablet, or any device on your Tailscale network.
+Think [Umbrel](https://umbrel.com), but for your active git repos, AI workflows, and personal knowledge. Access everything from your phone, tablet, or any device on your Tailscale network.
 
-![PortOS](./docs/media/portos_1.png)
+![PortOS Dashboard](./docs/media/portos_1.png)
 
-## Core Features
+---
+
+## Why PortOS?
+
+Most developers juggle a dozen tools — PM2 terminals, JIRA boards, AI chat windows, note apps, health trackers. PortOS unifies them into a single local-first dashboard that runs on your dev machine and travels with you over Tailscale.
+
+- **One dashboard** for all your apps, agents, and knowledge
+- **AI agents that work while you sleep** — autonomous task execution with multi-model orchestration
+- **Your identity, quantified** — genomics, chronotype, taste profiling, and mortality-aware goal tracking
+- **Second brain included** — capture thoughts, auto-classify them, and surface insights with daily digests
+- **Mobile-first design** — manage your entire dev environment from your phone
+
+---
+
+## Screenshots
+
+| Dashboard | CyberCity 3D | Chief of Staff |
+|:-:|:-:|:-:|
+| ![Dashboard](./docs/media/portos_1.png) | ![CyberCity](./docs/media/portos_2.png) | ![CoS](./docs/media/portos_3.png) |
+
+| Digital Twin | Brain | Developer Tools |
+|:-:|:-:|:-:|
+| ![Digital Twin](./docs/media/portos_4.png) | ![Brain](./docs/media/portos_5.png) | ![DevTools](./docs/media/portos_6.png) |
+
+---
+
+## Features
 
 ### App Management
+
+Bring your entire portfolio of projects under one roof.
+
 - **Dashboard** — Grid of app tiles with real-time status, port links, start/stop/restart controls, and system health monitoring
-- **Smart Import** — Point to a directory and auto-detect project config from package.json, vite.config, and ecosystem.config
+- **Smart Import** — Point to a directory and auto-detect project config from `package.json`, `vite.config`, and `ecosystem.config` ([App Wizard docs](./docs/features/app-wizard.md))
 - **App Templates** — Scaffold new projects from pre-built templates with AI provider integration
 - **Real-time Logs** — Stream PM2 logs via Socket.IO with tail length control
-- **JIRA Integration** — Per-app board config, active sprint resolution, epic search, and ticket creation from the UI
+- **JIRA Integration** — Per-app board config, active sprint resolution, epic search, and ticket creation from the UI ([Sprint Manager docs](./docs/features/jira-sprint-manager.md))
+- **Autofixer** — Autonomous crash detection and repair: polls PM2 for errored processes, invokes AI to diagnose and fix, tracks attempts with cooldowns ([Autofixer docs](./docs/features/autofixer.md))
 
 ### Chief of Staff (CoS)
-An autonomous AI agent orchestrator that manages your development workflow:
 
-- **Task Scheduling** — Submit tasks, set priorities, and let CoS dispatch AI agents (Claude Code, Codex, Gemini CLI, Ollama, LM Studio) to complete them
-- **Multi-Agent Orchestration** — Run multiple agents concurrently with global and per-project limits, capacity management, and fair scheduling
-- **Task Learning** — Tracks success rates, error patterns, and model performance to dynamically route tasks to the best provider
+An autonomous AI agent orchestrator that manages your development workflow. Submit a task, and CoS dispatches the right AI agent to handle it — then learns from the result. ([Full docs](./docs/features/chief-of-staff.md))
+
+- **Multi-Agent Orchestration** — Run Claude Code, Codex, Gemini CLI, Ollama, and LM Studio concurrently with global and per-project limits, capacity management, and fair scheduling ([Agent Runner docs](./docs/features/cos-agent-runner.md))
+- **Intelligent Routing** — 6 agent skill templates (bug-fix, feature, security-audit, refactor, docs, mobile) route tasks to the best model based on complexity ([Agent Skills docs](./docs/features/agent-skills.md))
+- **Task Learning** — Tracks success rates, error patterns, and model performance to dynamically improve routing decisions ([Memory System docs](./docs/features/memory-system.md))
 - **Goal Tracking** — Define goals and track progress across hundreds of completed tasks with success rate metrics
 - **Scheduled Automation** — Cron-based self-improvement and app-improvement jobs with per-app interval overrides
+- **Error Recovery** — 6 strategies (retry, escalate, fallback, decompose, defer, investigate) for automatic diagnosis and retry ([CoS Enhancement docs](./docs/features/cos-enhancement.md))
+- **Hybrid Memory Search** — BM25 + vector search with Reciprocal Rank Fusion for semantic retrieval across agent history
+- **Productivity Analytics** — Work streaks, hourly/daily patterns, milestones, and AI-generated weekly digests
 - **Decision Transparency** — Every skip, switch, and routing decision is logged with reasons, surfaced on the dashboard
-- **Productivity Analytics** — Work streaks, hourly/daily patterns, milestones, and AI-generated insights
-- **Weekly Digest** — Visual summaries of accomplishments, learnings, and week-over-week comparisons
-- **Error Recovery** — Automatic diagnosis and retry with adjusted routing for failed tasks
 
 ### Digital Twin
-An identity scaffolding system for building an AI representation of yourself:
 
-- **Identity Documents** — Manage markdown documents organized by category (values, communication style, routines, expertise, etc.)
+An identity scaffolding system for building a quantified AI representation of yourself. Your digital twin informs every agent prompt, ensuring AI interactions align with your values and style. ([Full docs](./docs/features/digital-twin.md) | [Identity System docs](./docs/features/identity-system.md))
+
+- **Genome Analysis** — Upload 23andMe data for 117 curated SNP markers across 32 categories with ClinVar integration ([Soul System docs](./docs/features/soul-system.md))
+- **Chronotype Profiling** — 5 sleep-related genetic markers derive evening/morning preference with caffeine and meal timing recommendations
+- **Taste Profiling** — Likert-scale preference scoring across 7 aesthetic domains (movies, music, art, architecture, food, fashion, digital) with AI-generated summaries
+- **Mortality-Aware Goals** — Life expectancy from actuarial data + 10 genome longevity markers, with urgency scoring for goal prioritization
 - **Behavioral Testing** — Run alignment tests across 14 dimensions with multi-model comparison
-- **Enrichment Questionnaire** — Guided questions across 14 categories to deepen the identity model
-- **Taste Profiling** — Likert-scale preference scoring with moving averages across personality dimensions
-- **Writing Style Analysis** — Extract voice patterns and communication style from writing samples
 - **Contradiction Detection** — AI analysis flags inconsistencies across identity documents
-- **Genome Visualization** — Genetic trait markers, cancer risk categories, and health predispositions (100+ SNP markers)
+- **Enrichment Questionnaire** — Guided questions across 14 categories to deepen the identity model
+- **Writing Style Analysis** — Extract voice patterns and communication style from writing samples
 - **Import/Export** — Import from Spotify and other sources; export as system prompt, CLAUDE.md, JSON, or individual files
 - **Creation Wizard** — 5-step guided setup for building a new digital twin from scratch
 
 ### Brain (Second Brain)
-A thought capture and knowledge management system:
+
+A thought capture and knowledge management system — your offline-first external memory. ([Full docs](./docs/features/brain-system.md))
 
 - **Thought Capture** — Natural language input with AI-powered auto-classification into People, Projects, Ideas, and Admin
-- **Inbox Review** — Validate and correct AI classifications before they're filed
+- **Inbox Review** — Validate and correct AI classifications before they're filed (confidence threshold gating)
 - **Knowledge Links** — Build a graph of connections between thoughts, people, and projects
-- **Memory System** — Long-term memory storage with vector similarity search, BM25 retrieval, and consolidation
-- **Daily/Weekly Digest** — AI-curated summaries of captured knowledge
+- **Memory System** — Long-term memory storage with vector similarity search, BM25 retrieval, and automatic consolidation ([Memory docs](./docs/features/memory-system.md))
+- **Daily/Weekly Digest** — AI-curated summaries of captured knowledge (< 150 / 250 words)
 - **Trust Scoring** — Rate data source reliability for better knowledge hygiene
+- **JSONL Audit Trail** — Full provenance tracking for every classified item
+
+### POST (Daily Cognitive Training)
+
+A gamified daily cognitive self-test in ~5 minutes across 5 domains. ([Full docs](./docs/features/post.md))
+
+- **Mental Math** — Speed and accuracy challenges with progressive difficulty
+- **Memory Builder** — Elements Song spaced repetition with karaoke mode and flash cards
+- **Wordplay** — Language analysis and verbal reasoning exercises
+- **Verbal Agility** — Communication skill challenges
+- **Imagination** — Creative thinking exercises scored by LLM
+- **Progress Tracking** — Streaks, rolling averages, and performance history
 
 ### Developer Tools
-- **Web Shell** — Full terminal emulator in the browser (xterm.js + node-pty) with Ghostty theme support
-- **AI Runner** — Execute prompts across any configured provider directly from the UI
+
+Everything you need to manage your dev environment without leaving the browser.
+
+- **Web Shell** — Full terminal emulator (xterm.js + node-pty) with multi-session support and Ghostty theme integration
+- **AI Runner** — Execute prompts across any configured provider directly from the UI ([Prompt Manager docs](./docs/features/prompt-manager.md))
 - **Process Monitor** — View all PM2 processes with live memory, CPU, uptime, and restart controls
 - **Agent Tracker** — Monitor running AI agents with runtime stats, app badges, and JIRA ticket links
 - **Git Management** — Branch status, release workflows, and PR creation
 - **Action History** — Searchable log of all executed actions with filtering and statistics
-- **CyberCity** — 3D voxel city visualization of your apps and agents in real-time
-- **Browser Control** — Remote Chrome DevTools Protocol integration for headless browser management
+- **CyberCity** — 3D voxel city visualization of your apps and agents in real-time ([CyberCity V2 docs](./docs/features/cybercity-v2.md))
+- **Browser Control** — Remote Chrome DevTools Protocol integration for headless browser management ([Browser docs](./docs/features/browser.md))
+- **Code Runner** — In-app code execution with syntax highlighting
+
+### Meatspace (Physical Health)
+
+Track your biological self alongside your digital one.
+
+- **Genome Visualization** — Genetic trait markers, cancer risk categories, and health predispositions (117 SNP markers)
+- **Blood Work** — Biomarker data tracking and trend analysis
+- **Body Composition** — Physical measurements and body tracking
+- **Age Metrics** — Biological vs chronological age tracking
+- **Lifestyle Tracking** — Alcohol, nicotine, and lifestyle factor monitoring
+- **Health Import** — Import data from Apple Health and other sources
 
 ### Infrastructure
+
 - **Mobile Ready** — Responsive design with collapsible sidebar for on-the-go access
-- **Multi-Provider AI** — Configure Claude, OpenAI, Gemini, Ollama, LM Studio, and more with model tiers and fallback chains
+- **Multi-Provider AI** — Configure Claude, OpenAI, Gemini, Ollama, LM Studio, and more with model tiers and fallback chains (via [portos-ai-toolkit](https://www.npmjs.com/package/portos-ai-toolkit))
 - **Secret Management** — Environment variable masking, API key redaction, and PTY shell allowlisting
 - **File Uploads** — Drag-and-drop file storage with preview support
+- **Multi-Instance** — Peer-to-peer networking between PortOS instances with app and agent availability across nodes
+- **Telegram Integration** — Bot integration for notification routing
+- **Database Backups** — Scheduled PostgreSQL backups with cron configuration
+- **Graceful Error Handling** — Centralized error normalization with real-time UI notifications and automatic CoS task creation for critical failures ([Error Handling docs](./docs/features/error-handling.md))
+
+---
 
 ## Quick Start
 
@@ -77,7 +145,16 @@ pm2 start ecosystem.config.cjs
 pm2 save
 ```
 
-Access PortOS at http://localhost:5554 (or via Tailscale at http://[your-machine]:5554). PM2 keeps PortOS running in the background and auto-restarts on reboot (with `pm2 save` + `pm2 startup`).
+Access PortOS at `http://localhost:5554` (or via Tailscale at `http://[your-machine]:5554`).
+
+PM2 keeps PortOS running in the background and auto-restarts on reboot (with `pm2 save` + `pm2 startup`).
+
+### Development Mode
+
+```bash
+npm run install:all    # Install all dependencies
+npm run dev            # Vite hot-reload on 5554, API on 5555
+```
 
 ## Network Access
 
@@ -87,7 +164,16 @@ PortOS binds to `0.0.0.0` so you can access it from any device on your Tailscale
 - Check logs and restart services from your phone
 - View dashboard on your tablet while coding on your laptop
 
-> **Security Note**: PortOS is designed for private Tailscale networks. Do not expose ports 5554-5560 to the public internet.
+> **Security Note**: PortOS is designed for private Tailscale networks. Do not expose ports 5554-5561 to the public internet. See the [Security Audit](./docs/SECURITY_AUDIT.md) for hardening details.
+
+## Tech Stack
+
+| Layer | Technologies |
+|-------|-------------|
+| **Frontend** | React 18, Vite, Tailwind CSS, Three.js, xterm.js |
+| **Backend** | Express.js, Socket.IO, PM2, Zod validation |
+| **Data** | PostgreSQL, JSON file persistence, vector embeddings |
+| **AI** | Claude Code, Codex, Gemini CLI, Ollama, LM Studio (via [portos-ai-toolkit](https://www.npmjs.com/package/portos-ai-toolkit)) |
 
 ## Project Structure
 
@@ -100,13 +186,6 @@ PortOS/
 ├── docs/                # Documentation and screenshots
 └── ecosystem.config.cjs # PM2 configuration
 ```
-
-## Tech Stack
-
-- **Frontend**: React 18, Vite, Tailwind CSS, Three.js, xterm.js
-- **Backend**: Express.js, Socket.IO, PM2, Zod validation
-- **Data**: JSON file persistence, vector embeddings for memory search
-- **AI**: Claude Code, Codex, Gemini CLI, Ollama, LM Studio (via [portos-ai-toolkit](https://www.npmjs.com/package/portos-ai-toolkit))
 
 ## PM2 Commands
 
@@ -137,14 +216,37 @@ Configure AI providers for the runner and Chief of Staff:
 
 ## Documentation
 
-- [Architecture Overview](./docs/ARCHITECTURE.md) — System design and data flow
-- [API Reference](./docs/API.md) — REST endpoints and WebSocket events
-- [Contributing Guide](./docs/CONTRIBUTING.md) — Development setup and code guidelines
+### Architecture & Operations
+- [Architecture Overview](./docs/ARCHITECTURE.md) — System design, data flow, and service diagram
+- [API Reference](./docs/API.md) — 50+ REST endpoints and WebSocket events
+- [Port Allocation](./docs/PORTS.md) — Port conventions (5554-5561) and allocation guide
 - [PM2 Configuration](./docs/PM2.md) — PM2 patterns and best practices
-- [Port Allocation](./docs/PORTS.md) — Port conventions and allocation guide
-- [Versioning & Releases](./docs/VERSIONING.md) — Version format and release process
+
+### Development
+- [Contributing Guide](./docs/CONTRIBUTING.md) — Development setup and code conventions
 - [GitHub Actions](./docs/GITHUB_ACTIONS.md) — CI/CD workflow patterns
+- [Versioning & Releases](./docs/VERSIONING.md) — Semantic versioning and release process
+- [Security Audit](./docs/SECURITY_AUDIT.md) — Hardening audit (10/10 items resolved)
 - [Troubleshooting](./docs/TROUBLESHOOTING.md) — Common issues and solutions
+
+### Feature Deep Dives
+- [Chief of Staff](./docs/features/chief-of-staff.md) — Autonomous agent orchestrator
+- [Agent Skills](./docs/features/agent-skills.md) — Task-type-specific agent prompts
+- [CoS Agent Runner](./docs/features/cos-agent-runner.md) — Isolated agent process architecture
+- [CoS Enhancement](./docs/features/cos-enhancement.md) — Hybrid search, proactive execution, error recovery
+- [Memory System](./docs/features/memory-system.md) — Semantic memory with vector search and importance decay
+- [Digital Twin](./docs/features/digital-twin.md) — Genome, chronotype, taste, and mortality-aware goals
+- [Identity System](./docs/features/identity-system.md) — Extended identity modeling (P1-P3)
+- [Soul System](./docs/features/soul-system.md) — Identity scaffold with behavioral testing
+- [Brain System](./docs/features/brain-system.md) — Offline-first second brain
+- [POST](./docs/features/post.md) — Daily cognitive training
+- [App Wizard](./docs/features/app-wizard.md) — App registration and scaffolding
+- [Autofixer](./docs/features/autofixer.md) — Autonomous crash detection and repair
+- [Browser](./docs/features/browser.md) — Headless browser automation
+- [CyberCity V2](./docs/features/cybercity-v2.md) — 3D systems visualization
+- [Prompt Manager](./docs/features/prompt-manager.md) — Customizable AI prompt templates
+- [JIRA Sprint Manager](./docs/features/jira-sprint-manager.md) — Autonomous JIRA triage and implementation
+- [Error Handling](./docs/features/error-handling.md) — Centralized error normalization and recovery
 
 ## License
 
