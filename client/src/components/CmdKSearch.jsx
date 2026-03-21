@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Brain, Cpu, Package, History, HeartPulse, Search, Loader2 } from 'lucide-react';
 import { useCmdKSearch } from '../hooks/useCmdKSearch';
+import { useScrollLock } from '../hooks/useScrollLock';
 import { search } from '../services/api';
+import { modKey } from '../utils/platform';
 
 const ICON_MAP = { Brain, Cpu, Package, History, HeartPulse };
 
@@ -40,10 +42,7 @@ export default function CmdKSearch() {
   }, [open]);
 
   // Lock body scroll when open
-  useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [open]);
+  useScrollLock(open);
 
   // Clear state when overlay closes
   useEffect(() => {
@@ -146,7 +145,7 @@ export default function CmdKSearch() {
             aria-label="Search PortOS"
           />
           <span className="text-xs text-gray-500 border border-port-border rounded px-1.5 py-0.5 shrink-0">
-            {navigator.platform?.includes('Mac') ? '⌘K' : 'Ctrl+K'}
+            {`${modKey}+K`}
           </span>
         </div>
 

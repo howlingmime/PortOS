@@ -5,17 +5,18 @@ export function useKeyboardHelp() {
 
   useEffect(() => {
     const handler = (e) => {
-      // Don't trigger when typing in inputs/textareas/contenteditable
-      const tag = e.target.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return;
-      // Don't trigger with modifier keys
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Escape always closes, even from inputs/textareas
+      if (e.key === 'Escape') {
+        setOpen(false);
+        return;
+      }
 
+      // ? toggle — check key before modifiers so AltGr layouts (ctrlKey+altKey) still work
       if (e.key === '?' && !e.repeat) {
+        const tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return;
         e.preventDefault();
         setOpen(prev => !prev);
-      } else if (e.key === 'Escape') {
-        setOpen(false);
       }
     };
     document.addEventListener('keydown', handler);
