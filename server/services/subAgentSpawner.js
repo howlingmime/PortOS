@@ -1612,6 +1612,7 @@ export async function spawnAgentForTask(task) {
     taskApp: task.metadata?.app || null,
     taskAppName: resolvedAppName,
     selfImprovementType: task.metadata?.selfImprovementType || null,
+    jobId: task.metadata?.jobId || null,
     missionName: task.metadata?.missionName || null,
     missionId: task.metadata?.missionId || null,
     // JIRA integration metadata

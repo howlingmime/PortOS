@@ -3828,10 +3828,12 @@ async function executeScheduledJob(jobId) {
     });
     if (shellOk) emitLog('info', `Shell job executed: ${job.name}`, { jobId: job.id });
   } else {
-    // Check if this job is already being spawned or has a running agent
+    // Check if this job is already being spawned or has a running agent.
+    // Don't re-register the timer here — the job:spawned handler will do it
+    // after recordJobExecution updates lastRun. Re-registering with stale
+    // lastRun causes a 1-second re-fire loop.
     if (spawningJobIds.has(jobId)) {
       emitLog('debug', `Job ${job.name} skipped - already spawning`, { jobId });
-      await registerSingleJobSchedule(jobId);
       return;
     }
     const agentAlreadyRunning = Object.values(state.agents).some(
@@ -3839,7 +3841,6 @@ async function executeScheduledJob(jobId) {
     );
     if (agentAlreadyRunning) {
       emitLog('debug', `Job ${job.name} skipped - agent already running`, { jobId });
-      await registerSingleJobSchedule(jobId);
       return;
     }
 
@@ -3886,13 +3887,18 @@ async function executeScheduledJob(jobId) {
       const task = await generateTaskFromJob(job);
       emitLog('info', `Autonomous job firing: ${job.name}`, { jobId, category: job.category });
       cosEvents.emit('task:ready', task);
+      // Don't re-register timer here — lastRun hasn't been updated yet, so
+      // computeNextJobFireTime would return a past-due time and the timer would
+      // fire in 1s, creating a rapid re-fire loop. The job:spawned handler
+      // re-registers after recordJobExecution updates lastRun.
+      return;
     } catch (err) {
       clearSpawningJob(jobId);
       emitLog('error', `Failed to fire autonomous job: ${job.name} - ${err?.message || err}`, { jobId, category: job.category });
     }
   }
 
-  // Re-register for next fire time
+  // Re-register for next fire time (script/shell jobs, early returns, and error paths)
   await registerSingleJobSchedule(jobId);
 }
 
@@ -3992,11 +3998,18 @@ async function init() {
     }
   });
 
-  // Record autonomous job execution only after the agent actually spawns
+  // Record autonomous job execution only after the agent actually spawns.
+  // Update lastRun BEFORE clearing the spawning guard to prevent a race where
+  // a pending timer fires between clearSpawningJob and recordJobExecution,
+  // sees no guard and stale lastRun, and spawns a duplicate agent.
   cosEvents.on('job:spawned', async ({ jobId }) => {
-    clearSpawningJob(jobId);
     await recordJobExecution(jobId).catch(err =>
       console.error(`❌ Failed to record job execution for ${jobId}: ${err.message}`)
+    );
+    clearSpawningJob(jobId);
+    // Re-register with updated lastRun so the next timer has the correct delay
+    await registerSingleJobSchedule(jobId).catch(err =>
+      console.error(`❌ Failed to re-register job schedule for ${jobId}: ${err.message}`)
     );
   });
 
