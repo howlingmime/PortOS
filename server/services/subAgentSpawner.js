@@ -3365,7 +3365,7 @@ export async function cleanupOrphanedAgents() {
 /**
  * Handle an orphaned task - retry or create investigation
  */
-async function handleOrphanedTask(taskId, agentId, getTaskById) {
+export async function handleOrphanedTask(taskId, agentId, getTaskById) {
   const task = await getTaskById(taskId).catch(() => null);
   if (!task) {
     emitLog('warn', `Could not find task ${taskId} for orphaned agent ${agentId}`, { taskId, agentId });

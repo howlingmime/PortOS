@@ -817,26 +817,25 @@ async function resetOrphanedTasks() {
 
   emitLog('debug', `Running agents: ${runningAgentTaskIds.length}`, { taskIds: runningAgentTaskIds });
 
-  // Reset orphaned user tasks
-  if (userTaskData.exists) {
-    const inProgressUserTasks = userTaskData.grouped.in_progress || [];
-    for (const task of inProgressUserTasks) {
+  // Route orphaned tasks through handleOrphanedTask for consistent retry counting,
+  // cooldown enforcement, and max-spawn limits (prevents runaway respawning)
+  const { handleOrphanedTask } = await import('./subAgentSpawner.js');
+
+  const processOrphanedTasks = async (tasks) => {
+    for (const task of tasks) {
       if (!runningAgentTaskIds.includes(task.id)) {
-        emitLog('info', `Resetting orphaned user task ${task.id} to pending`, { taskId: task.id });
-        await updateTask(task.id, { status: 'pending' }, 'user');
+        emitLog('info', `Found orphaned in_progress task ${task.id}, routing through retry handler`, { taskId: task.id });
+        await handleOrphanedTask(task.id, 'unknown-reset', getTaskById);
       }
     }
+  };
+
+  if (userTaskData.exists) {
+    await processOrphanedTasks(userTaskData.grouped.in_progress || []);
   }
 
-  // Reset orphaned CoS internal tasks
   if (cosTaskData.exists) {
-    const inProgressCosTasks = cosTaskData.grouped.in_progress || [];
-    for (const task of inProgressCosTasks) {
-      if (!runningAgentTaskIds.includes(task.id)) {
-        emitLog('info', `Resetting orphaned system task ${task.id} to pending`, { taskId: task.id });
-        await updateTask(task.id, { status: 'pending' }, 'internal');
-      }
-    }
+    await processOrphanedTasks(cosTaskData.grouped.in_progress || []);
   }
 }
 
