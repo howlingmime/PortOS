@@ -228,8 +228,9 @@ Tasks to perform:
 3. Check brain digest (GET /api/brain/digest/latest) for recent thought patterns
 4. Review CoS learning insights (GET /api/cos/learning/insights) for system health
 5. Check which agents completed work recently (GET /api/cos/agents)
-6. Suggest 2-3 focus areas for today based on open tasks and recent activity
-7. For each agent-actionable focus area (coding tasks, GitHub maintenance, system fixes — NOT personal activities), create a CoS task via POST /api/cos/tasks if no equivalent task already exists in the pending tasks from steps 1-2. Use type "internal", appropriate priority, and include context about why it was flagged.
+6. Check Claude Code changelog for new releases (GET /api/cos/claude-changelog). If there are newEntries, include a "Claude Code Updates" section listing each new version with a brief summary. Link to the release page for details.
+7. Suggest 2-3 focus areas for today based on open tasks and recent activity
+8. For each agent-actionable focus area (coding tasks, GitHub maintenance, system fixes — NOT personal activities), create a CoS task via POST /api/cos/tasks if no equivalent task already exists in the pending tasks from steps 1-2. Use type "internal", appropriate priority, and include context about why it was flagged.
 
 Write the briefing in a concise, actionable format. Save it as a CoS report. Note which tasks were created.`,
     lastRun: null,

@@ -17,6 +17,7 @@ import * as productivity from '../services/productivity.js';
 import * as goalProgress from '../services/goalProgress.js';
 import * as decisionLog from '../services/decisionLog.js';
 import { reinitialize as reinitializeEmbeddings } from '../services/memoryEmbeddings.js';
+import * as claudeChangelog from '../services/claudeChangelog.js';
 import { asyncHandler, ServerError } from '../lib/errorHandler.js';
 import { validateRequest, sanitizeTaskMetadata } from '../lib/validation.js';
 import { z } from 'zod';
@@ -454,6 +455,18 @@ router.get('/briefings/:date', asyncHandler(async (req, res) => {
     throw new ServerError('Briefing not found', { status: 404, code: 'NOT_FOUND' });
   }
   res.json(briefing);
+}));
+
+// GET /api/cos/claude-changelog - Get Claude Code changelog (fetches Atom feed)
+router.get('/claude-changelog', asyncHandler(async (req, res) => {
+  const result = await claudeChangelog.checkChangelog();
+  res.json(result);
+}));
+
+// GET /api/cos/claude-changelog/cached - Get cached changelog without fetching
+router.get('/claude-changelog/cached', asyncHandler(async (req, res) => {
+  const result = await claudeChangelog.getCachedChangelog();
+  res.json(result);
 }));
 
 // GET /api/cos/scripts - List generated scripts

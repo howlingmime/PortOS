@@ -1,6 +1,7 @@
 # Unreleased Changes
 
 ## Added
+- Claude Code changelog tracking: fetches GitHub Atom feed for new releases, caches with 1-hour TTL, surfaces new versions in daily briefing
 - POST wordplay drill cache: pre-generates challenges on startup so drills load instantly from cache with background replenishment
 - POST local scoring for deterministic drill types (bridge-word, compound-chain, verbal-fluency, story-recall) — instant results without LLM calls
 - POST loading indicator with elapsed timer, progress bar, and cycling status messages replaces static spinner
