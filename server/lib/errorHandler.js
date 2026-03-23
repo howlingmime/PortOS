@@ -41,7 +41,8 @@ export function asyncHandler(fn) {
       } else if (error.status >= 500) {
         console.error(logMsg, error.stack ? error.stack : '');
       } else {
-        console.error(logMsg);
+        const details = error.context?.details;
+        console.error(details ? `${logMsg}: ${JSON.stringify(details)}` : logMsg);
       }
 
       // Emit Socket.IO event for UI notification
