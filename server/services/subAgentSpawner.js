@@ -1798,20 +1798,11 @@ async function handleAgentCompletion(agentId, exitCode, success, duration) {
     if (cosAgent.taskId) {
       const task = await getTaskById(cosAgent.taskId).catch(() => null);
       if (task && task.status !== 'completed') {
-        const taskType = task.taskType || 'user';
         if (success) {
-          await updateTask(cosAgent.taskId, { status: 'completed' }, taskType);
+          await updateTask(cosAgent.taskId, { status: 'completed' }, task.taskType || 'user');
         } else {
-          // Preserve existing metadata (retry counts, spawn counts) to prevent counter resets
-          await updateTask(cosAgent.taskId, {
-            status: 'pending',
-            metadata: {
-              ...task.metadata,
-              retryReason: 'orphaned-agent',
-              lastOrphanedAt: new Date().toISOString(),
-              lastOrphanedAgentId: agentId
-            }
-          }, taskType);
+          // Route through handleOrphanedTask for consistent retry counting, cooldown, and limits
+          await handleOrphanedTask(cosAgent.taskId, agentId, getTaskById);
         }
       }
     }
