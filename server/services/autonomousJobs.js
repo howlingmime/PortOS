@@ -455,9 +455,12 @@ async function migrateScriptsState(jobsData) {
     return 'daily'
   }
 
+  const existingNames = new Set(jobsData.jobs.map(j => j.name.toLowerCase()))
+
   for (const script of scripts) {
     const jobId = `job-migrated-${script.id}`
     if (existingIds.has(jobId)) continue
+    if (existingNames.has(script.name.toLowerCase())) continue
 
     const mappedInterval = mapLegacySchedule(script.schedule, script.name)
     if (script.cronExpression) {
