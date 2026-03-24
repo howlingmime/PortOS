@@ -2,10 +2,12 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, Wand2, X, Check, Star, Crown } from 'lucide-react';
+import toast from 'react-hot-toast';
 import * as api from '../../services/api';
 import { layoutGoalNodes } from './goalTreeLayout';
-import GoalDetailPanel, { CATEGORY_CONFIG, HORIZON_OPTIONS } from './GoalDetailPanel';
+import GoalDetailPanel, { CATEGORY_CONFIG, HORIZON_OPTIONS, GOAL_TYPE_CONFIG } from './GoalDetailPanel';
+import { applyOrganizationSuggestion } from './applyOrganization';
 
 const EDGE_COLORS = {
   parent: '#3b82f6',
@@ -76,9 +78,10 @@ function GoalEdges({ edges, selectedId }) {
 
 function GoalScene({ graph, selectedId, adjacentIds, onSelect, onHover }) {
   const sphereGeo = useMemo(() => new THREE.SphereGeometry(1, 16, 12), []);
+  const octaGeo = useMemo(() => new THREE.OctahedronGeometry(1, 0), []);
 
   const selNode = selectedId ? graph.idMap.get(selectedId) : null;
-  const selRadius = selNode ? 0.5 + (selNode.urgency ?? 0.3) * 0.6 : 0;
+  const selRadius = selNode ? (selNode.goalType === 'apex' ? 1.6 : selNode.goalType === 'sub-apex' ? 1.1 : 0.5 + (selNode.urgency ?? 0.3) * 0.6) : 0;
 
   return (
     <>
@@ -89,17 +92,20 @@ function GoalScene({ graph, selectedId, adjacentIds, onSelect, onHover }) {
       <GoalEdges edges={graph.edges} selectedId={selectedId} />
 
       {graph.nodes.map(node => {
-        const radius = 0.5 + (node.urgency ?? 0.3) * 0.6;
+        const isApex = node.goalType === 'apex';
+        const isSubApex = node.goalType === 'sub-apex';
+        const radius = isApex ? 1.6 : isSubApex ? 1.1 : 0.5 + (node.urgency ?? 0.3) * 0.6;
         const cat = CATEGORY_CONFIG[node.category] || CATEGORY_CONFIG.mastery;
-        const color = cat.hex;
+        const color = isApex ? '#fbbf24' : isSubApex ? '#c084fc' : cat.hex;
         const isSelected = node.id === selectedId;
         const isConnected = adjacentIds?.has(node.id);
         const dimmed = selectedId && !isSelected && !isConnected;
+        const geo = isApex ? octaGeo : sphereGeo;
 
         return (
           <mesh
             key={node.id}
-            geometry={sphereGeo}
+            geometry={geo}
             scale={radius}
             position={[node.x, node.y, node.z]}
             onClick={(e) => { e.stopPropagation(); onSelect(node); }}
@@ -109,7 +115,7 @@ function GoalScene({ graph, selectedId, adjacentIds, onSelect, onHover }) {
             <meshStandardMaterial
               color={dimmed ? '#1a1a1a' : color}
               emissive={color}
-              emissiveIntensity={isSelected ? 0.6 : (dimmed ? 0.03 : 0.15 + (node.urgency ?? 0) * 0.3)}
+              emissiveIntensity={isSelected ? 0.6 : (dimmed ? 0.03 : isApex ? 0.5 : isSubApex ? 0.35 : 0.15 + (node.urgency ?? 0) * 0.3)}
             />
           </mesh>
         );
@@ -126,6 +132,112 @@ function GoalScene({ graph, selectedId, adjacentIds, onSelect, onHover }) {
   );
 }
 
+function OrganizePanel({ suggestion, goals, onApply, onClose, applying }) {
+  const goalMap = useMemo(() => new Map((goals || []).map(g => [g.id, g])), [goals]);
+  if (!suggestion) return null;
+
+  return (
+    <div className="absolute top-12 right-3 z-20 bg-port-card border border-port-border rounded-lg p-4 w-96 max-h-[80vh] overflow-y-auto shadow-xl">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Wand2 className="w-4 h-4 text-port-accent" />
+          <h3 className="text-sm font-semibold text-white">Goal Organization</h3>
+        </div>
+        <button onClick={onClose} className="p-1 text-gray-400 hover:text-white"><X className="w-4 h-4" /></button>
+      </div>
+
+      {suggestion.analysis && (
+        <p className="text-xs text-gray-400 mb-3 leading-relaxed">{suggestion.analysis}</p>
+      )}
+
+      {/* Apex goal suggestion */}
+      {suggestion.apexGoal && (
+        <div className="mb-3 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Crown className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-xs font-medium text-amber-400">Apex Goal (North Star)</span>
+          </div>
+          {suggestion.apexGoal.existingId ? (
+            <p className="text-xs text-gray-300">{goalMap.get(suggestion.apexGoal.existingId)?.title || suggestion.apexGoal.existingId}</p>
+          ) : (
+            <div>
+              <p className="text-xs text-white font-medium">{suggestion.apexGoal.suggestedTitle}</p>
+              {suggestion.apexGoal.suggestedDescription && (
+                <p className="text-xs text-gray-400 mt-0.5">{suggestion.apexGoal.suggestedDescription}</p>
+              )}
+              <span className="text-xs text-amber-500/60 italic">New goal — will be created when applied</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Organization */}
+      {suggestion.organization?.length > 0 && (
+        <div className="mb-3 space-y-1.5">
+          <h4 className="text-xs font-medium text-gray-400">Proposed Hierarchy</h4>
+          {suggestion.organization.map(item => {
+            const goal = goalMap.get(item.id);
+            const typeCfg = GOAL_TYPE_CONFIG[item.goalType] || GOAL_TYPE_CONFIG.standard;
+            const parent = item.suggestedParentId ? goalMap.get(item.suggestedParentId) : null;
+            return (
+              <div key={item.id} className="p-2 rounded bg-port-bg/50 border border-port-border/50">
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-xs px-1.5 py-0.5 rounded ${typeCfg.bg} ${typeCfg.color}`}>
+                    {typeCfg.label}
+                  </span>
+                  <span className="text-xs text-white truncate">{goal?.title || item.id}</span>
+                </div>
+                {parent && (
+                  <div className="text-xs text-gray-500 mt-0.5 ml-1">
+                    under: {parent.title}
+                  </div>
+                )}
+                {item.reasoning && (
+                  <p className="text-xs text-gray-600 mt-0.5 ml-1">{item.reasoning}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Suggested sub-apex goals */}
+      {suggestion.suggestedSubApex?.length > 0 && (
+        <div className="mb-3 space-y-1.5">
+          <h4 className="text-xs font-medium text-gray-400">Suggested Sub-Apex Goals</h4>
+          {suggestion.suggestedSubApex.map((sg, i) => (
+            <div key={i} className="p-2 rounded bg-purple-500/5 border border-purple-500/20">
+              <div className="flex items-center gap-1.5">
+                <Star className="w-3 h-3 text-purple-400" />
+                <span className="text-xs text-white font-medium">{sg.title}</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">{sg.description}</p>
+              <span className="text-xs text-purple-500/60 italic">New goal — will be created when applied</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2 pt-2 border-t border-port-border">
+        <button
+          onClick={onApply}
+          disabled={applying}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg bg-port-accent text-white hover:bg-blue-600 disabled:opacity-50 min-h-[40px]"
+        >
+          <Check className="w-4 h-4" />
+          {applying ? 'Applying...' : 'Apply Changes'}
+        </button>
+        <button
+          onClick={onClose}
+          className="px-3 py-2 text-sm rounded-lg bg-port-border text-gray-300 hover:bg-gray-600 min-h-[40px]"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function GoalsTreeView({ data, onRefresh }) {
   const [selectedNode, setSelectedNode] = useState(null);
   const [hoveredNode, setHoveredNode] = useState(null);
@@ -135,6 +247,9 @@ export default function GoalsTreeView({ data, onRefresh }) {
   );
   const [showNewGoal, setShowNewGoal] = useState(false);
   const [newGoal, setNewGoal] = useState({ title: '', description: '', horizon: '5-year', category: 'mastery' });
+  const [organizing, setOrganizing] = useState(false);
+  const [orgSuggestion, setOrgSuggestion] = useState(null);
+  const [applyingOrg, setApplyingOrg] = useState(false);
 
   const dragStartRef = useRef(null);
 
@@ -195,6 +310,27 @@ export default function GoalsTreeView({ data, onRefresh }) {
     onRefresh();
   };
 
+  const handleOrganize = async () => {
+    setOrganizing(true);
+    const result = await api.organizeGoals().catch(() => null);
+    setOrganizing(false);
+    if (result) {
+      setOrgSuggestion(result);
+    } else {
+      toast.error('Failed to organize goals');
+    }
+  };
+
+  const handleApplyOrganization = async () => {
+    if (!orgSuggestion) return;
+    setApplyingOrg(true);
+    await applyOrganizationSuggestion(orgSuggestion);
+    setApplyingOrg(false);
+    setOrgSuggestion(null);
+    toast.success('Goal hierarchy applied');
+    onRefresh();
+  };
+
   return (
     <div className="h-full flex">
       <div className="flex-1 relative">
@@ -234,6 +370,17 @@ export default function GoalsTreeView({ data, onRefresh }) {
             <Plus className="w-3 h-3" />
             Add
           </button>
+          {(data?.flat?.length ?? 0) >= 2 && (
+            <button
+              onClick={handleOrganize}
+              disabled={organizing}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 disabled:opacity-50"
+              title="Use AI to organize goals into a hierarchy with an apex north-star goal"
+            >
+              <Wand2 className={`w-3 h-3 ${organizing ? 'animate-spin' : ''}`} />
+              {organizing ? 'Analyzing...' : 'Organize'}
+            </button>
+          )}
         </div>
 
         {/* New goal form */}
@@ -287,6 +434,15 @@ export default function GoalsTreeView({ data, onRefresh }) {
           </div>
         )}
 
+        {/* Organization panel */}
+        <OrganizePanel
+          suggestion={orgSuggestion}
+          goals={data?.flat}
+          onApply={handleApplyOrganization}
+          onClose={() => setOrgSuggestion(null)}
+          applying={applyingOrg}
+        />
+
         {/* Legend */}
         <div className="absolute bottom-3 left-3 z-10 bg-port-card/90 backdrop-blur border border-port-border rounded-lg px-3 py-2 text-xs space-y-1">
           <div className="text-gray-400 font-medium mb-1">Legend</div>
@@ -297,6 +453,14 @@ export default function GoalsTreeView({ data, onRefresh }) {
           <div className="flex items-center gap-2">
             <div className="w-4 h-0.5 bg-yellow-500" />
             <span className="text-gray-500">Shared tag</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-amber-400 rotate-45" />
+            <span className="text-gray-500">Apex</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-purple-400" />
+            <span className="text-gray-500">Sub-apex</span>
           </div>
           {graph && (
             <div className="text-gray-600 pt-1 border-t border-port-border mt-1">
@@ -310,6 +474,11 @@ export default function GoalsTreeView({ data, onRefresh }) {
           <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 bg-port-card border border-port-border rounded-lg px-3 py-2 text-sm pointer-events-none shadow-lg">
             <div className="text-white font-medium">{hoveredNode.title}</div>
             <div className="text-gray-500 text-xs">
+              {hoveredNode.goalType && hoveredNode.goalType !== 'standard' && (
+                <span className={hoveredNode.goalType === 'apex' ? 'text-amber-400' : 'text-purple-400'}>
+                  {GOAL_TYPE_CONFIG[hoveredNode.goalType]?.label} &middot;{' '}
+                </span>
+              )}
               {CATEGORY_CONFIG[hoveredNode.category]?.label} &middot; {HORIZON_OPTIONS.find(h => h.value === hoveredNode.horizon)?.label}
               {hoveredNode.urgency != null && ` &middot; ${Math.round(hoveredNode.urgency * 100)}% urgency`}
             </div>

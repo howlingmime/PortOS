@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
 import {
-  ChevronRight, ChevronDown, Plus, GripVertical, Search, Tag, Link2
+  ChevronRight, ChevronDown, Plus, GripVertical, Search, Tag, Link2, Crown, Star, Wand2
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import * as api from '../../services/api';
-import GoalDetailPanel, { CATEGORY_CONFIG, HORIZON_OPTIONS } from './GoalDetailPanel';
+import GoalDetailPanel, { CATEGORY_CONFIG, HORIZON_OPTIONS, GOAL_TYPE_CONFIG } from './GoalDetailPanel';
+import { applyOrganizationSuggestion } from './applyOrganization';
 
 function urgencyIndicator(urgency) {
   if (urgency == null) return null;
@@ -45,6 +47,13 @@ function GoalRow({ goal, depth, expandedIds, onToggle, onSelect, selectedId, onA
         </div>
 
         <span className="text-sm text-white truncate flex-1">{goal.title}</span>
+
+        {goal.goalType && goal.goalType !== 'standard' && (
+          <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded ${GOAL_TYPE_CONFIG[goal.goalType]?.bg} ${GOAL_TYPE_CONFIG[goal.goalType]?.color}`}>
+            {goal.goalType === 'apex' ? <Crown className="w-3 h-3 inline mr-0.5" /> : <Star className="w-3 h-3 inline mr-0.5" />}
+            {GOAL_TYPE_CONFIG[goal.goalType]?.label}
+          </span>
+        )}
 
         {/* Progress pill */}
         {(goal.progress > 0 || goal.todos?.length > 0) && (
@@ -119,6 +128,7 @@ export default function GoalsListView({ data, onRefresh }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showNewGoal, setShowNewGoal] = useState(false);
   const [newGoal, setNewGoal] = useState({ title: '', description: '', horizon: '5-year', category: 'mastery', parentId: null });
+  const [organizing, setOrganizing] = useState(false);
 
   const toggleExpand = (id) => {
     setExpandedIds(prev => {
@@ -160,6 +170,16 @@ export default function GoalsListView({ data, onRefresh }) {
     onRefresh();
   };
 
+  const handleOrganize = async () => {
+    setOrganizing(true);
+    const result = await api.organizeGoals().catch(() => null);
+    setOrganizing(false);
+    if (!result) { toast.error('Failed to organize goals'); return; }
+    await applyOrganizationSuggestion(result);
+    toast.success('Goal hierarchy applied');
+    onRefresh();
+  };
+
   return (
     <div className="h-full flex">
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -185,6 +205,17 @@ export default function GoalsListView({ data, onRefresh }) {
             <Plus className="w-4 h-4" />
             Add Root Goal
           </button>
+          {(data?.flat?.length ?? 0) >= 2 && (
+            <button
+              onClick={handleOrganize}
+              disabled={organizing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 disabled:opacity-50 min-h-[40px]"
+              title="Use AI to organize goals into a hierarchy"
+            >
+              <Wand2 className={`w-4 h-4 ${organizing ? 'animate-spin' : ''}`} />
+              {organizing ? 'Analyzing...' : 'Organize'}
+            </button>
+          )}
           <button
             onClick={() => {
               if (expandedIds.size > 0) {

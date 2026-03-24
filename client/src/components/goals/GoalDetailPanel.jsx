@@ -26,10 +26,18 @@ const HORIZON_OPTIONS = [
   { value: 'lifetime', label: 'Lifetime' }
 ];
 
+const GOAL_TYPE_CONFIG = {
+  apex: { label: 'Apex', color: 'text-amber-400', bg: 'bg-amber-500/20', description: 'North-star purpose' },
+  'sub-apex': { label: 'Sub-Apex', color: 'text-purple-400', bg: 'bg-purple-500/20', description: 'Major life pillar' },
+  standard: { label: 'Standard', color: 'text-gray-400', bg: 'bg-gray-500/20', description: 'Regular goal' }
+};
+
+const GOAL_TYPE_OPTIONS = Object.entries(GOAL_TYPE_CONFIG).map(([value, cfg]) => ({ value, label: cfg.label }));
+
 const MAX_TAGS = 20;
 const MAX_TAG_LENGTH = 50;
 
-export { CATEGORY_CONFIG, HORIZON_OPTIONS };
+export { CATEGORY_CONFIG, HORIZON_OPTIONS, GOAL_TYPE_CONFIG, GOAL_TYPE_OPTIONS };
 
 function ProgressSlider({ goal, onCommit }) {
   const [draft, setDraft] = useState(goal.progress ?? 0);
@@ -144,6 +152,7 @@ export default function GoalDetailPanel({ goal, allGoals, onClose, onRefresh }) 
       description: goal.description || '',
       horizon: goal.horizon,
       category: goal.category,
+      goalType: goal.goalType || 'standard',
       parentId: goal.parentId || '',
       tags: [...(goal.tags || [])],
       targetDate: goal.targetDate || '',
@@ -347,13 +356,18 @@ export default function GoalDetailPanel({ goal, allGoals, onClose, onRefresh }) 
     <div className="w-80 bg-port-card border-l border-port-border h-full overflow-y-auto p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className={`p-1.5 rounded ${cat.bg}`}>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`p-1.5 rounded ${cat.bg} shrink-0`}>
             <CatIcon className={`w-4 h-4 ${cat.color}`} />
           </div>
           <span className="text-sm font-medium text-white truncate">{goal.title}</span>
+          {goal.goalType && goal.goalType !== 'standard' && (
+            <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded ${GOAL_TYPE_CONFIG[goal.goalType]?.bg} ${GOAL_TYPE_CONFIG[goal.goalType]?.color}`}>
+              {GOAL_TYPE_CONFIG[goal.goalType]?.label}
+            </span>
+          )}
         </div>
-        <button onClick={onClose} className="p-1 text-gray-500 hover:text-white">
+        <button onClick={onClose} className="p-1 text-gray-500 hover:text-white shrink-0">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -392,6 +406,16 @@ export default function GoalDetailPanel({ goal, allGoals, onClose, onRefresh }) 
               {Object.entries(CATEGORY_CONFIG).map(([k, v]) => (
                 <option key={k} value={k}>{v.label}</option>
               ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500">Goal Type</label>
+            <select
+              value={form.goalType || 'standard'}
+              onChange={e => setForm({ ...form, goalType: e.target.value })}
+              className="w-full bg-port-bg border border-port-border rounded px-3 py-1.5 text-sm text-white mt-1"
+            >
+              {GOAL_TYPE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </div>
           <div>
