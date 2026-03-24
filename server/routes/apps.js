@@ -347,11 +347,16 @@ router.put('/:id/task-types/:taskType', asyncHandler(async (req, res) => {
     }
   }
 
-  // Validate interval against allowed values
+  // Validate interval against allowed values (also accepts 5-field cron expressions)
   if (interval !== undefined) {
     const allowedIntervals = ['rotation', 'daily', 'weekly', 'once', 'on-demand'];
-    if (interval !== null && (typeof interval !== 'string' || !allowedIntervals.includes(interval))) {
-      throw new ServerError('interval must be one of rotation|daily|weekly|once|on-demand or null', { status: 400, code: 'VALIDATION_ERROR' });
+    if (interval !== null && typeof interval === 'string') {
+      const isCron = interval.trim().split(/\s+/).length === 5;
+      if (!isCron && !allowedIntervals.includes(interval)) {
+        throw new ServerError('interval must be one of rotation|daily|weekly|once|on-demand, a cron expression, or null', { status: 400, code: 'VALIDATION_ERROR' });
+      }
+    } else if (interval !== null) {
+      throw new ServerError('interval must be a string or null', { status: 400, code: 'VALIDATION_ERROR' });
     }
   }
 

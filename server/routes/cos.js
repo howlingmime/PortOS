@@ -64,7 +64,7 @@ const cosConfigSchema = z.object({
   }).optional()
 }).strict();
 
-const SCHEDULE_FIELDS = ['type', 'enabled', 'intervalMs', 'providerId', 'model', 'prompt', 'taskMetadata', 'runAfter'];
+const SCHEDULE_FIELDS = ['type', 'enabled', 'intervalMs', 'cronExpression', 'providerId', 'model', 'prompt', 'taskMetadata', 'runAfter'];
 
 /**
  * Pick only defined values from body for schedule settings updates
@@ -875,7 +875,8 @@ router.get('/schedule/interval-types', (req, res) => {
       weekly: 'Runs once per week',
       once: 'Runs once per app or globally, then stops',
       'on-demand': 'Only runs when manually triggered',
-      custom: 'Custom interval in milliseconds'
+      custom: 'Custom interval in milliseconds',
+      cron: 'Cron expression schedule (minute hour dayOfMonth month dayOfWeek)'
     }
   });
 });
@@ -942,7 +943,7 @@ router.get('/jobs/:id', asyncHandler(async (req, res) => {
 
 // POST /api/cos/jobs - Create a new autonomous job
 router.post('/jobs', asyncHandler(async (req, res) => {
-  const { name, description, category, type, interval, intervalMs, scheduledTime, enabled, priority, autonomyLevel, promptTemplate, command, triggerAction } = req.body;
+  const { name, description, category, type, interval, intervalMs, scheduledTime, cronExpression, enabled, priority, autonomyLevel, promptTemplate, command, triggerAction } = req.body;
 
   const VALID_JOB_TYPES = ['agent', 'shell', 'script'];
   if (!name) {
@@ -959,9 +960,15 @@ router.post('/jobs', asyncHandler(async (req, res) => {
       throw new ServerError('promptTemplate is required for agent jobs', { status: 400, code: 'VALIDATION_ERROR' });
     }
   }
+  if (cronExpression) {
+    const parts = cronExpression.trim().split(/\s+/);
+    if (parts.length !== 5) {
+      throw new ServerError('cronExpression must be a 5-field cron expression (minute hour dayOfMonth month dayOfWeek)', { status: 400, code: 'VALIDATION_ERROR' });
+    }
+  }
 
   const job = await autonomousJobs.createJob({
-    name, description, category, type, interval, intervalMs, scheduledTime,
+    name, description, category, type, interval, intervalMs, scheduledTime, cronExpression,
     enabled, priority, autonomyLevel, promptTemplate, command, triggerAction
   });
   res.json({ success: true, job });
@@ -969,10 +976,10 @@ router.post('/jobs', asyncHandler(async (req, res) => {
 
 // PUT /api/cos/jobs/:id - Update a job
 router.put('/jobs/:id', asyncHandler(async (req, res) => {
-  const { name, description, category, type, interval, intervalMs, scheduledTime,
+  const { name, description, category, type, interval, intervalMs, scheduledTime, cronExpression,
     enabled, priority, autonomyLevel, promptTemplate, command, triggerAction, weekdaysOnly } = req.body;
   const job = await autonomousJobs.updateJob(req.params.id, {
-    name, description, category, type, interval, intervalMs, scheduledTime,
+    name, description, category, type, interval, intervalMs, scheduledTime, cronExpression,
     enabled, priority, autonomyLevel, promptTemplate, command, triggerAction, weekdaysOnly
   });
   if (!job) {

@@ -1,2 +1,18 @@
+### Fixed
+- Job scheduling now uses user's configured timezone instead of UTC — daily briefing and all scheduled jobs fire at the correct local time
+- Briefing notification date uses user timezone instead of UTC date
+
 ### Added
 - Character Sheet page: D&D-style character tracking with XP, HP, leveling, dice-based damage, short/long rests, custom event logging, and JIRA/CoS task sync for XP
+- Timezone setting in Settings > General — auto-detects from browser, configurable per user
+- Cron expression support across all scheduling systems — full 5-field crontab syntax (minute hour dayOfMonth month dayOfWeek)
+- Cron support in System Tasks (Jobs), per-app Task Type Overrides, and global CoS Schedule
+- Shared CronInput component with presets dropdown and human-readable descriptions
+- Schedule mode toggle (Interval vs Cron) in job create/edit forms
+- Timezone-aware cron matching in event scheduler and task schedule evaluator
+- Shared cron utilities (cronHelpers.js) — DRY across all scheduling UIs
+- Timezone utility module with cached Intl.DateTimeFormat and comprehensive test coverage
+
+### Changed
+- Task Type Overrides switched from table to card layout for mobile responsiveness
+- Task type subtitle shows effective schedule (cron/override) instead of always showing global type

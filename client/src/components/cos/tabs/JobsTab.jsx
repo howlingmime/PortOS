@@ -3,6 +3,7 @@ import { Plus, RefreshCw, Play, Trash2, ChevronDown, ChevronUp, Clock, ToggleLef
 import toast from 'react-hot-toast';
 import * as api from '../../../services/api';
 import { timeAgo } from '../../../utils/formatters';
+import { CRON_PRESETS, describeCron } from '../../../utils/cronHelpers';
 
 const INTERVAL_OPTIONS = [
   { value: 'hourly', label: 'Every Hour' },
@@ -13,6 +14,11 @@ const INTERVAL_OPTIONS = [
   { value: 'weekly', label: 'Weekly' },
   { value: 'biweekly', label: 'Every 2 Weeks' },
   { value: 'monthly', label: 'Monthly' }
+];
+
+const SCHEDULE_MODE_OPTIONS = [
+  { value: 'interval', label: 'Interval' },
+  { value: 'cron', label: 'Cron' }
 ];
 
 const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -39,7 +45,95 @@ const JOB_TYPE_OPTIONS = [
   { value: 'shell', label: 'Shell Command' }
 ];
 
-function formatNextDue(lastRun, intervalMs, scheduledTime) {
+function normalizeJobPayload(formData) {
+  const payload = { ...formData };
+  if (payload.type !== 'shell' && payload.type !== 'script') {
+    payload.command = null;
+    payload.triggerAction = null;
+  }
+  if (payload.scheduleMode === 'cron') {
+    payload.cronExpression = payload.cronExpression?.trim() || null;
+    payload.scheduledTime = null;
+  } else {
+    payload.cronExpression = null;
+  }
+  delete payload.scheduleMode;
+  return payload;
+}
+
+function ScheduleFields({ data, onChange }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-400">Schedule:</span>
+        {SCHEDULE_MODE_OPTIONS.map(opt => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange('scheduleMode', opt.value)}
+            className={`px-2 py-1 text-xs rounded transition-colors ${
+              data.scheduleMode === opt.value
+                ? 'bg-port-accent/20 text-port-accent'
+                : 'bg-port-bg text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      {data.scheduleMode === 'cron' ? (
+        <div className="flex gap-2 items-center">
+          <input
+            type="text"
+            value={data.cronExpression || ''}
+            onChange={e => onChange('cronExpression', e.target.value)}
+            className="flex-1 px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm font-mono"
+            placeholder="0 7 * * *"
+            title="Cron expression: minute hour dayOfMonth month dayOfWeek"
+          />
+          <select
+            value=""
+            onChange={e => { if (e.target.value) onChange('cronExpression', e.target.value); }}
+            className="px-2 py-2 bg-port-bg border border-port-border rounded-lg text-gray-400 text-xs"
+          >
+            <option value="">Presets</option>
+            {CRON_PRESETS.map(p => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+          {data.cronExpression && (
+            <span className="text-xs text-gray-500">{describeCron(data.cronExpression)}</span>
+          )}
+        </div>
+      ) : (
+        <div className="flex gap-3">
+          <select
+            value={data.interval}
+            onChange={e => onChange('interval', e.target.value)}
+            className="px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm"
+          >
+            {INTERVAL_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <input
+            type="time"
+            value={data.scheduledTime || ''}
+            onChange={e => onChange('scheduledTime', e.target.value || null)}
+            className="px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm"
+            title="Run at specific time (leave empty for any time)"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatNextDue(job) {
+  // Cron jobs: show human-readable schedule (server computes exact next fire time)
+  if (job.cronExpression) return describeCron(job.cronExpression);
+
+  const { lastRun, intervalMs, scheduledTime } = job;
   if (!lastRun) return scheduledTime ? `at ${scheduledTime}` : 'Immediately';
   let nextDue = new Date(lastRun).getTime() + intervalMs;
   if (scheduledTime) {
@@ -50,10 +144,10 @@ function formatNextDue(lastRun, intervalMs, scheduledTime) {
   }
   const diff = nextDue - Date.now();
   if (diff <= 0) return 'Now';
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(hours / 24);
+  const hrs = Math.floor(diff / 3600000);
+  const days = Math.floor(hrs / 24);
   if (days > 0) return `in ${days}d`;
-  if (hours > 0) return `in ${hours}h`;
+  if (hrs > 0) return `in ${hrs}h`;
   const mins = Math.floor(diff / 60000);
   return `in ${mins}m`;
 }
@@ -77,8 +171,10 @@ function JobCard({ job, onToggle, onTrigger, onDelete, onUpdate }) {
       name: job.name,
       description: job.description,
       type: job.type || 'agent',
+      scheduleMode: job.cronExpression ? 'cron' : 'interval',
       interval: job.interval,
       scheduledTime: job.scheduledTime || '',
+      cronExpression: job.cronExpression || '',
       priority: job.priority,
       autonomyLevel: job.autonomyLevel,
       promptTemplate: job.promptTemplate || ''
@@ -92,11 +188,7 @@ function JobCard({ job, onToggle, onTrigger, onDelete, onUpdate }) {
   };
 
   const handleSave = async () => {
-    const payload = { ...editData };
-    if (payload.type !== 'shell' && payload.type !== 'script') {
-      payload.command = null;
-      payload.triggerAction = null;
-    }
+    const payload = normalizeJobPayload(editData);
     await api.updateCosJob(job.id, payload).catch(err => {
       toast.error(err.message);
       return null;
@@ -149,13 +241,18 @@ function JobCard({ job, onToggle, onTrigger, onDelete, onUpdate }) {
           <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
             <span className="flex items-center gap-1">
               <Clock size={10} />
-              {INTERVAL_OPTIONS.find(i => i.value === job.interval)?.label || job.interval}
-              {job.scheduledTime && ` at ${job.scheduledTime}`}
+              {job.cronExpression
+                ? <span title={job.cronExpression}>{describeCron(job.cronExpression)}</span>
+                : <>
+                    {INTERVAL_OPTIONS.find(i => i.value === job.interval)?.label || job.interval}
+                    {job.scheduledTime && ` at ${job.scheduledTime}`}
+                  </>
+              }
             </span>
             <span>Last: {timeAgo(job.lastRun, 'Never')}</span>
             {job.enabled && (
               <span className={isDue ? 'text-port-warning' : 'text-gray-500'}>
-                Next: {formatNextDue(job.lastRun, job.intervalMs, job.scheduledTime)}
+                Next: {formatNextDue(job)}
               </span>
             )}
             <span>Runs: {job.runCount || 0}</span>
@@ -224,22 +321,6 @@ function JobCard({ job, onToggle, onTrigger, onDelete, onUpdate }) {
                   {isScript && <option value="script">Script Handler</option>}
                 </select>
                 <select
-                  value={editData.interval}
-                  onChange={e => setEditData(d => ({ ...d, interval: e.target.value }))}
-                  className="px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm"
-                >
-                  {INTERVAL_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                <input
-                  type="time"
-                  value={editData.scheduledTime || ''}
-                  onChange={e => setEditData(d => ({ ...d, scheduledTime: e.target.value || null }))}
-                  className="px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm"
-                  title="Run at specific time (leave empty for any time)"
-                />
-                <select
                   value={editData.priority}
                   onChange={e => setEditData(d => ({ ...d, priority: e.target.value }))}
                   className="px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm"
@@ -260,6 +341,7 @@ function JobCard({ job, onToggle, onTrigger, onDelete, onUpdate }) {
                   </select>
                 )}
               </div>
+              <ScheduleFields data={editData} onChange={(key, val) => setEditData(d => ({ ...d, [key]: val }))} />
               {editData.type === 'shell' ? (
                 <>
                   <textarea
@@ -367,8 +449,10 @@ export default function JobsTab() {
     description: '',
     category: 'custom',
     type: 'agent',
+    scheduleMode: 'interval',
     interval: 'daily',
     scheduledTime: '',
+    cronExpression: '',
     priority: 'MEDIUM',
     autonomyLevel: 'manager',
     promptTemplate: '',
@@ -405,7 +489,7 @@ export default function JobsTab() {
       return;
     }
 
-    const created = await api.createCosJob(newJob).catch(err => {
+    const created = await api.createCosJob(normalizeJobPayload(newJob)).catch(err => {
       toast.error(err.message);
       return null;
     });
@@ -416,8 +500,10 @@ export default function JobsTab() {
       description: '',
       category: 'custom',
       type: 'agent',
+      scheduleMode: 'interval',
       interval: 'daily',
       scheduledTime: '',
+      cronExpression: '',
       priority: 'MEDIUM',
       autonomyLevel: 'manager',
       promptTemplate: '',
@@ -552,22 +638,6 @@ export default function JobsTab() {
             />
             <div className="flex gap-3">
               <select
-                value={newJob.interval}
-                onChange={e => setNewJob(j => ({ ...j, interval: e.target.value }))}
-                className="px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm"
-              >
-                {INTERVAL_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-              <input
-                type="time"
-                value={newJob.scheduledTime || ''}
-                onChange={e => setNewJob(j => ({ ...j, scheduledTime: e.target.value || null }))}
-                className="px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm"
-                title="Run at specific time (leave empty for any time)"
-              />
-              <select
                 value={newJob.priority}
                 onChange={e => setNewJob(j => ({ ...j, priority: e.target.value }))}
                 className="px-3 py-2 bg-port-bg border border-port-border rounded-lg text-white text-sm"
@@ -588,6 +658,7 @@ export default function JobsTab() {
                 </select>
               )}
             </div>
+            <ScheduleFields data={newJob} onChange={(key, val) => setNewJob(j => ({ ...j, [key]: val }))} />
             {newJob.type === 'shell' ? (
               <>
                 <textarea

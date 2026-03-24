@@ -21,6 +21,8 @@ import { DAY, ensureDir, HOUR, readJSONFile, PATHS, safeDate } from '../lib/file
 import { getAdaptiveCooldownMultiplier } from './taskLearning.js';
 import { isTaskTypeEnabledForApp, getAppTaskTypeInterval, getActiveApps, getAppTaskTypeOverrides } from './apps.js';
 import { PORTOS_UI_URL } from '../lib/ports.js';
+import { getUserTimezone } from '../lib/timezone.js';
+import { parseCronToNextRun } from './eventScheduler.js';
 
 const DATA_DIR = PATHS.cos;
 const SCHEDULE_FILE = join(DATA_DIR, 'task-schedule.json');
@@ -32,7 +34,8 @@ export const INTERVAL_TYPES = {
   WEEKLY: 'weekly',          // Runs once per week
   ONCE: 'once',              // Runs once per app or globally
   ON_DEMAND: 'on-demand',    // Only runs when manually triggered
-  CUSTOM: 'custom'           // Custom interval in milliseconds
+  CUSTOM: 'custom',          // Custom interval in milliseconds
+  CRON: 'cron'               // Cron expression schedule
 };
 
 const WEEK = 7 * DAY;
@@ -1247,7 +1250,9 @@ export async function shouldRunTask(taskType, appId = null) {
 
   // Determine effective interval type: per-app override takes precedence
   const perAppInterval = appId ? await getAppTaskTypeInterval(appId, taskType) : null;
-  const effectiveType = perAppInterval || interval.type;
+  // Cron expressions (contain spaces) are stored directly as the interval value
+  const isCronOverride = perAppInterval && perAppInterval.includes(' ');
+  const effectiveType = isCronOverride ? INTERVAL_TYPES.CRON : (perAppInterval || interval.type);
 
   const key = `task:${taskType}`;
   const execution = schedule.executions[key] || { lastRun: null, count: 0, perApp: {} };
@@ -1331,6 +1336,25 @@ export async function shouldRunTask(taskType, appId = null) {
           nextRunAt: new Date(lastRun + adjustedInterval).toISOString(),
           baseIntervalMs: baseInterval, adjustedIntervalMs: adjustedInterval
         });
+      }
+      break;
+    }
+
+    case INTERVAL_TYPES.CRON: {
+      // Cron expression: per-app override (stored as the interval string) or global config
+      const cronExpr = isCronOverride ? perAppInterval : interval.cronExpression;
+      if (!cronExpr || typeof cronExpr !== 'string' || cronExpr.trim().split(/\s+/).length !== 5) {
+        result = { shouldRun: false, reason: 'invalid-cron' };
+        break;
+      }
+      const timezone = await getUserTimezone();
+      const fromDate = lastRun ? new Date(lastRun) : new Date(now - DAY);
+      const nextRun = parseCronToNextRun(cronExpr, fromDate, timezone);
+      if (nextRun && now >= nextRun.getTime()) {
+        result = { shouldRun: true, reason: 'cron-due', cronExpression: cronExpr, nextRunAt: nextRun.toISOString() };
+      } else {
+        result = { shouldRun: false, reason: 'cron-cooldown', cronExpression: cronExpr,
+          nextRunAt: nextRun?.toISOString() || null };
       }
       break;
     }
