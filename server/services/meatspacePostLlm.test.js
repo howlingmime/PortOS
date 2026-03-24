@@ -365,12 +365,7 @@ describe('scoreLlmDrill', () => {
   });
 
   it('scores story-recall with answers', async () => {
-    mockApiProvider({
-      overallScore: 85,
-      scores: [{ score: 85, feedback: 'Recalled 3 of 4 details' }],
-      summary: 'Good memory'
-    });
-
+    // story-recall uses local scoring: 1/1 correct = 100
     const result = await scoreLlmDrill(
       'story-recall',
       { exercises: [{ paragraph: 'Jane went to Paris on Monday.', questions: [{ question: 'Where?', answer: 'Paris' }] }] },
@@ -379,16 +374,11 @@ describe('scoreLlmDrill', () => {
     );
 
     expect(result.score).toBeGreaterThan(0);
-    expect(result.evaluation.overallScore).toBe(85);
+    expect(result.evaluation.overallScore).toBe(100);
   });
 
   it('scores verbal-fluency with items', async () => {
-    mockApiProvider({
-      overallScore: 70,
-      scores: [{ score: 70, feedback: '10 valid items', validCount: 10, invalidItems: [] }],
-      summary: 'Decent fluency'
-    });
-
+    // verbal-fluency uses local scoring: 10 unique items / 15 target = 67
     const result = await scoreLlmDrill(
       'verbal-fluency',
       { categories: [{ category: 'Animals', minExpected: 15, examples: ['dog'] }] },
@@ -397,7 +387,7 @@ describe('scoreLlmDrill', () => {
     );
 
     expect(result.score).toBeGreaterThan(0);
-    expect(result.evaluation.overallScore).toBe(70);
+    expect(result.evaluation.overallScore).toBe(67);
   });
 });
 
