@@ -4106,5 +4106,7 @@ async function init() {
   }
 }
 
-// Initialize asynchronously
-init();
+// Initialize asynchronously (skip during tests to avoid circular import issues)
+if (process.env.NODE_ENV !== 'test') {
+  init();
+}
