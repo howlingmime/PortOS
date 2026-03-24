@@ -35,8 +35,7 @@ const takeRestSchema = z.object({
 const addEventSchema = z.object({
   description: z.string().min(1).max(500),
   xp: z.number().int().min(0).optional(),
-  diceNotation: z.string().regex(/^\d+d\d+([+-]\d+)?$/).optional(),
-  damageType: z.string().max(100).optional()
+  diceNotation: z.string().regex(/^\d+d\d+([+-]\d+)?$/).optional()
 });
 
 // GET /api/character - Get character sheet

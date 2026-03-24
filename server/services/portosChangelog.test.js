@@ -12,6 +12,7 @@ vi.mock('fs/promises', () => ({
 
 vi.mock('../lib/fileUtils.js', () => ({
   readJSONFile: vi.fn(),
+  ensureDir: vi.fn().mockResolvedValue(undefined),
   PATHS: { data: '/mock/data' },
   DAY: 86400000
 }));

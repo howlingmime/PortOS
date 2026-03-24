@@ -21,7 +21,7 @@ import { DAY, ensureDir, HOUR, readJSONFile, PATHS, safeDate } from '../lib/file
 import { getAdaptiveCooldownMultiplier } from './taskLearning.js';
 import { isTaskTypeEnabledForApp, getAppTaskTypeInterval, getActiveApps, getAppTaskTypeOverrides } from './apps.js';
 import { PORTOS_UI_URL } from '../lib/ports.js';
-import { getUserTimezone } from '../lib/timezone.js';
+import { getUserTimezone, getLocalParts } from '../lib/timezone.js';
 import { parseCronToNextRun } from './eventScheduler.js';
 
 const DATA_DIR = PATHS.cos;
@@ -1233,10 +1233,11 @@ export async function shouldRunTask(taskType, appId = null) {
     return { shouldRun: false, reason: 'disabled' };
   }
 
-  // Weekday-only tasks skip weekends
+  // Weekday-only tasks skip weekends (timezone-aware)
   if (interval.weekdaysOnly) {
-    const day = new Date().getDay();
-    if (day === 0 || day === 6) {
+    const timezone = await getUserTimezone();
+    const { dayOfWeek } = getLocalParts(new Date(), timezone);
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
       return { shouldRun: false, reason: 'weekday-only' };
     }
   }

@@ -5,11 +5,21 @@ import {
 } from 'lucide-react';
 import { timeAgo } from '../utils/formatters';
 
-const request = (endpoint, options = {}) =>
-  fetch(`/api/character${endpoint}`, {
+const request = async (endpoint, options = {}) => {
+  const response = await fetch(`/api/character${endpoint}`, {
     headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options
-  }).then(r => r.json());
+  });
+  let data = null;
+  try { data = await response.json(); } catch { /* non-JSON body */ }
+  if (!response.ok) {
+    const message = data?.message || `Request failed with status ${response.status}`;
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+};
 
 const get = () => request('');
 const post = (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) });

@@ -786,11 +786,32 @@ function GeneralTab() {
   }, []);
 
   const handleSave = async (tz) => {
+    const tzToSave = tz || detectedTz;
+    if (!tzToSave) {
+      toast.error('Timezone is required.');
+      return;
+    }
+
+    // Validate timezone string
+    let isValid = false;
+    if (allTimezones.length > 0) {
+      isValid = allTimezones.includes(tzToSave);
+    } else {
+      try {
+        new Intl.DateTimeFormat('en-US', { timeZone: tzToSave });
+        isValid = true;
+      } catch { isValid = false; }
+    }
+    if (!isValid) {
+      toast.error('Invalid timezone. Please select a valid IANA timezone.');
+      return;
+    }
+
     setSaving(true);
-    await updateSettings({ timezone: tz })
+    await updateSettings({ timezone: tzToSave })
       .then(() => {
-        setTimezone(tz);
-        toast.success(`Timezone set to ${tz}`);
+        setTimezone(tzToSave);
+        toast.success(`Timezone set to ${tzToSave}`);
       })
       .catch(() => toast.error('Failed to save timezone'))
       .finally(() => setSaving(false));
@@ -815,7 +836,7 @@ function GeneralTab() {
             list="tz-list"
           />
           <button
-            onClick={() => handleSave(timezone || detectedTz)}
+            onClick={() => handleSave(timezone)}
             disabled={saving}
             className="px-4 py-2 bg-port-accent/20 hover:bg-port-accent/30 text-port-accent rounded-lg text-sm transition-colors disabled:opacity-50"
           >

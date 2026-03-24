@@ -27,6 +27,7 @@ import { checkAndPrompt as autobiographyCheckAndPrompt } from './autobiography.j
 import { runGoalCheckIn } from './goalCheckIn.js'
 import { validateCommand, redactOutput, ALLOWED_COMMANDS_SORTED } from '../lib/commandSecurity.js'
 import { getUserTimezone, getLocalParts, nextLocalTime } from '../lib/timezone.js'
+import { parseCronToNextRun } from './eventScheduler.js'
 
 /**
  * Run the moltworld-explore.mjs script as a child process (no AI agent needed).
@@ -629,6 +630,21 @@ async function getDueJobs() {
   const due = []
 
   for (const job of enabledJobs) {
+    // Cron-mode jobs: compute next run from cron expression
+    if (job.cronExpression) {
+      const from = job.lastRun ? new Date(job.lastRun) : new Date(0)
+      const next = parseCronToNextRun(job.cronExpression, from, timezone)
+      if (!next || next.getTime() > now) continue
+
+      due.push({
+        ...job,
+        reason: job.lastRun ? 'cron-due' : 'never-run',
+        overdueBy: now - next.getTime()
+      })
+      continue
+    }
+
+    // Interval-mode jobs
     const lastRun = job.lastRun ? new Date(job.lastRun).getTime() : 0
     const timeSinceLastRun = now - lastRun
 
@@ -1022,19 +1038,32 @@ async function getNextDueJob() {
   let earliestTime = Infinity
 
   for (const job of enabledJobs) {
-    const lastRun = job.lastRun ? new Date(job.lastRun).getTime() : 0
-    let nextDue = lastRun + job.intervalMs
+    let nextDue
 
-    // If job has scheduledTime, find next occurrence in user's timezone
-    if (job.scheduledTime) {
-      const [hours, minutes] = job.scheduledTime.split(':').map(Number)
-      const candidate = nextLocalTime(nextDue, hours, minutes, timezone)
-      if (candidate > nextDue) nextDue = candidate
+    if (job.cronExpression) {
+      // Cron-mode: derive next due from cron expression
+      const from = job.lastRun ? new Date(job.lastRun) : new Date(0)
+      const next = parseCronToNextRun(job.cronExpression, from, timezone)
+      if (!next) continue
+      nextDue = next.getTime()
+    } else {
+      // Interval-mode
+      const lastRun = job.lastRun ? new Date(job.lastRun).getTime() : 0
+      nextDue = lastRun + job.intervalMs
+
+      // If job has scheduledTime, find next occurrence in user's timezone
+      if (job.scheduledTime) {
+        const [hours, minutes] = job.scheduledTime.split(':').map(Number)
+        const candidate = nextLocalTime(nextDue, hours, minutes, timezone)
+        if (candidate > nextDue) nextDue = candidate
+      }
     }
 
     if (nextDue < earliestTime) {
       earliestTime = nextDue
-      const isDue = Date.now() >= nextDue && isScheduledTimeMet(job.scheduledTime, timezone)
+      const isDue = job.cronExpression
+        ? Date.now() >= nextDue
+        : Date.now() >= nextDue && isScheduledTimeMet(job.scheduledTime, timezone)
       earliest = {
         jobId: job.id,
         jobName: job.name,

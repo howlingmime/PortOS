@@ -7,8 +7,8 @@
 
 import { execFileSync } from 'child_process';
 import { writeFile } from 'fs/promises';
-import { join } from 'path';
-import { readJSONFile, PATHS, DAY } from '../lib/fileUtils.js';
+import { join, dirname } from 'path';
+import { readJSONFile, ensureDir, PATHS, DAY } from '../lib/fileUtils.js';
 
 const STATE_FILE = join(PATHS.data, 'portos-changelog.json');
 const NUL = '\x00';
@@ -32,10 +32,16 @@ export async function getRecentChanges(since) {
     sinceDate = state.lastBriefedAt || new Date(Date.now() - DAY).toISOString();
   }
 
-  // NUL delimiter avoids breakage from | in commit messages
-  const raw = execFileSync('git', [
-    'log', `--since=${sinceDate}`, '--no-merges', `--format=%H${NUL}%s${NUL}%ai`
-  ], { cwd: process.cwd(), encoding: 'utf-8', windowsHide: true }).trim();
+  let raw;
+  try {
+    // NUL delimiter avoids breakage from | in commit messages
+    raw = execFileSync('git', [
+      'log', `--since=${sinceDate}`, '--no-merges', `--format=%H${NUL}%s${NUL}%ai`
+    ], { cwd: process.cwd(), encoding: 'utf-8', windowsHide: true }).trim();
+  } catch {
+    console.log('📋 PortOS changelog: git not available, skipping');
+    return { features: [], fixes: [], other: [], since: sinceDate };
+  }
 
   if (!raw) {
     return { features: [], fixes: [], other: [], since: sinceDate };
@@ -58,15 +64,22 @@ export async function getRecentChanges(since) {
 }
 
 export async function markBriefed() {
-  const headCommit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
-    cwd: process.cwd(), encoding: 'utf-8', windowsHide: true
-  }).trim();
+  let headCommit;
+  try {
+    headCommit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      cwd: process.cwd(), encoding: 'utf-8', windowsHide: true
+    }).trim();
+  } catch {
+    console.log('📋 PortOS changelog: git not available, skipping markBriefed');
+    return DEFAULT_STATE;
+  }
 
   const state = {
     lastBriefedAt: new Date().toISOString(),
     lastBriefedCommit: headCommit
   };
 
+  await ensureDir(dirname(STATE_FILE));
   await writeFile(STATE_FILE, JSON.stringify(state, null, 2));
   console.log(`📋 PortOS changelog briefed at ${headCommit}`);
   return state;

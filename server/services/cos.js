@@ -3757,7 +3757,14 @@ function computeNextJobFireTime(job, timezone) {
   if (job.cronExpression) {
     const from = job.lastRun ? new Date(job.lastRun) : new Date();
     const next = parseCronToNextRun(job.cronExpression, from, timezone);
-    return next ? next.getTime() : Date.now() + 60_000;
+    if (!next) {
+      throw new Error(
+        `Invalid cron expression for autonomous job` +
+        (job.id ? ` "${job.id}"` : '') +
+        `: ${job.cronExpression}`
+      );
+    }
+    return next.getTime();
   }
 
   const lastRun = job.lastRun ? new Date(job.lastRun).getTime() : 0;

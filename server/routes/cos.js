@@ -18,6 +18,7 @@ import * as goalProgress from '../services/goalProgress.js';
 import * as decisionLog from '../services/decisionLog.js';
 import { reinitialize as reinitializeEmbeddings } from '../services/memoryEmbeddings.js';
 import * as claudeChangelog from '../services/claudeChangelog.js';
+import { parseCronToNextRun } from '../services/eventScheduler.js';
 import { asyncHandler, ServerError } from '../lib/errorHandler.js';
 import { validateRequest, sanitizeTaskMetadata } from '../lib/validation.js';
 import { z } from 'zod';
@@ -965,6 +966,10 @@ router.post('/jobs', asyncHandler(async (req, res) => {
     if (parts.length !== 5) {
       throw new ServerError('cronExpression must be a 5-field cron expression (minute hour dayOfMonth month dayOfWeek)', { status: 400, code: 'VALIDATION_ERROR' });
     }
+    const nextRun = parseCronToNextRun(cronExpression);
+    if (!nextRun) {
+      throw new ServerError('Invalid cronExpression: unable to parse next run time', { status: 400, code: 'VALIDATION_ERROR' });
+    }
   }
 
   const job = await autonomousJobs.createJob({
@@ -978,6 +983,16 @@ router.post('/jobs', asyncHandler(async (req, res) => {
 router.put('/jobs/:id', asyncHandler(async (req, res) => {
   const { name, description, category, type, interval, intervalMs, scheduledTime, cronExpression,
     enabled, priority, autonomyLevel, promptTemplate, command, triggerAction, weekdaysOnly } = req.body;
+  if (cronExpression) {
+    const parts = cronExpression.trim().split(/\s+/);
+    if (parts.length !== 5) {
+      throw new ServerError('cronExpression must be a 5-field cron expression', { status: 400, code: 'VALIDATION_ERROR' });
+    }
+    const nextRun = parseCronToNextRun(cronExpression);
+    if (!nextRun) {
+      throw new ServerError('Invalid cronExpression: unable to parse next run time', { status: 400, code: 'VALIDATION_ERROR' });
+    }
+  }
   const job = await autonomousJobs.updateJob(req.params.id, {
     name, description, category, type, interval, intervalMs, scheduledTime, cronExpression,
     enabled, priority, autonomyLevel, promptTemplate, command, triggerAction, weekdaysOnly
