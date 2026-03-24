@@ -17,7 +17,7 @@ import { parseTasksMarkdown, groupTasksByStatus, getNextTask, getAutoApprovedTas
 import { isAppOnCooldown, getNextAppForReview, markAppReviewStarted, markIdleReviewStarted } from './appActivity.js';
 import { getActiveApps, getAppTaskTypeOverrides } from './apps.js';
 import { getAdaptiveCooldownMultiplier, getSkippedTaskTypes, getPerformanceSummary, checkAndRehabilitateSkippedTasks, getLearningInsights } from './taskLearning.js';
-import { schedule as scheduleEvent, cancel as cancelEvent, getStats as getSchedulerStats } from './eventScheduler.js';
+import { schedule as scheduleEvent, cancel as cancelEvent, getStats as getSchedulerStats, parseCronToNextRun } from './eventScheduler.js';
 import { createMutex } from '../lib/asyncMutex.js';
 import { generateProactiveTasks as generateMissionTasks, getStats as getMissionStats } from './missions.js';
 import { generateTaskFromJob, recordJobExecution, recordJobGateSkip, isScriptJob, executeScriptJob, isShellJob, executeShellJob } from './autonomousJobs.js';
@@ -26,6 +26,7 @@ import { ensureDir, ensureDirs, formatDuration, safeJSONParse, PATHS } from '../
 import { sanitizeTaskMetadata } from '../lib/validation.js';
 import { addNotification, NOTIFICATION_TYPES } from './notifications.js';
 import { recordDecision, DECISION_TYPES } from './decisionLog.js';
+import { getUserTimezone, getLocalParts, nextLocalTime, todayInTimezone } from '../lib/timezone.js';
 // Import and re-export cosEvents from separate module to avoid circular dependencies
 import { cosEvents as _cosEvents } from './cosEvents.js';
 export const cosEvents = _cosEvents;
@@ -3743,30 +3744,42 @@ export async function approveTask(taskId) {
 }
 
 /**
- * Compute the next fire time for an autonomous job
- * @param {Object} job - The job object with intervalMs, lastRun, scheduledTime, weekdaysOnly
+ * Compute the next fire time for an autonomous job.
+ * Supports two scheduling modes:
+ * 1. Cron mode: job.cronExpression defines the full schedule
+ * 2. Interval mode: job.intervalMs + optional job.scheduledTime (HH:MM in user timezone)
+ *
+ * @param {Object} job - The job object
+ * @param {string} timezone - IANA timezone string for interpreting scheduledTime/cron
  * @returns {number} Timestamp (ms) of next fire time
  */
-function computeNextJobFireTime(job) {
+function computeNextJobFireTime(job, timezone) {
+  if (job.cronExpression) {
+    const from = job.lastRun ? new Date(job.lastRun) : new Date();
+    const next = parseCronToNextRun(job.cronExpression, from, timezone);
+    if (!next) {
+      throw new Error(
+        `Invalid cron expression for autonomous job` +
+        (job.id ? ` "${job.id}"` : '') +
+        `: ${job.cronExpression}`
+      );
+    }
+    return next.getTime();
+  }
+
   const lastRun = job.lastRun ? new Date(job.lastRun).getTime() : 0;
   let nextDue = lastRun + job.intervalMs;
 
-  // If job has scheduledTime, adjust to that time of day
   if (job.scheduledTime) {
     const [hours, minutes] = job.scheduledTime.split(':').map(Number);
-    const nextDueDate = new Date(nextDue);
-    nextDueDate.setHours(hours, minutes, 0, 0);
-    if (nextDueDate.getTime() > nextDue) {
-      nextDue = nextDueDate.getTime();
-    }
+    nextDue = nextLocalTime(nextDue, hours, minutes, timezone);
   }
 
-  // If weekdaysOnly, skip to next weekday
+  // If weekdaysOnly, skip to next weekday (using local day-of-week)
   if (job.weekdaysOnly) {
-    const nextDate = new Date(nextDue);
-    const day = nextDate.getDay();
-    if (day === 0) nextDue += 24 * 60 * 60 * 1000; // Sunday → Monday
-    if (day === 6) nextDue += 2 * 24 * 60 * 60 * 1000; // Saturday → Monday
+    const { dayOfWeek } = getLocalParts(new Date(nextDue), timezone);
+    if (dayOfWeek === 0) nextDue += 24 * 60 * 60 * 1000; // Sunday → Monday
+    if (dayOfWeek === 6) nextDue += 2 * 24 * 60 * 60 * 1000; // Saturday → Monday
   }
 
   return nextDue;
@@ -3784,7 +3797,8 @@ async function registerSingleJobSchedule(jobId) {
     return;
   }
 
-  const nextFire = computeNextJobFireTime(job);
+  const timezone = await getUserTimezone();
+  const nextFire = computeNextJobFireTime(job, timezone);
   const delayMs = Math.max(nextFire - Date.now(), 1000);
 
   scheduleEvent({
@@ -4016,15 +4030,19 @@ async function init() {
 
     // Create notification when a daily briefing completes
     if (agent?.metadata?.jobId === 'job-daily-briefing' && agent?.result?.success) {
-      const today = new Date().toISOString().split('T')[0];
-      addNotification({
-        type: NOTIFICATION_TYPES.BRIEFING_READY,
-        title: 'Daily Briefing Ready',
-        description: `Your daily briefing for ${today} is ready for review.`,
-        priority: 'low',
-        link: '/cos/briefing',
-        metadata: { date: today, agentId: agent.id }
-      }).catch(err => console.error(`❌ Failed to create briefing notification: ${err.message}`));
+      getUserTimezone()
+        .then(tz => {
+          const today = todayInTimezone(tz);
+          return addNotification({
+            type: NOTIFICATION_TYPES.BRIEFING_READY,
+            title: 'Daily Briefing Ready',
+            description: `Your daily briefing for ${today} is ready for review.`,
+            priority: 'low',
+            link: '/cos/briefing',
+            metadata: { date: today, agentId: agent.id }
+          });
+        })
+        .catch(err => console.error(`❌ Failed to create briefing notification: ${err.message}`));
     }
   });
 
@@ -4091,5 +4109,7 @@ async function init() {
   }
 }
 
-// Initialize asynchronously
-init();
+// Initialize asynchronously (skip during tests to avoid circular import issues)
+if (process.env.NODE_ENV !== 'test') {
+  init();
+}

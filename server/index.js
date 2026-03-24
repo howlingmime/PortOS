@@ -61,6 +61,7 @@ import settingsRoutes from './routes/settings.js';
 import telegramRoutes from './routes/telegram.js';
 import updateRoutes from './routes/update.js';
 import loopsRoutes from './routes/loops.js';
+import characterRoutes from './routes/character.js';
 import { ensureSelf, startPolling } from './services/instances.js';
 import { initSyncLog } from './services/brainSyncLog.js';
 import { backfillOriginInstanceId } from './services/brainStorage.js';
@@ -258,6 +259,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/update', updateRoutes);
 app.use('/api/loops', loopsRoutes);
+app.use('/api/character', characterRoutes);
 
 // Initialize agent automation scheduler and action executor
 automationScheduler.init().catch(err => console.error(`❌ Agent scheduler init failed: ${err.message}`));

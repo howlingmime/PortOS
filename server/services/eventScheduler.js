@@ -6,6 +6,7 @@
  */
 
 import { cosEvents } from './cosEvents.js'
+import { getLocalParts } from '../lib/timezone.js'
 
 // Maximum safe setTimeout value (2^31 - 1 ms, ~24.8 days)
 const MAX_TIMEOUT = 2147483647
@@ -49,8 +50,8 @@ function validateCronFieldRange(expr, min, max) {
   return true
 }
 
-// Maximum iterations for cron search loop (1 year in minutes)
-const MAX_CRON_ITERATIONS = 525960
+// Maximum iterations for cron search loop (2 years in minutes, matches maxDate window)
+const MAX_CRON_ITERATIONS = 1051920
 
 /**
  * Parse cron expression to next execution time
@@ -63,9 +64,10 @@ const MAX_CRON_ITERATIONS = 525960
  *
  * @param {string} cronExpr - Cron expression
  * @param {Date} from - Starting point (default: now)
- * @returns {Date|null} - Next execution time, or null if invalid/no match
+ * @param {string} timezone - IANA timezone for matching (default: 'UTC')
+ * @returns {Date|null} - Next execution time (UTC), or null if invalid/no match
  */
-function parseCronToNextRun(cronExpr, from = new Date()) {
+function parseCronToNextRun(cronExpr, from = new Date(), timezone = 'UTC') {
   const parts = cronExpr.trim().split(/\s+/)
   if (parts.length !== 5) {
     throw new Error(`Invalid cron expression: ${cronExpr}`)
@@ -97,17 +99,34 @@ function parseCronToNextRun(cronExpr, from = new Date()) {
   const maxDate = new Date(from)
   maxDate.setFullYear(maxDate.getFullYear() + 2)
 
+  const useLocal = timezone !== 'UTC'
+
   let iterations = 0
   while (next < maxDate) {
     if (++iterations > MAX_CRON_ITERATIONS) {
       console.error(`❌ Cron search exceeded ${MAX_CRON_ITERATIONS} iterations for: ${cronExpr}`)
       return null
     }
-    if (matchesCronField(next.getMonth() + 1, monthExpr) &&
-        matchesCronField(next.getDate(), dayOfMonthExpr) &&
-        matchesCronField(next.getDay(), dayOfWeekExpr) &&
-        matchesCronField(next.getHours(), hourExpr) &&
-        matchesCronField(next.getMinutes(), minuteExpr)) {
+
+    let month, day, dow, hour, minute
+    if (useLocal) {
+      const lp = getLocalParts(next, timezone)
+      month = lp.month; day = lp.day; dow = lp.dayOfWeek; hour = lp.hour; minute = lp.minute
+    } else {
+      month = next.getMonth() + 1; day = next.getDate(); dow = next.getDay()
+      hour = next.getHours(); minute = next.getMinutes()
+    }
+
+    // Normalize DOW: cron allows 7 for Sunday, but JS getDay() returns 0
+    // Match both 0 and 7 representations for Sunday
+    const dowMatches = matchesCronField(dow, dayOfWeekExpr, 0) ||
+      (dow === 0 && matchesCronField(7, dayOfWeekExpr, 0))
+
+    if (matchesCronField(month, monthExpr, 1) &&
+        matchesCronField(day, dayOfMonthExpr, 1) &&
+        dowMatches &&
+        matchesCronField(hour, hourExpr, 0) &&
+        matchesCronField(minute, minuteExpr, 0)) {
       return next
     }
     next.setMinutes(next.getMinutes() + 1)
@@ -122,26 +141,36 @@ function parseCronToNextRun(cronExpr, from = new Date()) {
  * @param {string} expr - Cron field expression
  * @returns {boolean} - True if matches
  */
-function matchesCronField(value, expr) {
+function matchesCronField(value, expr, fieldMin = 0) {
   if (expr === '*') return true
 
   // Handle comma-separated values
   if (expr.includes(',')) {
-    return expr.split(',').some(part => matchesCronField(value, part.trim()))
+    return expr.split(',').some(part => matchesCronField(value, part.trim(), fieldMin))
+  }
+
+  // Handle step values first (e.g., */5, 0/10, 1-5/2)
+  if (expr.includes('/')) {
+    const [rangeExpr, step] = expr.split('/')
+    const stepNum = Number(step)
+    let startNum = fieldMin
+    let endNum = Infinity
+    if (rangeExpr === '*') {
+      startNum = fieldMin
+    } else if (rangeExpr.includes('-')) {
+      const [s, e] = rangeExpr.split('-').map(Number)
+      startNum = s
+      endNum = e
+    } else {
+      startNum = Number(rangeExpr)
+    }
+    return value >= startNum && value <= endNum && (value - startNum) % stepNum === 0
   }
 
   // Handle ranges (e.g., 1-5)
   if (expr.includes('-')) {
     const [start, end] = expr.split('-').map(Number)
     return value >= start && value <= end
-  }
-
-  // Handle step values (e.g., */5 or 0/10)
-  if (expr.includes('/')) {
-    const [start, step] = expr.split('/')
-    const startNum = start === '*' ? 0 : Number(start)
-    const stepNum = Number(step)
-    return (value - startNum) % stepNum === 0 && value >= startNum
   }
 
   // Direct value match
@@ -195,7 +224,7 @@ function createSafeTimer(callback, delayMs, eventId) {
  * @returns {Object} - Scheduled event
  */
 function schedule(config) {
-  const { id, type, cron, intervalMs, delayMs, handler, metadata = {} } = config
+  const { id, type, cron, timezone, intervalMs, delayMs, handler, metadata = {} } = config
 
   if (!id || !type || !handler) {
     throw new Error('Event requires id, type, and handler')
@@ -210,6 +239,7 @@ function schedule(config) {
     id,
     type,
     cron,
+    timezone: timezone || 'UTC',
     intervalMs,
     delayMs,
     handler,
@@ -225,7 +255,7 @@ function schedule(config) {
   switch (type) {
     case 'cron':
       if (!cron) throw new Error('Cron type requires cron expression')
-      event.nextRunAt = parseCronToNextRun(cron)?.getTime() || null
+      event.nextRunAt = parseCronToNextRun(cron, new Date(), event.timezone)?.getTime() || null
       break
 
     case 'interval':
@@ -334,7 +364,7 @@ async function runEvent(event) {
 function updateNextRunTime(event) {
   switch (event.type) {
     case 'cron':
-      const nextDate = parseCronToNextRun(event.cron, new Date())
+      const nextDate = parseCronToNextRun(event.cron, new Date(), event.timezone || 'UTC')
       event.nextRunAt = nextDate?.getTime() || null
       break
 
@@ -499,7 +529,7 @@ function getStats() {
 function cancelAll() {
   const count = scheduledEvents.size
 
-  for (const id of scheduledEvents.keys()) {
+  for (const id of [...scheduledEvents.keys()]) {
     cancel(id)
   }
 

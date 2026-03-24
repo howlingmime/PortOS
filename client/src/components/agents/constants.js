@@ -67,16 +67,8 @@ export const DEFAULT_AVATAR = {
   color: '#3b82f6'
 };
 
-// Cron presets for easy scheduling
-export const CRON_PRESETS = [
-  { value: '0 * * * *', label: 'Every hour' },
-  { value: '0 */2 * * *', label: 'Every 2 hours' },
-  { value: '0 */4 * * *', label: 'Every 4 hours' },
-  { value: '0 */6 * * *', label: 'Every 6 hours' },
-  { value: '0 9,12,15,18 * * *', label: 'Peak hours (9am, 12pm, 3pm, 6pm)' },
-  { value: '0 9 * * *', label: 'Daily at 9am' },
-  { value: '0 12 * * *', label: 'Daily at noon' }
-];
+// Re-export shared cron presets for agent scheduling
+export { CRON_PRESETS } from '../../utils/cronHelpers';
 
 // Interval presets (in milliseconds)
 export const INTERVAL_PRESETS = [

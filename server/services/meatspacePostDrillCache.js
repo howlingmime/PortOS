@@ -19,8 +19,10 @@ const CACHEABLE_TYPES = [
   'compound-chain', 'bridge-word', 'double-meaning', 'idiom-twist',
 ];
 
+const delay = ms => new Promise(r => setTimeout(r, ms));
+
 let cache = {}; // { type: [drill, drill, ...] }
-let replenishing = new Set(); // types currently being refilled
+let replenishing = new Map(); // type -> Promise (in-flight replenishment)
 let saveQueued = false;
 
 async function loadCache() {
@@ -46,17 +48,17 @@ function debouncedSave() {
 }
 
 function replenishType(type, providerId, model) {
-  if (replenishing.has(type)) return;
-  if ((cache[type]?.length || 0) >= MIN_PER_TYPE) return;
+  if (replenishing.has(type)) return replenishing.get(type);
+  if ((cache[type]?.length || 0) >= MIN_PER_TYPE) return Promise.resolve();
 
-  replenishing.add(type);
   const needed = MAX_PER_TYPE - (cache[type]?.length || 0);
 
-  (async () => {
+  const promise = (async () => {
     let generated = 0;
     let consecutiveFailures = 0;
     try {
       for (let i = 0; i < needed; i++) {
+        if (i > 0) await delay(2000); // avoid LLM rate limits
         const drill = await generateLlmDrill(type, { count: 5 }, providerId, model).catch(err => {
           console.log(`⚠️ POST cache: failed to generate ${type}: ${err.message}`);
           return null;
@@ -67,7 +69,6 @@ function replenishType(type, providerId, model) {
           consecutiveFailures = 0;
         } else {
           consecutiveFailures++;
-          // Bail early if provider appears unavailable (2+ consecutive failures)
           if (consecutiveFailures >= 2) {
             console.log(`⚠️ POST cache: bailing on ${type} after ${consecutiveFailures} consecutive failures`);
             break;
@@ -82,6 +83,9 @@ function replenishType(type, providerId, model) {
       replenishing.delete(type);
     }
   })();
+
+  replenishing.set(type, promise);
+  return promise;
 }
 
 /**
@@ -117,16 +121,21 @@ export function getCacheStats() {
 }
 
 /**
- * Initialize cache: load from disk, start background fill for empty types.
+ * Initialize cache: load from disk, start sequential background fill for low types.
  */
 export async function initDrillCache(providerId, model) {
   await loadCache();
   const stats = CACHEABLE_TYPES.map(t => `${t}:${cache[t]?.length || 0}`).join(' ');
   console.log(`📦 POST drill cache loaded: ${stats}`);
 
-  for (const type of CACHEABLE_TYPES) {
-    if ((cache[type]?.length || 0) < MIN_PER_TYPE) {
-      replenishType(type, providerId, model);
-    }
+  // Fill types sequentially (not in parallel) to avoid LLM API spam on startup
+  const lowTypes = CACHEABLE_TYPES.filter(t => (cache[t]?.length || 0) < MIN_PER_TYPE);
+  if (lowTypes.length > 0) {
+    console.log(`📦 POST cache: queuing startup fill for ${lowTypes.length} types`);
+    (async () => {
+      for (const type of lowTypes) {
+        await replenishType(type, providerId, model);
+      }
+    })().catch(err => console.error(`❌ POST drill cache startup fill failed: ${err.message}`));
   }
 }

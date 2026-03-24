@@ -8,6 +8,7 @@
 import { schedule, cancel } from './eventScheduler.js';
 import { getSettings } from './settings.js';
 import { runBackup } from './backup.js';
+import { getUserTimezone } from '../lib/timezone.js';
 
 /**
  * Start the backup scheduler.
@@ -30,11 +31,13 @@ export async function startBackupScheduler() {
   const cronExpression = settings.backup?.cronExpression || '0 0 * * *';
   const destPath = settings.backup.destPath;
   const excludePaths = settings.backup?.excludePaths || [];
+  const timezone = await getUserTimezone();
 
   schedule({
     id: 'backup-daily',
     type: 'cron',
     cron: cronExpression,
+    timezone,
     handler: async () => {
       console.log('💾 Backup scheduler: running scheduled backup');
       await runBackup(destPath, null, { excludePaths });

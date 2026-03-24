@@ -12,6 +12,7 @@ import { logAction } from '../services/history.js';
 import { z } from 'zod';
 import { validateRequest, appSchema, appUpdateSchema, sanitizeTaskMetadata } from '../lib/validation.js';
 import * as git from '../services/git.js';
+import { parseCronToNextRun } from '../services/eventScheduler.js';
 import { asyncHandler, ServerError } from '../lib/errorHandler.js';
 import { safeJSONParse } from '../lib/fileUtils.js';
 import { parseEcosystemFromPath, usesPm2 } from '../services/streamingDetect.js';
@@ -347,11 +348,21 @@ router.put('/:id/task-types/:taskType', asyncHandler(async (req, res) => {
     }
   }
 
-  // Validate interval against allowed values
+  // Validate interval against allowed values (also accepts 5-field cron expressions)
   if (interval !== undefined) {
     const allowedIntervals = ['rotation', 'daily', 'weekly', 'once', 'on-demand'];
-    if (interval !== null && (typeof interval !== 'string' || !allowedIntervals.includes(interval))) {
-      throw new ServerError('interval must be one of rotation|daily|weekly|once|on-demand or null', { status: 400, code: 'VALIDATION_ERROR' });
+    if (interval !== null && typeof interval === 'string') {
+      const isCron = interval.trim().split(/\s+/).length === 5;
+      if (!isCron && !allowedIntervals.includes(interval)) {
+        throw new ServerError('interval must be one of rotation|daily|weekly|once|on-demand, a cron expression, or null', { status: 400, code: 'VALIDATION_ERROR' });
+      }
+      if (isCron) {
+        // Validate syntax and field ranges (parseCronToNextRun throws on invalid expressions)
+        // Note: null return means no match within search window (e.g. leap day) -- not invalid
+        parseCronToNextRun(interval, new Date(), 'UTC');
+      }
+    } else if (interval !== null) {
+      throw new ServerError('interval must be a string or null', { status: 400, code: 'VALIDATION_ERROR' });
     }
   }
 

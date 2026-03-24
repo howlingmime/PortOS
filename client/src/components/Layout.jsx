@@ -65,7 +65,8 @@ import {
   RefreshCw,
   Dog,
   FilePen,
-  MessageCircle
+  MessageCircle,
+  Swords
 } from 'lucide-react';
 /* global __APP_VERSION__ */
 import Logo from './Logo';
@@ -113,6 +114,7 @@ const navItems = [
       { to: '/calendar/week', label: 'Week', icon: CalendarDays }
     ]
   },
+  { to: '/character', label: 'Character', icon: Swords, single: true },
   {
     label: 'Chief of Staff',
     icon: Crown,
@@ -671,7 +673,8 @@ export default function Layout() {
 
         {/* Main content */}
         {(() => {
-          const isFullWidth = location.pathname.startsWith('/calendar') ||
+          const isFullWidth = location.pathname === '/character' ||
+            location.pathname.startsWith('/calendar') ||
             location.pathname.startsWith('/cos') ||
             location.pathname.startsWith('/brain') ||
             location.pathname.startsWith('/digital-twin') ||

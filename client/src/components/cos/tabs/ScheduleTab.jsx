@@ -3,7 +3,9 @@ import { Play, RotateCcw, ChevronDown, ChevronRight, AlertCircle, RefreshCw, Pac
 import toast from 'react-hot-toast';
 import * as api from '../../../services/api';
 import AppIcon from '../../AppIcon';
+import CronInput from '../../CronInput';
 import { AGENT_OPTIONS, toggleAppMetadataOverride } from '../constants';
+import { isCronExpression, describeCron } from '../../../utils/cronHelpers';
 
 const INTERVAL_LABELS = {
   rotation: 'Rotation',
@@ -11,7 +13,8 @@ const INTERVAL_LABELS = {
   weekly: 'Weekly',
   once: 'Once',
   'on-demand': 'On Demand',
-  custom: 'Custom'
+  custom: 'Custom',
+  cron: 'Cron'
 };
 
 const INTERVAL_DESCRIPTIONS = {
@@ -20,7 +23,8 @@ const INTERVAL_DESCRIPTIONS = {
   weekly: 'Runs once per week',
   once: 'Runs once then stops',
   'on-demand': 'Only runs when manually triggered',
-  custom: 'Custom interval'
+  custom: 'Custom interval',
+  cron: 'Cron expression schedule'
 };
 
 // Toggle a global taskMetadata field, enforcing the openPR→useWorktree invariant.
@@ -41,16 +45,20 @@ function toggleMetadataField(metadata, field) {
 }
 
 
-function IntervalBadge({ type }) {
+function IntervalBadge({ type, cronExpression }) {
+  const label = type === 'cron' && cronExpression
+    ? describeCron(cronExpression) || cronExpression
+    : INTERVAL_LABELS[type] || type;
   return (
     <span className={`text-xs px-2 py-0.5 rounded ${
       type === 'daily' ? 'bg-port-accent/20 text-port-accent' :
       type === 'weekly' ? 'bg-purple-500/20 text-purple-400' :
       type === 'once' ? 'bg-port-warning/20 text-port-warning' :
       type === 'on-demand' ? 'bg-gray-500/20 text-gray-400' :
+      type === 'cron' ? 'bg-cyan-500/20 text-cyan-400' :
       'bg-port-success/20 text-port-success'
-    }`}>
-      {INTERVAL_LABELS[type]}
+    }`} title={type === 'cron' && cronExpression ? cronExpression : undefined}>
+      {label}
     </span>
   );
 }
@@ -87,12 +95,29 @@ function GlobalConfigControls({ taskType, config, onUpdate, onTrigger, onReset, 
 
   const activeApps = apps?.filter(app => !app.archived) || [];
 
+  const [cronEditing, setCronEditing] = useState(false);
+
   const handleTypeChange = async (newType) => {
+    if (newType === 'cron') {
+      setCronEditing(true);
+      setSelectedType('cron');
+      return;
+    }
+    setCronEditing(false);
     setUpdating(true);
     setSelectedType(newType);
-    await onUpdate(taskType, { type: newType }).catch(() => {
+    await onUpdate(taskType, { type: newType, cronExpression: null }).catch(() => {
       setSelectedType(config.type);
     });
+    setUpdating(false);
+  };
+
+  const handleCronSave = async (expr) => {
+    setUpdating(true);
+    await onUpdate(taskType, { type: 'cron', cronExpression: expr }).catch(() => {
+      setSelectedType(config.type);
+    });
+    setCronEditing(false);
     setUpdating(false);
   };
 
@@ -169,8 +194,18 @@ function GlobalConfigControls({ taskType, config, onUpdate, onTrigger, onReset, 
           <option value="weekly">Weekly (once per week)</option>
           <option value="once">Once (run once then stop)</option>
           <option value="on-demand">On Demand (manual trigger only)</option>
+          <option value="cron">Cron (custom schedule)</option>
         </select>
-        <p className="text-xs text-gray-500 mt-1">{INTERVAL_DESCRIPTIONS[selectedType]}</p>
+        {(selectedType === 'cron' && (cronEditing || config.type === 'cron')) ? (
+          <CronInput
+            value={config.cronExpression || '0 7 * * *'}
+            onSave={handleCronSave}
+            onCancel={() => { setCronEditing(false); setSelectedType(config.type); }}
+            className="mt-2"
+          />
+        ) : (
+          <p className="text-xs text-gray-500 mt-1">{INTERVAL_DESCRIPTIONS[selectedType]}</p>
+        )}
       </div>
 
       <div>
@@ -387,8 +422,10 @@ function GlobalConfigControls({ taskType, config, onUpdate, onTrigger, onReset, 
 
 function AppOverrideRow({ app, taskType, globalIntervalType, globalTaskMetadata, override, onUpdate }) {
   const [updating, setUpdating] = useState(false);
+  const [cronEditing, setCronEditing] = useState(false);
   const isEnabled = override?.enabled === true;
   const currentInterval = override?.interval || null;
+  const hasCron = isCronExpression(currentInterval);
 
   const handleToggle = async () => {
     setUpdating(true);
@@ -397,9 +434,21 @@ function AppOverrideRow({ app, taskType, globalIntervalType, globalTaskMetadata,
   };
 
   const handleIntervalChange = async (newInterval) => {
+    if (newInterval === 'cron') {
+      setCronEditing(true);
+      return;
+    }
+    setCronEditing(false);
     setUpdating(true);
     const interval = newInterval === '' ? null : newInterval;
     await onUpdate(app.id, taskType, { enabled: isEnabled, interval }).catch(() => {});
+    setUpdating(false);
+  };
+
+  const handleCronSave = async (expr) => {
+    setUpdating(true);
+    await onUpdate(app.id, taskType, { enabled: isEnabled, interval: expr }).catch(() => {});
+    setCronEditing(false);
     setUpdating(false);
   };
 
@@ -417,19 +466,37 @@ function AppOverrideRow({ app, taskType, globalIntervalType, globalTaskMetadata,
         <span className="text-sm text-white truncate">{app.name}</span>
       </div>
 
-      <select
-        value={currentInterval || ''}
-        onChange={(e) => handleIntervalChange(e.target.value)}
-        disabled={updating}
-        className="bg-port-card border border-port-border rounded px-2 py-1 text-xs text-white min-w-[140px]"
-      >
-        <option value="">Inherit ({INTERVAL_LABELS[globalIntervalType]})</option>
-        <option value="rotation">Rotation</option>
-        <option value="daily">Daily</option>
-        <option value="weekly">Weekly</option>
-        <option value="once">Once</option>
-        <option value="on-demand">On Demand</option>
-      </select>
+      <div className="flex items-center gap-1">
+        <select
+          value={cronEditing || hasCron ? 'cron' : (currentInterval || '')}
+          onChange={(e) => handleIntervalChange(e.target.value)}
+          disabled={updating}
+          className="bg-port-card border border-port-border rounded px-2 py-1 text-xs text-white min-w-[120px]"
+        >
+          <option value="">Inherit ({INTERVAL_LABELS[globalIntervalType] || globalIntervalType})</option>
+          <option value="rotation">Rotation</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="once">Once</option>
+          <option value="on-demand">On Demand</option>
+          <option value="cron">Cron</option>
+        </select>
+        {cronEditing ? (
+          <CronInput
+            value={hasCron ? currentInterval : '0 7 * * *'}
+            onSave={handleCronSave}
+            onCancel={() => setCronEditing(false)}
+          />
+        ) : hasCron ? (
+          <button
+            onClick={() => setCronEditing(true)}
+            className="px-2 py-1 text-xs text-gray-400 font-mono bg-port-bg border border-port-border rounded hover:border-port-accent cursor-pointer"
+            title={describeCron(currentInterval)}
+          >
+            {currentInterval}
+          </button>
+        ) : null}
+      </div>
 
       {AGENT_OPTIONS.map(({ field, label, shortLabel }) => {
         const effective = override?.taskMetadata?.[field] ?? globalTaskMetadata?.[field] ?? false;
@@ -576,7 +643,7 @@ function AppTaskTypeRow({ taskType, config, onUpdate, onTrigger, onReset, provid
               {enabledCount}/{totalCount} apps
             </span>
           )}
-          <IntervalBadge type={config.type} />
+          <IntervalBadge type={config.type} cronExpression={config.cronExpression} />
         </div>
       </div>
 

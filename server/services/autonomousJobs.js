@@ -26,6 +26,8 @@ import { createMutex } from '../lib/asyncMutex.js'
 import { checkAndPrompt as autobiographyCheckAndPrompt } from './autobiography.js'
 import { runGoalCheckIn } from './goalCheckIn.js'
 import { validateCommand, redactOutput, ALLOWED_COMMANDS_SORTED } from '../lib/commandSecurity.js'
+import { getUserTimezone, getLocalParts, nextLocalTime } from '../lib/timezone.js'
+import { parseCronToNextRun } from './eventScheduler.js'
 
 /**
  * Run the moltworld-explore.mjs script as a child process (no AI agent needed).
@@ -592,27 +594,29 @@ async function getEnabledJobs() {
 
 /**
  * Check if the current time has passed a job's scheduledTime today.
- * scheduledTime is "HH:MM" in local time (e.g., "05:00").
+ * scheduledTime is "HH:MM" in the user's configured timezone.
  * Returns true if no scheduledTime is set, or if current local time >= scheduledTime.
  * @param {string|null} scheduledTime - "HH:MM" or null/undefined
+ * @param {string} timezone - IANA timezone string
  * @returns {boolean}
  */
-function isScheduledTimeMet(scheduledTime) {
+function isScheduledTimeMet(scheduledTime, timezone) {
   if (!scheduledTime) return true
   const [hours, minutes] = scheduledTime.split(':').map(Number)
-  const now = new Date()
-  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const local = getLocalParts(new Date(), timezone)
+  const nowMinutes = local.hour * 60 + local.minute
   const targetMinutes = hours * 60 + minutes
   return nowMinutes >= targetMinutes
 }
 
 /**
- * Check if today is a weekday (Monday-Friday).
+ * Check if today is a weekday (Monday-Friday) in the user's timezone.
+ * @param {string} timezone - IANA timezone string
  * @returns {boolean}
  */
-function isWeekday() {
-  const day = new Date().getDay()
-  return day >= 1 && day <= 5
+function isWeekday(timezone) {
+  const local = getLocalParts(new Date(), timezone)
+  return local.dayOfWeek >= 1 && local.dayOfWeek <= 5
 }
 
 /**
@@ -622,18 +626,34 @@ function isWeekday() {
 async function getDueJobs() {
   const enabledJobs = await getEnabledJobs()
   const now = Date.now()
+  const timezone = await getUserTimezone()
   const due = []
 
   for (const job of enabledJobs) {
+    // Cron-mode jobs: compute next run from cron expression
+    if (job.cronExpression) {
+      const from = job.lastRun ? new Date(job.lastRun) : new Date(now)
+      const next = parseCronToNextRun(job.cronExpression, from, timezone)
+      if (!next || next.getTime() > now) continue
+
+      due.push({
+        ...job,
+        reason: job.lastRun ? 'cron-due' : 'never-run',
+        overdueBy: now - next.getTime()
+      })
+      continue
+    }
+
+    // Interval-mode jobs
     const lastRun = job.lastRun ? new Date(job.lastRun).getTime() : 0
     const timeSinceLastRun = now - lastRun
 
     if (timeSinceLastRun >= job.intervalMs) {
       // If job has a scheduledTime, only mark due if we've passed that time today
-      if (!isScheduledTimeMet(job.scheduledTime)) continue
+      if (!isScheduledTimeMet(job.scheduledTime, timezone)) continue
 
       // If job is weekdaysOnly, skip weekends
-      if (job.weekdaysOnly && !isWeekday()) continue
+      if (job.weekdaysOnly && !isWeekday(timezone)) continue
 
       due.push({
         ...job,
@@ -687,6 +707,7 @@ async function createJob(jobData) {
       name: jobData.name,
       description: jobData.description || '',
       category: jobData.category || 'custom',
+      cronExpression: jobData.cronExpression || null,
       type: jobType,
       interval: jobData.interval || 'weekly',
       intervalMs: resolveIntervalMs(jobData.interval || 'weekly', jobData.intervalMs),
@@ -739,7 +760,7 @@ async function updateJob(jobId, updates) {
 
     const updatableFields = [
       'name', 'description', 'category', 'type', 'interval', 'intervalMs',
-      'scheduledTime', 'weekdaysOnly', 'enabled', 'priority', 'autonomyLevel', 'promptTemplate',
+      'scheduledTime', 'cronExpression', 'weekdaysOnly', 'enabled', 'priority', 'autonomyLevel', 'promptTemplate',
       'command', 'triggerAction'
     ]
 
@@ -1012,28 +1033,37 @@ async function getNextDueJob() {
   const enabledJobs = await getEnabledJobs()
   if (enabledJobs.length === 0) return null
 
+  const timezone = await getUserTimezone()
   let earliest = null
   let earliestTime = Infinity
 
   for (const job of enabledJobs) {
-    const lastRun = job.lastRun ? new Date(job.lastRun).getTime() : 0
-    let nextDue = lastRun + job.intervalMs
+    let nextDue
 
-    // If job has scheduledTime, adjust nextDue to that time of day
-    if (job.scheduledTime) {
-      const [hours, minutes] = job.scheduledTime.split(':').map(Number)
-      const nextDueDate = new Date(nextDue)
-      nextDueDate.setHours(hours, minutes, 0, 0)
-      // If the scheduled time already passed on the interval-due date, it's fine
-      // If not, the job waits until that time
-      if (nextDueDate.getTime() > nextDue) {
-        nextDue = nextDueDate.getTime()
+    if (job.cronExpression) {
+      // Cron-mode: derive next due from cron expression
+      const from = job.lastRun ? new Date(job.lastRun) : new Date()
+      const next = parseCronToNextRun(job.cronExpression, from, timezone)
+      if (!next) continue
+      nextDue = next.getTime()
+    } else {
+      // Interval-mode
+      const lastRun = job.lastRun ? new Date(job.lastRun).getTime() : 0
+      nextDue = lastRun + job.intervalMs
+
+      // If job has scheduledTime, find next occurrence in user's timezone
+      if (job.scheduledTime) {
+        const [hours, minutes] = job.scheduledTime.split(':').map(Number)
+        const candidate = nextLocalTime(nextDue, hours, minutes, timezone)
+        if (candidate > nextDue) nextDue = candidate
       }
     }
 
     if (nextDue < earliestTime) {
       earliestTime = nextDue
-      const isDue = Date.now() >= nextDue && isScheduledTimeMet(job.scheduledTime)
+      const isDue = job.cronExpression
+        ? Date.now() >= nextDue
+        : Date.now() >= nextDue && isScheduledTimeMet(job.scheduledTime, timezone)
       earliest = {
         jobId: job.id,
         jobName: job.name,
