@@ -3,22 +3,17 @@ import {
   Sword, Star, Moon, ScrollText, Shield, Heart,
   Sparkles, RefreshCw, Dices, X, ChevronDown, Zap
 } from 'lucide-react';
+import { timeAgo } from '../utils/formatters';
 
-const API = '/api/character';
-const fetchJson = (url, opts) => fetch(url, opts).then(r => r.json());
-const get = () => fetchJson(API);
-const post = (path, body) =>
-  fetchJson(`${API}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-const put = (body) =>
-  fetchJson(API, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+const request = (endpoint, options = {}) =>
+  fetch(`/api/character${endpoint}`, {
+    headers: { 'Content-Type': 'application/json', ...options.headers },
+    ...options
+  }).then(r => r.json());
+
+const get = () => request('');
+const post = (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) });
+const put = (body) => request('', { method: 'PUT', body: JSON.stringify(body) });
 
 // D&D 5e XP thresholds (must match server)
 const XP_THRESHOLDS = [
@@ -49,18 +44,6 @@ const EVENT_COLORS = {
   custom: 'text-gray-400',
   sync: 'text-port-accent'
 };
-
-function relativeTime(ts) {
-  const diff = Date.now() - new Date(ts).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
-  return `${Math.floor(days / 30)}mo ago`;
-}
 
 function hpColor(pct) {
   if (pct > 50) return 'bg-port-success';
@@ -527,7 +510,7 @@ export default function CharacterSheet() {
                       )}
                     </div>
                     <span className="text-xs text-gray-600 whitespace-nowrap mt-0.5">
-                      {relativeTime(evt.timestamp)}
+                      {timeAgo(evt.timestamp)}
                     </span>
                   </div>
                 );

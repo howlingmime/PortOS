@@ -97,12 +97,7 @@ router.post('/sync/tasks', asyncHandler(async (req, res) => {
 
 // POST /api/character/reset - Reset character (fresh start)
 router.post('/reset', asyncHandler(async (req, res) => {
-  const character = await characterService.saveCharacter(
-    Object.assign(
-      { name: 'Adventurer', class: 'Developer', xp: 0, hp: 15, maxHp: 15, level: 1, events: [], syncedJiraTickets: [], syncedTaskIds: [] },
-      { createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-    )
-  );
+  const character = await characterService.saveCharacter(characterService.createDefaultCharacter());
   res.json(character);
 }));
 
