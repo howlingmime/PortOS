@@ -28,6 +28,7 @@ import { ensureDir, readJSONFile, PATHS } from '../lib/fileUtils.js';
 import { getAppById } from './apps.js';
 import { createToolExecution, startExecution, updateExecution, completeExecution, errorExecution, getExecution, getStats as getToolStats } from './toolStateMachine.js';
 import { resolveThinkingLevel, getModelForLevel, isLocalPreferred } from './thinkingLevels.js';
+import { getToolsSummaryForPrompt } from './tools.js';
 import { determineLane, acquire, release, hasCapacity, waitForLane } from './executionLanes.js';
 import { detectConflicts } from './taskConflict.js';
 import { createWorktree, removeWorktree, cleanupOrphanedWorktrees } from './worktreeManager.js';
@@ -2794,6 +2795,12 @@ ${task.metadata.jiraBranch ? 'Commit your changes to this branch. Do NOT switch 
       })
     : null;
 
+  // Build onboard tools section for agent awareness
+  const toolsSection = await getToolsSummaryForPrompt().catch(err => {
+    console.log(`⚠️ Tools summary retrieval failed: ${err.message}`);
+    return '';
+  });
+
   // Build .planning/ context section for GSD-enabled apps
   let planningContextSection = '';
   if (task.metadata?.app) {
@@ -2827,6 +2834,7 @@ ${task.metadata.jiraBranch ? 'Commit your changes to this branch. Do NOT switch 
     compactionSection,
     skillSection,
     planningContextSection,
+    toolsSection,
     soulSection: digitalTwinSection, // Backwards compatibility for prompt templates
     timestamp: new Date().toISOString()
   }).catch(() => null);
@@ -2857,7 +2865,7 @@ ${jiraSection}
 ${simplifySection}
 ${reviewLoopSection}
 ${compactionSection}
-${skillSection ? `## Task-Type Skill Guidelines\n\n${skillSection}\n` : ''}${planningContextSection}
+${skillSection ? `## Task-Type Skill Guidelines\n\n${skillSection}\n` : ''}${toolsSection ? `\n${toolsSection}\n` : ''}${planningContextSection}
 ## Instructions
 1. Analyze the task requirements carefully
 2. Make necessary changes to complete the task

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Sword, Star, Moon, ScrollText, Shield, Heart,
-  Sparkles, RefreshCw, Dices, X, ChevronDown, Zap
+  Sparkles, RefreshCw, Dices, X, ChevronDown, Zap, Image
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { timeAgo } from '../utils/formatters';
@@ -72,6 +72,7 @@ export default function CharacterSheet() {
   const [nameVal, setNameVal] = useState('');
   const [classVal, setClassVal] = useState('');
   const [syncing, setSyncing] = useState(null);
+  const [generatingAvatar, setGeneratingAvatar] = useState(false);
 
   // Form states
   const [dmgDice, setDmgDice] = useState('1d6');
@@ -188,6 +189,24 @@ export default function CharacterSheet() {
     setEditingClass(false);
   };
 
+  const handleGenerateAvatar = () => {
+    setGeneratingAvatar(true);
+    fetch('/api/image-gen/avatar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: char.name, characterClass: char.class })
+    })
+      .then(res => res.ok ? res.json() : res.json().then(e => Promise.reject(new Error(e.error))))
+      .then(result => {
+        const updated = { ...char, avatarPath: result.path };
+        setChar(updated);
+        return put({ avatarPath: result.path });
+      })
+      .then(() => toast.success('Avatar generated'))
+      .catch(err => toast.error(err.message || 'Failed to generate avatar'))
+      .finally(() => setGeneratingAvatar(false));
+  };
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400">
@@ -234,6 +253,27 @@ export default function CharacterSheet() {
         {/* Character Identity & Stats */}
         <div className="bg-port-card border border-port-border rounded-xl p-4 md:p-6">
           <div className="flex flex-col md:flex-row md:items-start gap-4">
+            {/* Avatar */}
+            <div className="flex-shrink-0">
+              <div className="relative group w-20 h-20 rounded-lg overflow-hidden border border-port-border bg-port-bg">
+                {char.avatarPath ? (
+                  <img src={char.avatarPath} alt={char.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-600">
+                    <Shield className="w-8 h-8" />
+                  </div>
+                )}
+                <button
+                  onClick={handleGenerateAvatar}
+                  disabled={generatingAvatar}
+                  className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Generate avatar"
+                >
+                  {generatingAvatar ? <RefreshCw className="w-5 h-5 text-white animate-spin" /> : <Image className="w-5 h-5 text-white" />}
+                </button>
+              </div>
+            </div>
+
             {/* Name, Class, Level */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-1">
