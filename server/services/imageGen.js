@@ -3,6 +3,7 @@
  *
  * Handles communication with Stable Diffusion API (AUTOMATIC1111 / Forge WebUI).
  * Generated images are stored in data/images/.
+ * Streams diffusion progress via Socket.IO during generation.
  */
 
 import { writeFile } from 'fs/promises';
@@ -11,12 +12,15 @@ import { randomUUID } from 'crypto';
 import { ensureDir, PATHS } from '../lib/fileUtils.js';
 import { fetchWithTimeout } from '../lib/fetchWithTimeout.js';
 import { getSettings } from './settings.js';
+import { imageGenEvents } from './imageGenEvents.js';
 
 const DEFAULT_NEGATIVE_PROMPT = 'blurry, low quality, distorted, deformed, ugly, watermark, text, signature';
 
 // Cache detected model to avoid extra HTTP round-trip per generation
 let cachedModel = { name: null, timestamp: 0 };
 const MODEL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+const PROGRESS_POLL_INTERVAL = 500; // ms between progress polls
 
 async function getSdApiUrl() {
   const settings = await getSettings();
@@ -46,6 +50,32 @@ export async function checkConnection() {
   return { connected: true, model };
 }
 
+function startProgressPolling(baseUrl, generationId) {
+  let lastProgress = -1;
+  const interval = setInterval(async () => {
+    const res = await fetchWithTimeout(`${baseUrl}/sdapi/v1/progress`, {}, 5000).catch(() => null);
+    if (!res?.ok) return;
+    const data = await res.json().catch(() => null);
+    if (!data) return;
+
+    // Only emit if progress actually changed
+    const progress = Math.round(data.progress * 100);
+    if (progress === lastProgress) return;
+    lastProgress = progress;
+
+    imageGenEvents.emit('progress', {
+      generationId,
+      progress: data.progress,
+      eta: data.eta_relative,
+      step: data.state?.sampling_step,
+      totalSteps: data.state?.sampling_steps,
+      currentImage: data.current_image || null
+    });
+  }, PROGRESS_POLL_INTERVAL);
+
+  return () => clearInterval(interval);
+}
+
 export async function generateImage({ prompt, negativePrompt, width, height, steps, cfgScale, seed }) {
   const baseUrl = await getSdApiUrl();
   if (!baseUrl) throw new Error('No SD API URL configured — set it in Settings > Image Gen');
@@ -66,32 +96,54 @@ export async function generateImage({ prompt, negativePrompt, width, height, ste
     ...(seed != null && seed >= 0 && { seed })
   };
 
-  console.log(`🎨 Generating image: ${prompt.slice(0, 80)}... (${payload.width}x${payload.height}, ${payload.steps} steps)`);
+  const generationId = randomUUID();
+  console.log(`🎨 Generating image [${generationId.slice(0, 8)}]: ${prompt.slice(0, 80)}... (${payload.width}x${payload.height}, ${payload.steps} steps)`);
 
-  const res = await fetchWithTimeout(
-    `${baseUrl}/sdapi/v1/txt2img`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    },
-    300000
-  );
+  imageGenEvents.emit('started', {
+    generationId,
+    prompt: prompt.slice(0, 200),
+    totalSteps: payload.steps
+  });
+
+  // Start polling progress in background
+  const stopPolling = startProgressPolling(baseUrl, generationId);
+
+  let res;
+  try {
+    res = await fetchWithTimeout(
+      `${baseUrl}/sdapi/v1/txt2img`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      },
+      300000
+    );
+  } finally {
+    stopPolling();
+  }
 
   if (!res.ok) {
     const errBody = await res.text().catch(() => '');
+    imageGenEvents.emit('failed', { generationId, error: `SD API error ${res.status}` });
     throw new Error(`SD API error ${res.status}: ${errBody.slice(0, 200)}`);
   }
 
   const data = await res.json();
-  if (!data.images?.length) throw new Error('SD API returned no images');
+  if (!data.images?.length) {
+    imageGenEvents.emit('failed', { generationId, error: 'No images returned' });
+    throw new Error('SD API returned no images');
+  }
 
   await ensureDir(PATHS.images);
   const filename = `${randomUUID()}.png`;
   await writeFile(join(PATHS.images, filename), Buffer.from(data.images[0], 'base64'));
 
+  const path = `/data/images/${filename}`;
   console.log(`🖼️ Image saved: ${filename}`);
-  return { filename, path: `/data/images/${filename}` };
+
+  imageGenEvents.emit('completed', { generationId, path, filename });
+  return { generationId, filename, path };
 }
 
 export async function generateAvatar({ name, characterClass, prompt }) {

@@ -6,3 +6,8 @@
 - **CoS Tools Registry** — New onboard tools system (`data/tools/`) that lets CoS agents discover and use instance-specific capabilities like image generation. Tools are exposed in agent prompts via `getToolsSummaryForPrompt()`.
 - **Character Avatar Generation** — D&D Character Sheet now supports AI-generated avatars via the configured SD API. Hover over the avatar area to generate a new portrait.
 - **Image serving** — Generated images stored in `data/images/` and served via `/data/images/` static route.
+- **Diffusion progress streaming** — Image generation now streams intermediate diffusion steps via Socket.IO. The character avatar shows a live preview of the image forming, a progress bar, and step counter during generation.
+
+## Fixed
+
+- **Avatar images broken in dev mode** — Added `/data` proxy to Vite dev config so generated images load correctly when running `npm run dev`.
