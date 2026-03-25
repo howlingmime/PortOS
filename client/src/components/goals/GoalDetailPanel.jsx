@@ -363,7 +363,7 @@ export default function GoalDetailPanel({ goal, allGoals, onClose, onRefresh }) 
   const parentOptions = (allGoals || []).filter(g => !excludedIds.has(g.id));
 
   return (
-    <div className="w-80 bg-port-card border-l border-port-border h-full overflow-y-auto p-4 space-y-4">
+    <div className="w-full sm:w-80 bg-port-card border-l border-port-border h-full overflow-y-auto p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">

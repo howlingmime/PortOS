@@ -40,17 +40,17 @@ export default function Goals() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-port-border bg-port-card">
-        <div className="flex items-center gap-3">
-          <Target className="w-6 h-6 text-port-accent" />
-          <h1 className="text-xl font-semibold text-white">Goals</h1>
+      <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-port-border bg-port-card">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <Target className="w-5 h-5 sm:w-6 sm:h-6 text-port-accent shrink-0" />
+          <h1 className="text-lg sm:text-xl font-semibold text-white">Goals</h1>
           {data && (
-            <span className="text-sm text-gray-500">
-              {data.flat?.length || 0} goals
+            <span className="text-xs sm:text-sm text-gray-500">
+              {data.flat?.length || 0}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => { setLoading(true); loadData(); }}
             className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-port-border/50"
@@ -66,14 +66,14 @@ export default function Goals() {
                 <button
                   key={t.id}
                   onClick={() => handleTabChange(t.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                     active
                       ? 'bg-port-accent text-white'
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
-                  {t.label}
+                  <span className="hidden sm:inline">{t.label}</span>
                 </button>
               );
             })}

@@ -341,18 +341,18 @@ export default function GoalsTreeView({ data, onRefresh }) {
   };
 
   return (
-    <div className="h-full flex">
+    <div className="h-full flex relative">
       <div className="flex-1 relative">
         {/* Filter bar */}
-        <div className="absolute top-3 left-3 right-3 z-10 flex items-center gap-2 flex-wrap">
+        <div className="absolute top-2 sm:top-3 left-2 sm:left-3 right-2 sm:right-3 z-10 flex items-center gap-1.5 sm:gap-2 flex-wrap">
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
             <input
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search goals..."
-              className="bg-port-card/90 backdrop-blur border border-port-border rounded-lg pl-7 pr-3 py-1.5 text-sm text-white w-48"
+              placeholder="Search..."
+              className="bg-port-card/90 backdrop-blur border border-port-border rounded-lg pl-7 pr-3 py-1.5 text-sm text-white w-32 sm:w-48"
             />
           </div>
           {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => {
@@ -361,14 +361,15 @@ export default function GoalsTreeView({ data, onRefresh }) {
               <button
                 key={key}
                 onClick={() => toggleCategory(key)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                className={`flex items-center gap-1 px-1.5 sm:px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
                   categoryFilters[key]
                     ? `${cfg.bg} ${cfg.color} border-transparent`
                     : 'bg-port-card/60 text-gray-600 border-port-border'
                 }`}
+                title={cfg.label}
               >
                 <Icon className="w-3 h-3" />
-                {cfg.label}
+                <span className="hidden sm:inline">{cfg.label}</span>
               </button>
             );
           })}
@@ -381,16 +382,18 @@ export default function GoalsTreeView({ data, onRefresh }) {
           </button>
           {(data?.flat?.length ?? 0) >= 2 && (
             <div className="flex items-center gap-2">
-              <ProviderModelSelector
-                providers={providers}
-                selectedProviderId={selectedProviderId}
-                selectedModel={selectedModel}
-                availableModels={availableModels}
-                onProviderChange={setSelectedProviderId}
-                onModelChange={setSelectedModel}
-                label="AI Provider"
-                disabled={organizing || providersLoading}
-              />
+              <div className="hidden sm:block">
+                <ProviderModelSelector
+                  providers={providers}
+                  selectedProviderId={selectedProviderId}
+                  selectedModel={selectedModel}
+                  availableModels={availableModels}
+                  onProviderChange={setSelectedProviderId}
+                  onModelChange={setSelectedModel}
+                  label="AI Provider"
+                  disabled={organizing || providersLoading}
+                />
+              </div>
               <button
                 onClick={handleOrganize}
                 disabled={organizing || !selectedProviderId}
@@ -465,7 +468,7 @@ export default function GoalsTreeView({ data, onRefresh }) {
         />
 
         {/* Legend */}
-        <div className="absolute bottom-3 left-3 z-10 bg-port-card/90 backdrop-blur border border-port-border rounded-lg px-3 py-2 text-xs space-y-1">
+        <div className="hidden sm:block absolute bottom-3 left-3 z-10 bg-port-card/90 backdrop-blur border border-port-border rounded-lg px-3 py-2 text-xs space-y-1">
           <div className="text-gray-400 font-medium mb-1">Legend</div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-0.5 bg-blue-500" />
@@ -529,14 +532,16 @@ export default function GoalsTreeView({ data, onRefresh }) {
         )}
       </div>
 
-      {/* Detail panel */}
+      {/* Detail panel — full overlay on mobile, side panel on desktop */}
       {selectedGoal && (
-        <GoalDetailPanel
-          goal={selectedGoal}
-          allGoals={data?.flat}
-          onClose={() => setSelectedNode(null)}
-          onRefresh={onRefresh}
-        />
+        <div className="absolute inset-0 sm:relative sm:inset-auto z-20 sm:z-auto">
+          <GoalDetailPanel
+            goal={selectedGoal}
+            allGoals={data?.flat}
+            onClose={() => setSelectedNode(null)}
+            onRefresh={onRefresh}
+          />
+        </div>
       )}
     </div>
   );

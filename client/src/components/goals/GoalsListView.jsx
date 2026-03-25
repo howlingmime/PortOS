@@ -27,13 +27,13 @@ function GoalRow({ goal, depth, expandedIds, onToggle, onSelect, selectedId, onA
   return (
     <>
       <div
-        className={`flex items-center gap-2 px-3 py-2 hover:bg-port-border/30 cursor-pointer transition-colors border-b border-port-border/50 ${
+        className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 hover:bg-port-border/30 cursor-pointer transition-colors border-b border-port-border/50 ${
           isSelected ? 'bg-port-accent/10' : ''
         }`}
-        style={{ paddingLeft: `${depth * 24 + 12}px` }}
+        style={{ paddingLeft: `${depth * 20 + 8}px` }}
         onClick={() => onSelect(goal)}
       >
-        <GripVertical className="w-3.5 h-3.5 text-gray-600 shrink-0 cursor-grab" />
+        <GripVertical className="w-3.5 h-3.5 text-gray-600 shrink-0 cursor-grab hidden sm:block" />
 
         {hasChildren ? (
           <button
@@ -50,18 +50,17 @@ function GoalRow({ goal, depth, expandedIds, onToggle, onSelect, selectedId, onA
           <CatIcon className={`w-3.5 h-3.5 ${cat.color}`} />
         </div>
 
-        <span className="text-sm text-white truncate flex-1">{goal.title}</span>
+        <span className="text-sm text-white truncate flex-1 min-w-0">{goal.title}</span>
 
         {goal.goalType && goal.goalType !== 'standard' && (
           <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded ${GOAL_TYPE_CONFIG[goal.goalType]?.bg} ${GOAL_TYPE_CONFIG[goal.goalType]?.color}`}>
             {goal.goalType === 'apex' ? <Crown className="w-3 h-3 inline mr-0.5" /> : <Star className="w-3 h-3 inline mr-0.5" />}
-            {GOAL_TYPE_CONFIG[goal.goalType]?.label}
+            <span className="hidden sm:inline">{GOAL_TYPE_CONFIG[goal.goalType]?.label}</span>
           </span>
         )}
 
-        {/* Progress pill */}
         {(goal.progress > 0 || goal.todos?.length > 0) && (
-          <span className="shrink-0 flex items-center gap-1 text-xs text-gray-500">
+          <span className="shrink-0 flex items-center gap-1 text-xs text-gray-500 hidden sm:flex">
             <div className="w-12 h-1.5 rounded-full bg-gray-700 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${
@@ -74,21 +73,21 @@ function GoalRow({ goal, depth, expandedIds, onToggle, onSelect, selectedId, onA
           </span>
         )}
 
-        <span className="text-xs text-gray-500 shrink-0 px-1.5 py-0.5 rounded bg-gray-800">
+        <span className="text-xs text-gray-500 shrink-0 px-1 sm:px-1.5 py-0.5 rounded bg-gray-800">
           {HORIZON_OPTIONS.find(h => h.value === goal.horizon)?.label}
         </span>
 
         {urgencyIndicator(goal.urgency)}
 
         {goal.linkedActivities?.length > 0 && (
-          <span className="flex items-center gap-0.5 text-xs text-gray-500 shrink-0" title={`${goal.linkedActivities.length} linked ${goal.linkedActivities.length === 1 ? 'activity' : 'activities'}`}>
+          <span className="hidden sm:flex items-center gap-0.5 text-xs text-gray-500 shrink-0" title={`${goal.linkedActivities.length} linked ${goal.linkedActivities.length === 1 ? 'activity' : 'activities'}`}>
             <Link2 className="w-3 h-3" />
             {goal.linkedActivities.length}
           </span>
         )}
 
         {goal.tags?.length > 0 && (
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="hidden md:flex items-center gap-1 shrink-0">
             {goal.tags.slice(0, 3).map(tag => (
               <span key={tag} className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-port-accent/10 text-port-accent text-xs">
                 <Tag className="w-2.5 h-2.5" />
@@ -190,11 +189,11 @@ export default function GoalsListView({ data, onRefresh }) {
   };
 
   return (
-    <div className="h-full flex">
-      <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col sm:flex-row relative">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Toolbar */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-port-border bg-port-card/50">
-          <div className="relative flex-1 max-w-xs">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 border-b border-port-border bg-port-card/50">
+          <div className="relative flex-1 min-w-[140px] max-w-xs">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <input
               type="text"
@@ -209,23 +208,26 @@ export default function GoalsListView({ data, onRefresh }) {
               setNewGoal({ ...DEFAULT_NEW_GOAL });
               setShowNewGoal(true);
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-port-accent text-white hover:bg-blue-600"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-port-accent text-white hover:bg-blue-600 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
-            Add Root Goal
+            <span className="hidden sm:inline">Add Root Goal</span>
+            <span className="sm:hidden">Add</span>
           </button>
           {(data?.flat?.length ?? 0) >= 2 && (
             <div className="flex items-center gap-2">
-              <ProviderModelSelector
-                providers={providers}
-                selectedProviderId={selectedProviderId}
-                selectedModel={selectedModel}
-                availableModels={availableModels}
-                onProviderChange={setSelectedProviderId}
-                onModelChange={setSelectedModel}
-                label="AI Provider"
-                disabled={organizing || providersLoading}
-              />
+              <div className="hidden sm:block">
+                <ProviderModelSelector
+                  providers={providers}
+                  selectedProviderId={selectedProviderId}
+                  selectedModel={selectedModel}
+                  availableModels={availableModels}
+                  onProviderChange={setSelectedProviderId}
+                  onModelChange={setSelectedModel}
+                  label="AI Provider"
+                  disabled={organizing || providersLoading}
+                />
+              </div>
               <button
                 onClick={handleOrganize}
                 disabled={organizing || !selectedProviderId}
@@ -252,22 +254,24 @@ export default function GoalsListView({ data, onRefresh }) {
                 setExpandedIds(allIds);
               }
             }}
-            className="px-3 py-1.5 text-sm rounded-lg bg-port-border text-gray-300 hover:bg-gray-600"
+            className="px-3 py-1.5 text-sm rounded-lg bg-port-border text-gray-300 hover:bg-gray-600 whitespace-nowrap"
           >
-            {expandedIds.size > 0 ? 'Collapse All' : 'Expand All'}
+            {expandedIds.size > 0 ? 'Collapse' : 'Expand'}
           </button>
         </div>
 
         {/* New goal form */}
         {showNewGoal && (
-          <div className="bg-port-card border-b border-port-border px-4 py-3 space-y-2">
+          <div className="bg-port-card border-b border-port-border px-3 sm:px-4 py-3 space-y-2">
             <div className="flex items-center gap-2 text-sm text-gray-400">
-              <Plus className="w-4 h-4" />
-              {newGoal.parentId
-                ? `New sub-goal under "${data?.flat?.find(g => g.id === newGoal.parentId)?.title}"`
-                : 'New root goal'}
+              <Plus className="w-4 h-4 shrink-0" />
+              <span className="truncate">
+                {newGoal.parentId
+                  ? `New sub-goal under "${data?.flat?.find(g => g.id === newGoal.parentId)?.title}"`
+                  : 'New root goal'}
+              </span>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
                 value={newGoal.title}
@@ -277,35 +281,37 @@ export default function GoalsListView({ data, onRefresh }) {
                 onKeyDown={e => e.key === 'Enter' && handleCreateGoal()}
                 autoFocus
               />
-              <select
-                value={newGoal.horizon}
-                onChange={e => setNewGoal({ ...newGoal, horizon: e.target.value })}
-                className="bg-port-bg border border-port-border rounded px-2 py-1.5 text-sm text-white"
-              >
-                {HORIZON_OPTIONS.map(h => <option key={h.value} value={h.value}>{h.label}</option>)}
-              </select>
-              <select
-                value={newGoal.category}
-                onChange={e => setNewGoal({ ...newGoal, category: e.target.value })}
-                className="bg-port-bg border border-port-border rounded px-2 py-1.5 text-sm text-white"
-              >
-                {Object.entries(CATEGORY_CONFIG).map(([k, v]) => (
-                  <option key={k} value={k}>{v.label}</option>
-                ))}
-              </select>
-              <button
-                onClick={handleCreateGoal}
-                disabled={!newGoal.title.trim()}
-                className="px-3 py-1.5 text-sm rounded bg-port-accent text-white disabled:opacity-50"
-              >
-                Create
-              </button>
-              <button
-                onClick={() => setShowNewGoal(false)}
-                className="px-3 py-1.5 text-sm rounded bg-port-border text-gray-300"
-              >
-                Cancel
-              </button>
+              <div className="flex gap-2">
+                <select
+                  value={newGoal.horizon}
+                  onChange={e => setNewGoal({ ...newGoal, horizon: e.target.value })}
+                  className="flex-1 sm:flex-none bg-port-bg border border-port-border rounded px-2 py-1.5 text-sm text-white"
+                >
+                  {HORIZON_OPTIONS.map(h => <option key={h.value} value={h.value}>{h.label}</option>)}
+                </select>
+                <select
+                  value={newGoal.category}
+                  onChange={e => setNewGoal({ ...newGoal, category: e.target.value })}
+                  className="flex-1 sm:flex-none bg-port-bg border border-port-border rounded px-2 py-1.5 text-sm text-white"
+                >
+                  {Object.entries(CATEGORY_CONFIG).map(([k, v]) => (
+                    <option key={k} value={k}>{v.label}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleCreateGoal}
+                  disabled={!newGoal.title.trim()}
+                  className="px-3 py-1.5 text-sm rounded bg-port-accent text-white disabled:opacity-50"
+                >
+                  Create
+                </button>
+                <button
+                  onClick={() => setShowNewGoal(false)}
+                  className="px-3 py-1.5 text-sm rounded bg-port-border text-gray-300"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -333,17 +339,19 @@ export default function GoalsListView({ data, onRefresh }) {
         </div>
       </div>
 
-      {/* Detail panel */}
+      {/* Detail panel — full overlay on mobile, side panel on desktop */}
       {selectedGoal && (
-        <GoalDetailPanel
-          goal={selectedGoal}
-          allGoals={data?.flat}
-          onClose={() => setSelectedGoal(null)}
-          onRefresh={() => {
-            setSelectedGoal(null);
-            onRefresh();
-          }}
-        />
+        <div className="absolute inset-0 sm:relative sm:inset-auto z-20 sm:z-auto">
+          <GoalDetailPanel
+            goal={selectedGoal}
+            allGoals={data?.flat}
+            onClose={() => setSelectedGoal(null)}
+            onRefresh={() => {
+              setSelectedGoal(null);
+              onRefresh();
+            }}
+          />
+        </div>
       )}
     </div>
   );
