@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   ChevronRight, ChevronDown, Plus, GripVertical, Search, Tag, Link2, Crown, Star, Wand2
 } from 'lucide-react';
@@ -200,6 +200,18 @@ export default function GoalsListView({ data, onRefresh }) {
   } = useProviderModels({ filter: API_PROVIDER_FILTER });
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  useEffect(() => {
+    if (!data?.roots) return;
+    const allIds = new Set();
+    const collect = (goals) => {
+      for (const g of goals) {
+        if (g.children?.length) { allIds.add(g.id); collect(g.children); }
+      }
+    };
+    collect(data.roots);
+    setExpandedIds(allIds);
+  }, [data]);
 
   const toggleExpand = (id) => {
     setExpandedIds(prev => {

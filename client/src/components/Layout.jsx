@@ -175,7 +175,7 @@ const navItems = [
       { to: '/digital-twin/test', label: 'Test', icon: CheckCircle }
     ]
   },
-  { to: '/goals/tree', label: 'Goals', icon: Target, single: true },
+  { to: '/goals/list', label: 'Goals', icon: Target, single: true },
   { to: '/insights/overview', label: 'Insights', icon: Lightbulb, single: true },
   {
     label: 'MeatSpace',
