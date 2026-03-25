@@ -37,7 +37,17 @@ const GOAL_TYPE_OPTIONS = Object.entries(GOAL_TYPE_CONFIG).map(([value, cfg]) =>
 const MAX_TAGS = 20;
 const MAX_TAG_LENGTH = 50;
 
-export { CATEGORY_CONFIG, HORIZON_OPTIONS, GOAL_TYPE_CONFIG, GOAL_TYPE_OPTIONS };
+const DEFAULT_NEW_GOAL = { title: '', description: '', horizon: '5-year', category: 'mastery', parentId: null };
+
+const CHECK_IN_STATUS_CONFIG = {
+  'on-track': { color: 'text-green-400', bg: 'bg-green-500/20', label: 'On Track' },
+  'behind': { color: 'text-yellow-400', bg: 'bg-yellow-500/20', label: 'Behind' },
+  'at-risk': { color: 'text-red-400', bg: 'bg-red-500/20', label: 'At Risk' }
+};
+
+const CHECK_IN_DOT_COLORS = { 'on-track': 'bg-green-500', 'behind': 'bg-yellow-500', 'at-risk': 'bg-red-500' };
+
+export { CATEGORY_CONFIG, HORIZON_OPTIONS, GOAL_TYPE_CONFIG, GOAL_TYPE_OPTIONS, DEFAULT_NEW_GOAL };
 
 function ProgressSlider({ goal, onCommit }) {
   const [draft, setDraft] = useState(goal.progress ?? 0);
@@ -947,21 +957,15 @@ export default function GoalDetailPanel({ goal, allGoals, onClose, onRefresh }) 
                 {checkInsOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                 <ClipboardCheck className="w-3.5 h-3.5" />
                 <span>Check-ins ({goal.checkIns.length})</span>
-                {goal.checkIns.length > 0 && (() => {
+                {(() => {
                   const latest = goal.checkIns[goal.checkIns.length - 1];
-                  const statusColors = { 'on-track': 'bg-green-500', 'behind': 'bg-yellow-500', 'at-risk': 'bg-red-500' };
-                  return <span className={`ml-auto w-2 h-2 rounded-full ${statusColors[latest.status] || 'bg-gray-500'}`} />;
+                  return <span className={`ml-auto w-2 h-2 rounded-full ${CHECK_IN_DOT_COLORS[latest.status] || 'bg-gray-500'}`} />;
                 })()}
               </button>
               {checkInsOpen && (
                 <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
                   {[...goal.checkIns].reverse().map(ci => {
-                    const statusConfig = {
-                      'on-track': { color: 'text-green-400', bg: 'bg-green-500/20', label: 'On Track' },
-                      'behind': { color: 'text-yellow-400', bg: 'bg-yellow-500/20', label: 'Behind' },
-                      'at-risk': { color: 'text-red-400', bg: 'bg-red-500/20', label: 'At Risk' }
-                    };
-                    const sc = statusConfig[ci.status] || statusConfig['behind'];
+                    const sc = CHECK_IN_STATUS_CONFIG[ci.status] || CHECK_IN_STATUS_CONFIG['behind'];
                     return (
                       <div key={ci.id} className="p-2 rounded bg-port-bg border border-port-border space-y-1">
                         <div className="flex items-center justify-between">

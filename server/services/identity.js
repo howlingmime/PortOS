@@ -1207,9 +1207,12 @@ ${JSON.stringify(goalSummaries, null, 2)}
 Respond with JSON only (no markdown fences). The response must be an object with:
 - "apexGoal": { "existingId": string|null, "suggestedTitle": string|null, "suggestedDescription": string|null } — if an existing goal IS the apex, set existingId. If no existing goal fits, suggest a new one.
 - "organization": array of { "id": string, "goalType": "apex"|"sub-apex"|"standard", "suggestedParentId": string|null, "reasoning": string }
-  - For each existing goal, assign its type and suggested parent. Use null parentId for apex and top-level sub-apex goals.
+  - For each existing goal, assign its type and suggested parent.
+  - The apex goal has null parentId.
+  - Sub-apex goals MUST have suggestedParentId set to the apex goal's existingId (if an existing goal is the apex) or "__new_apex__" (if you are suggesting a new apex goal). Sub-apex goals are never root nodes.
+  - Standard goals should have suggestedParentId set to the most appropriate sub-apex goal id, or to the apex goal id if they directly support the apex.
   - The reasoning should be 1 sentence explaining why this goal fits where it does.
-- "suggestedSubApex": array of { "title": string, "description": string, "category": string } — suggest 0-3 sub-apex goals if the existing goals don't cover major life pillars well.
+- "suggestedSubApex": array of { "title": string, "description": string, "category": string, "suggestedParentId": string|null } — suggest 0-3 sub-apex goals if the existing goals don't cover major life pillars well. Set suggestedParentId to the apex goal's existingId or "__new_apex__" if suggesting a new apex.
 - "analysis": string — 2-3 sentences summarizing the person's core purpose and how their goals connect.`;
 
   const result = await callProviderAISimple(provider, selectedModel, prompt, { max_tokens: 3000, temperature: 0.4 });

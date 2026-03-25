@@ -2,6 +2,8 @@ import * as api from '../../services/api';
 
 export async function applyOrganizationSuggestion(suggestion) {
   let apexId = null;
+  // Clone organization array to avoid mutating caller's state
+  const organization = suggestion.organization?.map(item => ({ ...item }));
 
   // Create apex goal if suggested as new
   if (suggestion.apexGoal?.suggestedTitle && !suggestion.apexGoal?.existingId) {
@@ -11,11 +13,12 @@ export async function applyOrganizationSuggestion(suggestion) {
       horizon: 'lifetime',
       category: 'legacy',
       goalType: 'apex'
-    }).catch(() => null);
-    apexId = apex?.id;
+    }).then(res => res, () => null);
+    if (!apex?.id) return false;
+    apexId = apex.id;
     // Rewrite organization items that should parent under new apex
-    if (apexId && suggestion.organization) {
-      for (const item of suggestion.organization) {
+    if (organization) {
+      for (const item of organization) {
         if (item.suggestedParentId === '__new_apex__' || (!item.suggestedParentId && item.goalType === 'sub-apex')) {
           item.suggestedParentId = apexId;
         }
@@ -23,21 +26,32 @@ export async function applyOrganizationSuggestion(suggestion) {
     }
   }
 
-  // Create suggested sub-apex goals in parallel
+  // Resolve apex ID: prefer existing, fall back to newly created
+  if (!apexId && suggestion.apexGoal?.existingId) {
+    apexId = suggestion.apexGoal.existingId;
+  }
+
+  // Create suggested sub-apex goals in parallel, parented under the apex
   if (suggestion.suggestedSubApex?.length) {
-    await Promise.all(suggestion.suggestedSubApex.map(sg =>
-      api.createGoal({
+    const results = await Promise.all(suggestion.suggestedSubApex.map(sg => {
+      const parentId = apexId || (sg.suggestedParentId !== '__new_apex__' ? sg.suggestedParentId : null) || null;
+      return api.createGoal({
         title: sg.title,
         description: sg.description || '',
         horizon: 'lifetime',
         category: sg.category || 'legacy',
-        goalType: 'sub-apex'
-      }).catch(() => null)
-    ));
+        goalType: 'sub-apex',
+        ...(parentId ? { parentId } : {})
+      }).then(() => true, () => false);
+    }));
+    if (results.some(r => !r)) return false;
   }
 
   // Apply organization to existing goals
-  if (suggestion.organization?.length) {
-    await api.applyGoalOrganization(suggestion.organization).catch(() => null);
+  if (organization?.length) {
+    const ok = await api.applyGoalOrganization(organization).then(() => true, () => false);
+    if (!ok) return false;
   }
+
+  return true;
 }

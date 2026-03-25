@@ -6,7 +6,7 @@ import { Search, Plus, Wand2, X, Check, Star, Crown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as api from '../../services/api';
 import { layoutGoalNodes } from './goalTreeLayout';
-import GoalDetailPanel, { CATEGORY_CONFIG, HORIZON_OPTIONS, GOAL_TYPE_CONFIG } from './GoalDetailPanel';
+import GoalDetailPanel, { CATEGORY_CONFIG, HORIZON_OPTIONS, GOAL_TYPE_CONFIG, DEFAULT_NEW_GOAL } from './GoalDetailPanel';
 import { applyOrganizationSuggestion } from './applyOrganization';
 
 const EDGE_COLORS = {
@@ -246,7 +246,7 @@ export default function GoalsTreeView({ data, onRefresh }) {
     Object.fromEntries(Object.keys(CATEGORY_CONFIG).map(k => [k, true]))
   );
   const [showNewGoal, setShowNewGoal] = useState(false);
-  const [newGoal, setNewGoal] = useState({ title: '', description: '', horizon: '5-year', category: 'mastery' });
+  const [newGoal, setNewGoal] = useState({ ...DEFAULT_NEW_GOAL });
   const [organizing, setOrganizing] = useState(false);
   const [orgSuggestion, setOrgSuggestion] = useState(null);
   const [applyingOrg, setApplyingOrg] = useState(false);
@@ -305,7 +305,7 @@ export default function GoalsTreeView({ data, onRefresh }) {
   const handleCreateGoal = async () => {
     if (!newGoal.title.trim()) return;
     await api.createGoal(newGoal);
-    setNewGoal({ title: '', description: '', horizon: '5-year', category: 'mastery' });
+    setNewGoal({ ...DEFAULT_NEW_GOAL });
     setShowNewGoal(false);
     onRefresh();
   };

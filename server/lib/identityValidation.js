@@ -162,7 +162,7 @@ export const applyOrganizationInputSchema = z.object({
   organization: z.array(z.object({
     id: z.string().min(1),
     goalType: goalTypeEnum.optional(),
-    suggestedParentId: z.string().nullable().optional(),
+    suggestedParentId: z.string().min(1).nullable().optional(),
     reasoning: z.string().optional()
   })).min(1)
 });

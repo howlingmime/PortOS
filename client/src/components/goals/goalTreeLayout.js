@@ -55,12 +55,11 @@ export function layoutGoalNodes(flatGoals) {
       x: (i - (apexGoals.length - 1) / 2) * 2,
       y: 0,
       z: (rng() - 0.5) * 1.5,
-      vx: 0, vy: 0, vz: 0
     });
   });
 
   // Position sub-apex goals in a tight inner ring around apex
-  const subApexRadius = apexGoals.length > 0 ? RING_RADIUS * 0.6 : 0;
+  const subApexRadius = RING_RADIUS * 0.6;
   subApexGoals.forEach((goal, i) => {
     const rng = seededRandom(goal.id);
     const parent = goal.parentId ? positioned.get(goal.parentId) : null;
@@ -72,7 +71,6 @@ export function layoutGoalNodes(flatGoals) {
       x: baseX + Math.cos(angle) * subApexRadius,
       y: (rng() - 0.5) * Y_SPREAD * 0.5,
       z: baseZ + Math.sin(angle) * subApexRadius,
-      vx: 0, vy: 0, vz: 0
     });
   });
 
@@ -111,8 +109,7 @@ export function layoutGoalNodes(flatGoals) {
 
       positioned.set(goal.id, {
         ...goal,
-        x, y, z,
-        vx: 0, vy: 0, vz: 0
+        x, y, z
       });
     });
   }

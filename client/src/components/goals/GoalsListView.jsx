@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as api from '../../services/api';
-import GoalDetailPanel, { CATEGORY_CONFIG, HORIZON_OPTIONS, GOAL_TYPE_CONFIG } from './GoalDetailPanel';
+import GoalDetailPanel, { CATEGORY_CONFIG, HORIZON_OPTIONS, GOAL_TYPE_CONFIG, DEFAULT_NEW_GOAL } from './GoalDetailPanel';
 import { applyOrganizationSuggestion } from './applyOrganization';
 
 function urgencyIndicator(urgency) {
@@ -127,7 +127,7 @@ export default function GoalsListView({ data, onRefresh }) {
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNewGoal, setShowNewGoal] = useState(false);
-  const [newGoal, setNewGoal] = useState({ title: '', description: '', horizon: '5-year', category: 'mastery', parentId: null });
+  const [newGoal, setNewGoal] = useState({ ...DEFAULT_NEW_GOAL });
   const [organizing, setOrganizing] = useState(false);
 
   const toggleExpand = (id) => {
@@ -158,14 +158,14 @@ export default function GoalsListView({ data, onRefresh }) {
   };
 
   const handleAddChild = (parentId) => {
-    setNewGoal({ title: '', description: '', horizon: '5-year', category: 'mastery', parentId });
+    setNewGoal({ ...DEFAULT_NEW_GOAL, parentId });
     setShowNewGoal(true);
   };
 
   const handleCreateGoal = async () => {
     if (!newGoal.title.trim()) return;
     await api.createGoal(newGoal);
-    setNewGoal({ title: '', description: '', horizon: '5-year', category: 'mastery', parentId: null });
+    setNewGoal({ ...DEFAULT_NEW_GOAL });
     setShowNewGoal(false);
     onRefresh();
   };
@@ -197,7 +197,7 @@ export default function GoalsListView({ data, onRefresh }) {
           </div>
           <button
             onClick={() => {
-              setNewGoal({ title: '', description: '', horizon: '5-year', category: 'mastery', parentId: null });
+              setNewGoal({ ...DEFAULT_NEW_GOAL });
               setShowNewGoal(true);
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-port-accent text-white hover:bg-blue-600"
