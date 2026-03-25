@@ -77,18 +77,20 @@ export default function TimeCapsuleTab({ onRefresh: _onRefresh }) {
   const handleCreate = async () => {
     if (!label.trim()) return;
     setCreating(true);
-    const snapshot = await api.createTimeCapsuleSnapshot(label.trim(), description.trim());
+    const snapshot = await api.createTimeCapsuleSnapshot(label.trim(), description.trim()).catch(() => null);
+    setCreating(false);
+    if (!snapshot) return;
     setSnapshots(prev => [snapshot, ...prev]);
     setLabel('');
     setDescription('');
     setShowForm(false);
-    setCreating(false);
     toast.success(`Snapshot "${snapshot.label}" created`);
   };
 
   const handleDelete = async (id) => {
     const snap = snapshots.find(s => s.id === id);
-    await api.deleteTimeCapsuleSnapshot(id);
+    const ok = await api.deleteTimeCapsuleSnapshot(id).then(() => true).catch(() => false);
+    if (!ok) return;
     setSnapshots(prev => prev.filter(s => s.id !== id));
     setConfirmDelete(null);
     if (viewingSnapshot?.id === id) setViewingSnapshot(null);
@@ -101,9 +103,9 @@ export default function TimeCapsuleTab({ onRefresh: _onRefresh }) {
       return;
     }
     setViewLoading(true);
-    const data = await api.getTimeCapsuleSnapshot(id);
-    setViewingSnapshot(data);
+    const data = await api.getTimeCapsuleSnapshot(id).catch(() => null);
     setViewLoading(false);
+    if (data) setViewingSnapshot(data);
   };
 
   const toggleCompareId = (id) => {
@@ -118,9 +120,9 @@ export default function TimeCapsuleTab({ onRefresh: _onRefresh }) {
   const handleCompare = async () => {
     if (compareIds.length !== 2) return;
     setComparing(true);
-    const result = await api.compareTimeCapsuleSnapshots(compareIds[0], compareIds[1]);
-    setCompareResult(result);
+    const result = await api.compareTimeCapsuleSnapshots(compareIds[0], compareIds[1]).catch(() => null);
     setComparing(false);
+    if (result) setCompareResult(result);
   };
 
   if (loading) {

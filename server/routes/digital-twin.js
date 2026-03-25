@@ -665,7 +665,11 @@ router.post('/snapshots', asyncHandler(async (req, res) => {
  * Get a snapshot with full data
  */
 router.get('/snapshots/:id', asyncHandler(async (req, res) => {
-  const snapshot = await timeCapsuleService.getSnapshot(req.params.id);
+  const { id } = req.params;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    throw new ServerError('Invalid snapshot ID', { status: 400 });
+  }
+  const snapshot = await timeCapsuleService.getSnapshot(id);
   if (!snapshot) {
     throw new ServerError('Snapshot not found', { status: 404, code: 'NOT_FOUND' });
   }
@@ -677,7 +681,11 @@ router.get('/snapshots/:id', asyncHandler(async (req, res) => {
  * Delete a snapshot
  */
 router.delete('/snapshots/:id', asyncHandler(async (req, res) => {
-  const deleted = await timeCapsuleService.deleteSnapshot(req.params.id);
+  const { id } = req.params;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    throw new ServerError('Invalid snapshot ID', { status: 400 });
+  }
+  const deleted = await timeCapsuleService.deleteSnapshot(id);
   if (!deleted) {
     throw new ServerError('Snapshot not found', { status: 404, code: 'NOT_FOUND' });
   }
