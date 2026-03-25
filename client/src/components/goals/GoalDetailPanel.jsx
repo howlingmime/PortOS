@@ -26,10 +26,28 @@ const HORIZON_OPTIONS = [
   { value: 'lifetime', label: 'Lifetime' }
 ];
 
+const GOAL_TYPE_CONFIG = {
+  apex: { label: 'Apex', color: 'text-amber-400', bg: 'bg-amber-500/20', description: 'North-star purpose' },
+  'sub-apex': { label: 'Sub-Apex', color: 'text-purple-400', bg: 'bg-purple-500/20', description: 'Major life pillar' },
+  standard: { label: 'Standard', color: 'text-gray-400', bg: 'bg-gray-500/20', description: 'Regular goal' }
+};
+
+const GOAL_TYPE_OPTIONS = Object.entries(GOAL_TYPE_CONFIG).map(([value, cfg]) => ({ value, label: cfg.label }));
+
 const MAX_TAGS = 20;
 const MAX_TAG_LENGTH = 50;
 
-export { CATEGORY_CONFIG, HORIZON_OPTIONS };
+const DEFAULT_NEW_GOAL = { title: '', description: '', horizon: '5-year', category: 'mastery', parentId: null };
+
+const CHECK_IN_STATUS_CONFIG = {
+  'on-track': { color: 'text-green-400', bg: 'bg-green-500/20', label: 'On Track' },
+  'behind': { color: 'text-yellow-400', bg: 'bg-yellow-500/20', label: 'Behind' },
+  'at-risk': { color: 'text-red-400', bg: 'bg-red-500/20', label: 'At Risk' }
+};
+
+const CHECK_IN_DOT_COLORS = { 'on-track': 'bg-green-500', 'behind': 'bg-yellow-500', 'at-risk': 'bg-red-500' };
+
+export { CATEGORY_CONFIG, HORIZON_OPTIONS, GOAL_TYPE_CONFIG, GOAL_TYPE_OPTIONS, DEFAULT_NEW_GOAL };
 
 function ProgressSlider({ goal, onCommit }) {
   const [draft, setDraft] = useState(goal.progress ?? 0);
@@ -144,6 +162,7 @@ export default function GoalDetailPanel({ goal, allGoals, onClose, onRefresh }) 
       description: goal.description || '',
       horizon: goal.horizon,
       category: goal.category,
+      goalType: goal.goalType || 'standard',
       parentId: goal.parentId || '',
       tags: [...(goal.tags || [])],
       targetDate: goal.targetDate || '',
@@ -347,13 +366,18 @@ export default function GoalDetailPanel({ goal, allGoals, onClose, onRefresh }) 
     <div className="w-80 bg-port-card border-l border-port-border h-full overflow-y-auto p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className={`p-1.5 rounded ${cat.bg}`}>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`p-1.5 rounded ${cat.bg} shrink-0`}>
             <CatIcon className={`w-4 h-4 ${cat.color}`} />
           </div>
           <span className="text-sm font-medium text-white truncate">{goal.title}</span>
+          {goal.goalType && goal.goalType !== 'standard' && (
+            <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded ${GOAL_TYPE_CONFIG[goal.goalType]?.bg} ${GOAL_TYPE_CONFIG[goal.goalType]?.color}`}>
+              {GOAL_TYPE_CONFIG[goal.goalType]?.label}
+            </span>
+          )}
         </div>
-        <button onClick={onClose} className="p-1 text-gray-500 hover:text-white">
+        <button onClick={onClose} className="p-1 text-gray-500 hover:text-white shrink-0">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -392,6 +416,16 @@ export default function GoalDetailPanel({ goal, allGoals, onClose, onRefresh }) 
               {Object.entries(CATEGORY_CONFIG).map(([k, v]) => (
                 <option key={k} value={k}>{v.label}</option>
               ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500">Goal Type</label>
+            <select
+              value={form.goalType || 'standard'}
+              onChange={e => setForm({ ...form, goalType: e.target.value })}
+              className="w-full bg-port-bg border border-port-border rounded px-3 py-1.5 text-sm text-white mt-1"
+            >
+              {GOAL_TYPE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </div>
           <div>
@@ -923,21 +957,15 @@ export default function GoalDetailPanel({ goal, allGoals, onClose, onRefresh }) 
                 {checkInsOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                 <ClipboardCheck className="w-3.5 h-3.5" />
                 <span>Check-ins ({goal.checkIns.length})</span>
-                {goal.checkIns.length > 0 && (() => {
+                {(() => {
                   const latest = goal.checkIns[goal.checkIns.length - 1];
-                  const statusColors = { 'on-track': 'bg-green-500', 'behind': 'bg-yellow-500', 'at-risk': 'bg-red-500' };
-                  return <span className={`ml-auto w-2 h-2 rounded-full ${statusColors[latest.status] || 'bg-gray-500'}`} />;
+                  return <span className={`ml-auto w-2 h-2 rounded-full ${CHECK_IN_DOT_COLORS[latest.status] || 'bg-gray-500'}`} />;
                 })()}
               </button>
               {checkInsOpen && (
                 <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
                   {[...goal.checkIns].reverse().map(ci => {
-                    const statusConfig = {
-                      'on-track': { color: 'text-green-400', bg: 'bg-green-500/20', label: 'On Track' },
-                      'behind': { color: 'text-yellow-400', bg: 'bg-yellow-500/20', label: 'Behind' },
-                      'at-risk': { color: 'text-red-400', bg: 'bg-red-500/20', label: 'At Risk' }
-                    };
-                    const sc = statusConfig[ci.status] || statusConfig['behind'];
+                    const sc = CHECK_IN_STATUS_CONFIG[ci.status] || CHECK_IN_STATUS_CONFIG['behind'];
                     return (
                       <div key={ci.id} className="p-2 rounded bg-port-bg border border-port-border space-y-1">
                         <div className="flex items-center justify-between">

@@ -15,7 +15,9 @@ import {
   updateTodoInputSchema,
   updateProgressSchema,
   generatePhasesInputSchema,
-  acceptPhasesInputSchema
+  acceptPhasesInputSchema,
+  organizeGoalsInputSchema,
+  applyOrganizationInputSchema
 } from '../lib/identityValidation.js';
 import * as goalCalendarScheduler from '../services/goalCalendarScheduler.js';
 
@@ -263,6 +265,20 @@ router.post('/goals/:id/accept-phases', asyncHandler(async (req, res) => {
   const data = validateRequest(acceptPhasesInputSchema, req.body);
   const goal = await identityService.acceptGoalPhases(req.params.id, data.phases);
   res.json(goal);
+}));
+
+// POST /api/digital-twin/identity/goals/organize — AI-organize goals into hierarchy
+router.post('/goals/organize', asyncHandler(async (req, res) => {
+  const data = validateRequest(organizeGoalsInputSchema, req.body);
+  const result = await identityService.organizeGoals(data);
+  res.json(result);
+}));
+
+// POST /api/digital-twin/identity/goals/organize/apply — Apply organization suggestions
+router.post('/goals/organize/apply', asyncHandler(async (req, res) => {
+  const { organization } = validateRequest(applyOrganizationInputSchema, req.body);
+  const result = await identityService.applyGoalOrganization(organization);
+  res.json(result);
 }));
 
 // POST /api/digital-twin/identity/goals/:id/schedule — Create time blocks

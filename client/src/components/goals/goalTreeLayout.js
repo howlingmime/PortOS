@@ -32,9 +32,14 @@ export function layoutGoalNodes(flatGoals) {
 
   const goalMap = new Map(flatGoals.map(g => [g.id, g]));
 
-  // Group by ring tier
+  // Separate apex goals — they always go at the very center
+  const apexGoals = flatGoals.filter(g => g.goalType === 'apex');
+  const subApexGoals = flatGoals.filter(g => g.goalType === 'sub-apex');
+  const standardGoals = flatGoals.filter(g => !g.goalType || g.goalType === 'standard');
+
+  // Group standard goals by ring tier
   const rings = {};
-  for (const goal of flatGoals) {
+  for (const goal of standardGoals) {
     const ring = HORIZON_RING[goal.horizon] ?? 3;
     if (!rings[ring]) rings[ring] = [];
     rings[ring].push(goal);
@@ -42,7 +47,34 @@ export function layoutGoalNodes(flatGoals) {
 
   const positioned = new Map();
 
-  // Position nodes ring by ring (sorted so parents at inner rings are positioned first)
+  // Position apex goals at dead center
+  apexGoals.forEach((goal, i) => {
+    const rng = seededRandom(goal.id);
+    positioned.set(goal.id, {
+      ...goal,
+      x: (i - (apexGoals.length - 1) / 2) * 2,
+      y: 0,
+      z: (rng() - 0.5) * 1.5,
+    });
+  });
+
+  // Position sub-apex goals in a tight inner ring around apex
+  const subApexRadius = RING_RADIUS * 0.6;
+  subApexGoals.forEach((goal, i) => {
+    const rng = seededRandom(goal.id);
+    const parent = goal.parentId ? positioned.get(goal.parentId) : null;
+    const angle = (2 * Math.PI * i) / Math.max(subApexGoals.length, 1);
+    const baseX = parent?.x ?? 0;
+    const baseZ = parent?.z ?? 0;
+    positioned.set(goal.id, {
+      ...goal,
+      x: baseX + Math.cos(angle) * subApexRadius,
+      y: (rng() - 0.5) * Y_SPREAD * 0.5,
+      z: baseZ + Math.sin(angle) * subApexRadius,
+    });
+  });
+
+  // Position standard nodes ring by ring (sorted so parents at inner rings are positioned first)
   for (const [ringStr, goals] of Object.entries(rings).sort((a, b) => Number(a[0]) - Number(b[0]))) {
     const ring = Number(ringStr);
     const radius = ring * RING_RADIUS;
@@ -77,8 +109,7 @@ export function layoutGoalNodes(flatGoals) {
 
       positioned.set(goal.id, {
         ...goal,
-        x, y, z,
-        vx: 0, vy: 0, vz: 0
+        x, y, z
       });
     });
   }

@@ -7,6 +7,7 @@ import { getGenomeSummary } from './genome.js';
 import { getTasteProfile } from './taste-questionnaire.js';
 import { getActivities } from './meatspaceCalendar.js';
 import { callProviderAISimple, parseLLMJSON } from '../lib/aiProvider.js';
+import { goalTypeEnum } from '../lib/identityValidation.js';
 
 const IDENTITY_DIR = PATHS.digitalTwin;
 const IDENTITY_FILE = join(IDENTITY_DIR, 'identity.json');
@@ -705,6 +706,7 @@ export async function getGoals() {
     if (goal.timeBlockConfig === undefined) { goal.timeBlockConfig = null; needsSave = true; }
     if (!Array.isArray(goal.scheduledEvents)) { goal.scheduledEvents = []; needsSave = true; }
     if (!Array.isArray(goal.checkIns)) { goal.checkIns = []; needsSave = true; }
+    if (!goal.goalType) { goal.goalType = 'standard'; needsSave = true; }
     // Lazy-migrate milestones with description and order
     for (const ms of (goal.milestones || [])) {
       if (ms.description === undefined) { ms.description = ''; needsSave = true; }
@@ -743,7 +745,7 @@ export async function setBirthDate(birthDate) {
   return goals;
 }
 
-export async function createGoal({ title, description, horizon, category, parentId, tags, targetDate, timeBlockConfig }) {
+export async function createGoal({ title, description, horizon, category, goalType, parentId, tags, targetDate, timeBlockConfig }) {
   const goals = await getGoals();
   const longevity = await loadJSON(LONGEVITY_FILE, DEFAULT_LONGEVITY);
 
@@ -759,6 +761,7 @@ export async function createGoal({ title, description, horizon, category, parent
     description: description || '',
     horizon: horizon || '5-year',
     category: category || 'mastery',
+    goalType: goalType || 'standard',
     parentId: parentId || null,
     tags: [...new Set((tags || []).map(t => t.trim()).filter(Boolean))],
     linkedActivities: [],
@@ -820,7 +823,7 @@ export async function updateGoal(goalId, updates) {
     }
   }
 
-  const allowed = ['title', 'description', 'horizon', 'category', 'status', 'parentId', 'tags', 'targetDate', 'timeBlockConfig'];
+  const allowed = ['title', 'description', 'horizon', 'category', 'goalType', 'status', 'parentId', 'tags', 'targetDate', 'timeBlockConfig'];
   for (const key of allowed) {
     if (updates[key] !== undefined) goal[key] = updates[key];
   }
@@ -1161,6 +1164,124 @@ export async function acceptGoalPhases(goalId, phases) {
   await saveJSON(GOALS_FILE, goals);
   console.log(`🎯 Accepted ${phases.length} phases for goal "${goal.title}"`);
   return goal;
+}
+
+// =============================================================================
+// Goal Hierarchy Organization (LLM-powered)
+// =============================================================================
+
+export async function organizeGoals({ providerId, model } = {}) {
+  const { getActiveProvider, getProviderById } = await import('./providers.js');
+  const goals = await getGoals();
+  const activeGoals = goals.goals.filter(g => g.status === 'active');
+
+  if (activeGoals.length < 2) {
+    throw new ServerError('Need at least 2 active goals to organize', { status: 400, code: 'TOO_FEW_GOALS' });
+  }
+
+  const provider = providerId ? await getProviderById(providerId) : await getActiveProvider();
+  if (!provider) throw new ServerError('No AI provider available', { status: 503, code: 'NO_PROVIDER' });
+  const selectedModel = model ?? provider.defaultModel;
+
+  const goalSummaries = activeGoals.map(g => ({
+    id: g.id,
+    title: g.title,
+    description: g.description || '',
+    horizon: g.horizon,
+    category: g.category,
+    currentType: g.goalType || 'standard',
+    currentParentId: g.parentId
+  }));
+
+  const prompt = `You are a life purpose analyst. Given a list of personal goals, analyze them and organize them into a meaningful hierarchy.
+
+Your task:
+1. Identify the single APEX goal — the ultimate north-star purpose that all other goals serve. This is the person's deepest "why". If none of the existing goals captures this, suggest one.
+2. Identify SUB-APEX goals — major life pillars that directly support the apex goal (e.g., "Stay alive and healthy as long as possible", "Build lasting legacy").
+3. Organize remaining goals as STANDARD goals under the appropriate sub-apex or apex parent.
+4. Suggest a parentId hierarchy — which goal should be parent of which.
+
+Current goals:
+${JSON.stringify(goalSummaries, null, 2)}
+
+Respond with JSON only (no markdown fences). The response must be an object with:
+- "apexGoal": { "existingId": string|null, "suggestedTitle": string|null, "suggestedDescription": string|null } — if an existing goal IS the apex, set existingId. If no existing goal fits, suggest a new one.
+- "organization": array of { "id": string, "goalType": "apex"|"sub-apex"|"standard", "suggestedParentId": string|null, "reasoning": string }
+  - For each existing goal, assign its type and suggested parent.
+  - The apex goal has null parentId.
+  - Sub-apex goals MUST have suggestedParentId set to the apex goal's existingId (if an existing goal is the apex) or "__new_apex__" (if you are suggesting a new apex goal). Sub-apex goals are never root nodes.
+  - Standard goals should have suggestedParentId set to the most appropriate sub-apex goal id, or to the apex goal id if they directly support the apex.
+  - The reasoning should be 1 sentence explaining why this goal fits where it does.
+- "suggestedSubApex": array of { "title": string, "description": string, "category": string, "suggestedParentId": string|null } — suggest 0-3 sub-apex goals if the existing goals don't cover major life pillars well. Set suggestedParentId to the apex goal's existingId or "__new_apex__" if suggesting a new apex.
+- "analysis": string — 2-3 sentences summarizing the person's core purpose and how their goals connect.`;
+
+  const result = await callProviderAISimple(provider, selectedModel, prompt, { max_tokens: 3000, temperature: 0.4 });
+  if (result.error) throw new ServerError(`AI organization failed: ${result.error}`, { status: 502, code: 'AI_ERROR' });
+
+  let parsed;
+  try {
+    parsed = parseLLMJSON(result.text);
+  } catch (e) {
+    throw new ServerError(`AI returned invalid organization data: ${e.message}`, { status: 502, code: 'AI_PARSE_ERROR' });
+  }
+
+  // Validate required shape from LLM response
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.organization)) {
+    throw new ServerError('AI returned unexpected shape: missing organization array', { status: 502, code: 'AI_PARSE_ERROR' });
+  }
+  if (!parsed.apexGoal || typeof parsed.apexGoal !== 'object') {
+    throw new ServerError('AI returned unexpected shape: missing apexGoal', { status: 502, code: 'AI_PARSE_ERROR' });
+  }
+
+  // Filter organization to only known goal IDs
+  const goalIds = new Set(activeGoals.map(g => g.id));
+  parsed.organization = parsed.organization.filter(item => item.id && goalIds.has(item.id));
+
+  console.log(`🎯 Organized ${activeGoals.length} goals into hierarchy`);
+  return parsed;
+}
+
+export async function applyGoalOrganization(organization) {
+  const goals = await getGoals();
+  const now = new Date().toISOString();
+  const goalMap = new Map(goals.goals.map(g => [g.id, g]));
+  let changed = 0;
+
+  for (const item of organization) {
+    const goal = goalMap.get(item.id);
+    if (!goal) continue;
+
+    let goalChanged = false;
+
+    if (item.goalType && goalTypeEnum.options.includes(item.goalType)) {
+      if (goal.goalType !== item.goalType) {
+        goal.goalType = item.goalType;
+        goalChanged = true;
+      }
+    }
+    if (item.suggestedParentId !== undefined) {
+      const newParentId = item.suggestedParentId;
+      if (newParentId === null || goalMap.has(newParentId)) {
+        if (!newParentId || !hasAncestorCycle(goals.goals, goal.id, newParentId)) {
+          if (goal.parentId !== newParentId) {
+            goal.parentId = newParentId;
+            goalChanged = true;
+          }
+        }
+      }
+    }
+    if (goalChanged) {
+      goal.updatedAt = now;
+      changed++;
+    }
+  }
+
+  if (changed > 0) {
+    goals.updatedAt = now;
+    await saveJSON(GOALS_FILE, goals);
+  }
+  console.log(`🎯 Applied organization to ${changed} goals`);
+  return { applied: changed };
 }
 
 // =============================================================================

@@ -48,6 +48,8 @@ export const goalCategoryEnum = z.enum([
 
 export const goalStatusEnum = z.enum(['active', 'completed', 'abandoned']);
 
+export const goalTypeEnum = z.enum(['apex', 'sub-apex', 'standard']);
+
 const timeBlockConfigSchema = z.object({
   preferredDays: z.array(z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])).min(1).max(7),
   timeSlot: z.union([
@@ -63,6 +65,7 @@ export const createGoalInputSchema = z.object({
   description: z.string().max(2000).optional(),
   horizon: goalHorizonEnum.optional().default('5-year'),
   category: goalCategoryEnum.optional().default('mastery'),
+  goalType: goalTypeEnum.optional().default('standard'),
   parentId: z.string().min(1).nullable().optional().default(null),
   tags: z.array(z.string().min(1).max(50)).max(20).optional().default([]),
   targetDate: validCalendarDate.optional(),
@@ -74,6 +77,7 @@ export const updateGoalInputSchema = z.object({
   description: z.string().max(2000).optional(),
   horizon: goalHorizonEnum.optional(),
   category: goalCategoryEnum.optional(),
+  goalType: goalTypeEnum.optional(),
   status: goalStatusEnum.optional(),
   parentId: z.string().min(1).nullable().optional(),
   tags: z.array(z.string().min(1).max(50)).max(20).optional(),
@@ -86,10 +90,12 @@ export const addMilestoneInputSchema = z.object({
   targetDate: validCalendarDate.optional()
 });
 
-export const generatePhasesInputSchema = z.object({
+export const aiProviderInputSchema = z.object({
   providerId: z.string().min(1).optional(),
   model: z.string().min(1).optional()
 });
+
+export const generatePhasesInputSchema = aiProviderInputSchema;
 
 export const acceptPhasesInputSchema = z.object({
   phases: z.array(z.object({
@@ -146,4 +152,17 @@ export const linkCalendarInputSchema = z.object({
   subcalendarId: z.string().min(1),
   subcalendarName: z.string().min(1),
   matchPattern: z.string().max(200).optional().default('')
+});
+
+// --- Goal Organization Schemas ---
+
+export const organizeGoalsInputSchema = aiProviderInputSchema;
+
+export const applyOrganizationInputSchema = z.object({
+  organization: z.array(z.object({
+    id: z.string().min(1),
+    goalType: goalTypeEnum.optional(),
+    suggestedParentId: z.string().min(1).nullable().optional(),
+    reasoning: z.string().optional()
+  })).min(1)
 });

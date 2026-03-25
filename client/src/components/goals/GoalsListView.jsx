@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
 import {
-  ChevronRight, ChevronDown, Plus, GripVertical, Search, Tag, Link2
+  ChevronRight, ChevronDown, Plus, GripVertical, Search, Tag, Link2, Crown, Star, Wand2
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import * as api from '../../services/api';
-import GoalDetailPanel, { CATEGORY_CONFIG, HORIZON_OPTIONS } from './GoalDetailPanel';
+import GoalDetailPanel, { CATEGORY_CONFIG, HORIZON_OPTIONS, GOAL_TYPE_CONFIG, DEFAULT_NEW_GOAL } from './GoalDetailPanel';
+import { applyOrganizationSuggestion } from './applyOrganization';
 
 function urgencyIndicator(urgency) {
   if (urgency == null) return null;
@@ -45,6 +47,13 @@ function GoalRow({ goal, depth, expandedIds, onToggle, onSelect, selectedId, onA
         </div>
 
         <span className="text-sm text-white truncate flex-1">{goal.title}</span>
+
+        {goal.goalType && goal.goalType !== 'standard' && (
+          <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded ${GOAL_TYPE_CONFIG[goal.goalType]?.bg} ${GOAL_TYPE_CONFIG[goal.goalType]?.color}`}>
+            {goal.goalType === 'apex' ? <Crown className="w-3 h-3 inline mr-0.5" /> : <Star className="w-3 h-3 inline mr-0.5" />}
+            {GOAL_TYPE_CONFIG[goal.goalType]?.label}
+          </span>
+        )}
 
         {/* Progress pill */}
         {(goal.progress > 0 || goal.todos?.length > 0) && (
@@ -118,7 +127,8 @@ export default function GoalsListView({ data, onRefresh }) {
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNewGoal, setShowNewGoal] = useState(false);
-  const [newGoal, setNewGoal] = useState({ title: '', description: '', horizon: '5-year', category: 'mastery', parentId: null });
+  const [newGoal, setNewGoal] = useState({ ...DEFAULT_NEW_GOAL });
+  const [organizing, setOrganizing] = useState(false);
 
   const toggleExpand = (id) => {
     setExpandedIds(prev => {
@@ -148,15 +158,25 @@ export default function GoalsListView({ data, onRefresh }) {
   };
 
   const handleAddChild = (parentId) => {
-    setNewGoal({ title: '', description: '', horizon: '5-year', category: 'mastery', parentId });
+    setNewGoal({ ...DEFAULT_NEW_GOAL, parentId });
     setShowNewGoal(true);
   };
 
   const handleCreateGoal = async () => {
     if (!newGoal.title.trim()) return;
     await api.createGoal(newGoal);
-    setNewGoal({ title: '', description: '', horizon: '5-year', category: 'mastery', parentId: null });
+    setNewGoal({ ...DEFAULT_NEW_GOAL });
     setShowNewGoal(false);
+    onRefresh();
+  };
+
+  const handleOrganize = async () => {
+    setOrganizing(true);
+    const result = await api.organizeGoals().catch(() => null);
+    setOrganizing(false);
+    if (!result) { toast.error('Failed to organize goals'); return; }
+    await applyOrganizationSuggestion(result);
+    toast.success('Goal hierarchy applied');
     onRefresh();
   };
 
@@ -177,7 +197,7 @@ export default function GoalsListView({ data, onRefresh }) {
           </div>
           <button
             onClick={() => {
-              setNewGoal({ title: '', description: '', horizon: '5-year', category: 'mastery', parentId: null });
+              setNewGoal({ ...DEFAULT_NEW_GOAL });
               setShowNewGoal(true);
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-port-accent text-white hover:bg-blue-600"
@@ -185,6 +205,17 @@ export default function GoalsListView({ data, onRefresh }) {
             <Plus className="w-4 h-4" />
             Add Root Goal
           </button>
+          {(data?.flat?.length ?? 0) >= 2 && (
+            <button
+              onClick={handleOrganize}
+              disabled={organizing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 disabled:opacity-50 min-h-[40px]"
+              title="Use AI to organize goals into a hierarchy"
+            >
+              <Wand2 className={`w-4 h-4 ${organizing ? 'animate-spin' : ''}`} />
+              {organizing ? 'Analyzing...' : 'Organize'}
+            </button>
+          )}
           <button
             onClick={() => {
               if (expandedIds.size > 0) {

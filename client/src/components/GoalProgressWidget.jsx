@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronRight, AlertTriangle, Target } from 'lucide-react';
 import * as api from '../services/api';
 import { useAutoRefetch } from '../hooks/useAutoRefetch';
-import { CATEGORY_CONFIG } from './goals/GoalDetailPanel';
+import { CATEGORY_CONFIG, GOAL_TYPE_CONFIG } from './goals/GoalDetailPanel';
 
 const HORIZON_LABELS = {
   '1-year': '1Y', '3-year': '3Y', '5-year': '5Y',
@@ -84,6 +84,11 @@ const GoalProgressWidget = memo(function GoalProgressWidget() {
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2 min-w-0">
                   <CatIcon size={14} className={`shrink-0 ${cat.color}`} aria-hidden="true" />
+                  {goal.goalType && goal.goalType !== 'standard' && (
+                    <span className={`shrink-0 text-[10px] px-1 py-0.5 rounded ${GOAL_TYPE_CONFIG[goal.goalType]?.bg} ${GOAL_TYPE_CONFIG[goal.goalType]?.color}`}>
+                      {GOAL_TYPE_CONFIG[goal.goalType]?.label}
+                    </span>
+                  )}
                   <span className="text-sm font-medium text-gray-300 truncate group-hover:text-white transition-colors">
                     {goal.title}
                   </span>

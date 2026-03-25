@@ -1583,3 +1583,315 @@ describe('Integration: Calendar Linking', () => {
     expect(result).toBeNull();
   });
 });
+
+// =============================================================================
+// Goal Hierarchy Organization
+// =============================================================================
+
+describe('Integration: applyGoalOrganization', () => {
+  let createGoal, getGoals, applyGoalOrganization;
+
+  beforeEach(async () => {
+    vi.resetModules();
+
+    vi.doMock('fs/promises', () => {
+      const store = {};
+      return {
+        readFile: vi.fn(async (path) => {
+          if (store[path]) return store[path];
+          throw new Error('ENOENT');
+        }),
+        writeFile: vi.fn(async (path, data) => {
+          store[path] = data;
+        }),
+        mkdir: vi.fn(async () => {})
+      };
+    });
+
+    vi.doMock('./genome.js', () => ({
+      getGenomeSummary: vi.fn(async () => ({
+        uploaded: false, markerCount: 0, uploadedAt: null, savedMarkers: {}
+      }))
+    }));
+
+    vi.doMock('./taste-questionnaire.js', () => ({
+      getTasteProfile: vi.fn(async () => ({
+        completedCount: 0, totalSections: 5, overallPercentage: 0, lastSessionAt: null
+      }))
+    }));
+
+    const mod = await import('./identity.js');
+    createGoal = mod.createGoal;
+    getGoals = mod.getGoals;
+    applyGoalOrganization = mod.applyGoalOrganization;
+  });
+
+  it('should apply goalType and parentId changes to goals', async () => {
+    const apex = await createGoal({ title: 'Apex Goal' });
+    const sub = await createGoal({ title: 'Sub Apex Goal' });
+    const standard = await createGoal({ title: 'Standard Goal' });
+
+    const result = await applyGoalOrganization([
+      { id: apex.id, goalType: 'apex', suggestedParentId: null },
+      { id: sub.id, goalType: 'sub-apex', suggestedParentId: apex.id },
+      { id: standard.id, goalType: 'standard', suggestedParentId: sub.id }
+    ]);
+
+    expect(result.applied).toBe(3);
+
+    const goals = await getGoals();
+    const updatedApex = goals.goals.find(g => g.id === apex.id);
+    const updatedSub = goals.goals.find(g => g.id === sub.id);
+    const updatedStandard = goals.goals.find(g => g.id === standard.id);
+
+    expect(updatedApex.goalType).toBe('apex');
+    expect(updatedApex.parentId).toBeNull();
+    expect(updatedSub.goalType).toBe('sub-apex');
+    expect(updatedSub.parentId).toBe(apex.id);
+    expect(updatedStandard.goalType).toBe('standard');
+    expect(updatedStandard.parentId).toBe(sub.id);
+  });
+
+  it('should prevent a goal from becoming its own parent', async () => {
+    const goal = await createGoal({ title: 'Self Referencing' });
+
+    await applyGoalOrganization([
+      { id: goal.id, goalType: 'standard', suggestedParentId: goal.id }
+    ]);
+
+    const goals = await getGoals();
+    const updated = goals.goals.find(g => g.id === goal.id);
+
+    // parentId should remain null — self-cycle prevented
+    expect(updated.parentId).toBeNull();
+  });
+
+  it('should prevent ancestor cycles in reparenting', async () => {
+    const a = await createGoal({ title: 'A' });
+    const b = await createGoal({ title: 'B', parentId: a.id });
+    const c = await createGoal({ title: 'C', parentId: b.id });
+
+    // Try to make A a child of C (would create A->B->C->A cycle)
+    await applyGoalOrganization([
+      { id: a.id, suggestedParentId: c.id }
+    ]);
+
+    const goals = await getGoals();
+    const updatedA = goals.goals.find(g => g.id === a.id);
+
+    // parentId should remain null — cycle prevented
+    expect(updatedA.parentId).toBeNull();
+  });
+
+  it('should ignore invalid goalType values', async () => {
+    const goal = await createGoal({ title: 'Test Goal', goalType: 'standard' });
+
+    await applyGoalOrganization([
+      { id: goal.id, goalType: 'bogus' }
+    ]);
+
+    const goals = await getGoals();
+    const updated = goals.goals.find(g => g.id === goal.id);
+
+    // goalType should remain unchanged
+    expect(updated.goalType).toBe('standard');
+  });
+
+  it('should accept all valid goalType values', async () => {
+    const g1 = await createGoal({ title: 'Goal 1' });
+    const g2 = await createGoal({ title: 'Goal 2' });
+    const g3 = await createGoal({ title: 'Goal 3' });
+
+    await applyGoalOrganization([
+      { id: g1.id, goalType: 'apex' },
+      { id: g2.id, goalType: 'sub-apex' },
+      { id: g3.id, goalType: 'standard' }
+    ]);
+
+    const goals = await getGoals();
+    expect(goals.goals.find(g => g.id === g1.id).goalType).toBe('apex');
+    expect(goals.goals.find(g => g.id === g2.id).goalType).toBe('sub-apex');
+    expect(goals.goals.find(g => g.id === g3.id).goalType).toBe('standard');
+  });
+
+  it('should skip non-existent goal IDs without error', async () => {
+    const goal = await createGoal({ title: 'Exists' });
+
+    const result = await applyGoalOrganization([
+      { id: 'nonexistent', goalType: 'apex' },
+      { id: goal.id, goalType: 'sub-apex' }
+    ]);
+
+    // Only the existing goal counts as changed
+    expect(result.applied).toBe(1);
+
+    const goals = await getGoals();
+    expect(goals.goals.find(g => g.id === goal.id).goalType).toBe('sub-apex');
+  });
+
+  it('should skip reparenting to a non-existent parent', async () => {
+    const goal = await createGoal({ title: 'Goal' });
+
+    await applyGoalOrganization([
+      { id: goal.id, suggestedParentId: 'nonexistent-parent' }
+    ]);
+
+    const goals = await getGoals();
+    const updated = goals.goals.find(g => g.id === goal.id);
+
+    // parentId should remain null — target parent doesn't exist
+    expect(updated.parentId).toBeNull();
+  });
+
+  it('should allow clearing parentId by setting it to null', async () => {
+    const parent = await createGoal({ title: 'Parent' });
+    const child = await createGoal({ title: 'Child', parentId: parent.id });
+
+    await applyGoalOrganization([
+      { id: child.id, suggestedParentId: null }
+    ]);
+
+    const goals = await getGoals();
+    const updated = goals.goals.find(g => g.id === child.id);
+    expect(updated.parentId).toBeNull();
+  });
+});
+
+describe('Integration: organizeGoals', () => {
+  let organizeGoals, createGoal;
+
+  beforeEach(async () => {
+    vi.resetModules();
+
+    vi.doMock('fs/promises', () => {
+      const store = {};
+      return {
+        readFile: vi.fn(async (path) => {
+          if (store[path]) return store[path];
+          throw new Error('ENOENT');
+        }),
+        writeFile: vi.fn(async (path, data) => {
+          store[path] = data;
+        }),
+        mkdir: vi.fn(async () => {})
+      };
+    });
+
+    vi.doMock('./genome.js', () => ({
+      getGenomeSummary: vi.fn(async () => ({
+        uploaded: false, markerCount: 0, uploadedAt: null, savedMarkers: {}
+      }))
+    }));
+
+    vi.doMock('./taste-questionnaire.js', () => ({
+      getTasteProfile: vi.fn(async () => ({
+        completedCount: 0, totalSections: 5, overallPercentage: 0, lastSessionAt: null
+      }))
+    }));
+
+    vi.doMock('./providers.js', () => ({
+      getActiveProvider: vi.fn(async () => ({
+        id: 'mock-provider',
+        name: 'Mock AI',
+        defaultModel: 'mock-model'
+      })),
+      getProviderById: vi.fn(async () => ({
+        id: 'mock-provider',
+        name: 'Mock AI',
+        defaultModel: 'mock-model'
+      }))
+    }));
+
+    // callProviderAISimple mock set per-test to use actual goal IDs
+    vi.doMock('../lib/aiProvider.js', () => ({
+      callProviderAISimple: vi.fn(async () => ({ text: '{}' })),
+      parseLLMJSON: vi.fn((text) => JSON.parse(text))
+    }));
+
+    const mod = await import('./identity.js');
+    organizeGoals = mod.organizeGoals;
+    createGoal = mod.createGoal;
+  });
+
+  it('should return LLM organization suggestion', async () => {
+    const goal1 = await createGoal({ title: 'Health & Fitness' });
+    const goal2 = await createGoal({ title: 'Learn Spanish' });
+
+    // Re-mock with actual goal IDs
+    const { callProviderAISimple, parseLLMJSON } = await import('../lib/aiProvider.js');
+    callProviderAISimple.mockResolvedValue({
+      text: JSON.stringify({
+        apexGoal: { existingId: null, suggestedTitle: 'Live fully', suggestedDescription: 'The ultimate purpose' },
+        organization: [
+          { id: goal1.id, goalType: 'sub-apex', suggestedParentId: null, reasoning: 'Major life pillar' },
+          { id: goal2.id, goalType: 'standard', suggestedParentId: goal1.id, reasoning: 'Supports pillar' }
+        ],
+        suggestedSubApex: [],
+        analysis: 'Your goals center around personal growth.'
+      })
+    });
+    parseLLMJSON.mockImplementation((text) => JSON.parse(text));
+
+    const result = await organizeGoals();
+
+    expect(result.apexGoal).toBeDefined();
+    expect(result.apexGoal.suggestedTitle).toBe('Live fully');
+    expect(result.organization).toHaveLength(2);
+    expect(result.organization[0].goalType).toBe('sub-apex');
+    expect(result.organization[1].suggestedParentId).toBe(goal1.id);
+    expect(result.analysis).toContain('personal growth');
+  });
+
+  it('should throw when fewer than 2 active goals', async () => {
+    await createGoal({ title: 'Only one' });
+
+    await expect(organizeGoals()).rejects.toMatchObject({ code: 'TOO_FEW_GOALS' });
+  });
+
+  it('should throw when no AI provider is available', async () => {
+    vi.resetModules();
+
+    vi.doMock('fs/promises', () => {
+      const store = {};
+      return {
+        readFile: vi.fn(async (path) => {
+          if (store[path]) return store[path];
+          throw new Error('ENOENT');
+        }),
+        writeFile: vi.fn(async (path, data) => { store[path] = data; }),
+        mkdir: vi.fn(async () => {})
+      };
+    });
+
+    vi.doMock('./genome.js', () => ({
+      getGenomeSummary: vi.fn(async () => ({
+        uploaded: false, markerCount: 0, uploadedAt: null, savedMarkers: {}
+      }))
+    }));
+
+    vi.doMock('./taste-questionnaire.js', () => ({
+      getTasteProfile: vi.fn(async () => ({
+        completedCount: 0, totalSections: 5, overallPercentage: 0, lastSessionAt: null
+      }))
+    }));
+
+    vi.doMock('./providers.js', () => ({
+      getActiveProvider: vi.fn(async () => null),
+      getProviderById: vi.fn(async () => null)
+    }));
+
+    vi.doMock('../lib/aiProvider.js', () => ({
+      callProviderAISimple: vi.fn(),
+      parseLLMJSON: vi.fn()
+    }));
+
+    const mod = await import('./identity.js');
+    const localCreateGoal = mod.createGoal;
+    const localOrganizeGoals = mod.organizeGoals;
+
+    await localCreateGoal({ title: 'Goal A' });
+    await localCreateGoal({ title: 'Goal B' });
+
+    await expect(localOrganizeGoals()).rejects.toMatchObject({ code: 'NO_PROVIDER' });
+  });
+});

@@ -410,6 +410,78 @@ export async function createPR(dir, { title, body, base, head }) {
 }
 
 /**
+ * Generate a rich PR description from the agent's output summary.
+ * Extracts the implementation summary from the tail of the agent output,
+ * stripping tool-call artifacts and keeping only the meaningful explanation
+ * of what was implemented (new APIs, UI elements, behaviors, etc.).
+ * Falls back to commit messages when no agent output is available.
+ * @param {string} dir - Working directory (repo root)
+ * @param {string} baseBranch - Base branch (e.g., 'main')
+ * @param {string} headBranch - Head branch (agent's branch)
+ * @param {string} agentOutput - Raw agent output text
+ * @returns {Promise<string>} Formatted PR body
+ */
+export async function generatePRDescription(dir, baseBranch, headBranch, agentOutput) {
+  const summary = extractAgentSummary(agentOutput);
+
+  if (summary) {
+    return `Automated PR created by PortOS Chief of Staff.\n\n## Summary\n\n${summary}`;
+  }
+
+  // Fallback: build from commit messages when no usable agent output
+  const comparison = await getBranchComparison(dir, baseBranch, headBranch).catch(() => null);
+  if (comparison?.commits?.length) {
+    const commitLines = comparison.commits.map(c => `- ${c.message}`).join('\n');
+    return `Automated PR created by PortOS Chief of Staff.\n\n## Changes\n\n${commitLines}`;
+  }
+
+  return 'Automated PR created by PortOS Chief of Staff.';
+}
+
+/**
+ * Extract a meaningful implementation summary from raw agent output.
+ * Agents typically end their output with a summary of what was implemented.
+ * This function finds the last tool-call artifact in the tail of the output
+ * and returns everything after it, cleaned up.
+ * @param {string} output - Raw agent output
+ * @returns {string|null} Cleaned summary text, or null if nothing usable
+ */
+export function extractAgentSummary(output) {
+  if (!output || output.length < 50) return null;
+
+  // Take the last ~4000 chars where the summary typically lives
+  const tail = output.slice(-4000);
+  const lines = tail.split('\n');
+
+  // Find the last tool-call artifact line index.
+  // Everything after it is the agent's final summary.
+  let lastToolLine = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const trimmed = lines[i].trimStart();
+    if (trimmed.startsWith('→') || trimmed.startsWith('🔧') || /^\s*\$ /.test(lines[i])) {
+      lastToolLine = i;
+      break;
+    }
+  }
+
+  // Extract everything after the last tool line
+  const summaryLines = lastToolLine >= 0
+    ? lines.slice(lastToolLine + 1)
+    : lines;
+
+  // Trim leading/trailing blank lines
+  while (summaryLines.length && !summaryLines[0].trim()) summaryLines.shift();
+  while (summaryLines.length && !summaryLines[summaryLines.length - 1].trim()) summaryLines.pop();
+
+  const summary = summaryLines.join('\n').trim();
+
+  // Must have meaningful content (at least a sentence)
+  if (summary.length < 30) return null;
+
+  return summary;
+}
+
+/**
  * Detect base and dev branches from local branch list
  * @returns {{ baseBranch: string|null, devBranch: string|null }}
  */

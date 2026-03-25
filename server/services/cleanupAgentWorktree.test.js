@@ -158,7 +158,8 @@ vi.mock('./jira.js', () => ({
 vi.mock('./git.js', () => ({
   push: vi.fn(),
   getRepoBranches: vi.fn(),
-  createPR: vi.fn()
+  createPR: vi.fn(),
+  generatePRDescription: vi.fn()
 }));
 
 vi.mock('./runner.js', () => ({
@@ -194,6 +195,10 @@ describe('cleanupAgentWorktree - openPR path', () => {
     // Default: agent is a worktree agent with valid metadata
     getAgent.mockResolvedValue(mockWorktreeAgent());
     git.getRepoBranches.mockResolvedValue({ baseBranch: 'main', devBranch: null });
+    // generatePRDescription returns a rich body from agent output summary
+    git.generatePRDescription.mockImplementation(() =>
+      Promise.resolve('Automated PR created by PortOS Chief of Staff.\n\n## Summary\n\nImplemented the requested feature with new API endpoints and UI components.')
+    );
   });
 
   it('should run PR flow when openPR is true and success is true', async () => {
@@ -205,7 +210,7 @@ describe('cleanupAgentWorktree - openPR path', () => {
     expect(git.push).toHaveBeenCalledWith('/mock/root/data/cos/worktrees/agent-1', 'cos/task-abc123');
     expect(git.createPR).toHaveBeenCalledWith('/mock/root/data/cos/worktrees/agent-1', {
       title: 'Test task',
-      body: expect.stringContaining('Test task'),
+      body: expect.stringContaining('Summary'),
       base: 'main',
       head: 'cos/task-abc123'
     });
@@ -326,7 +331,7 @@ describe('cleanupAgentWorktree - openPR path', () => {
 
     expect(git.createPR).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
       title: 'CoS automated task',
-      body: expect.stringContaining('CoS automated task')
+      body: expect.stringContaining('Chief of Staff')
     }));
   });
 
