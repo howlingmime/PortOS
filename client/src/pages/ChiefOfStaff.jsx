@@ -421,22 +421,25 @@ export default function ChiefOfStaff() {
   }
 
   return (
-    <div className={`flex flex-col lg:grid ${desktopPanelCollapsed ? 'lg:grid-cols-[48px_1fr]' : 'lg:grid-cols-[320px_1fr]'} h-full overflow-hidden transition-[grid-template-columns] duration-200`}>
+    <div className={`relative flex flex-col lg:grid ${desktopPanelCollapsed ? 'lg:grid-cols-[0px_1fr]' : 'lg:grid-cols-[320px_1fr]'} h-full overflow-hidden transition-[grid-template-columns] duration-200`}>
+      {/* Floating expand button - flush with nav edge when panel is collapsed */}
+      {desktopPanelCollapsed && (
+        <button
+          onClick={toggleDesktopPanel}
+          className="hidden lg:flex absolute left-0 top-2 z-20 p-1.5 text-gray-500 hover:text-white transition-colors rounded-r-md hover:bg-slate-800/80 bg-slate-900/60 border border-l-0 border-indigo-500/20"
+          aria-label="Expand CoS panel"
+          title="Expand CoS panel"
+        >
+          <PanelLeftOpen size={16} />
+        </button>
+      )}
+
       {/* Agent Panel */}
       {avatarStyle === 'ascii' ? (
         <>
-          {/* Desktop: collapsed strip or full panel */}
+          {/* Desktop: collapsed placeholder or full panel */}
           {desktopPanelCollapsed ? (
-            <div className="hidden lg:flex flex-col items-center py-4 border-r border-indigo-500/20 bg-slate-900/60 overflow-hidden">
-              <button
-                onClick={toggleDesktopPanel}
-                className="p-2 text-gray-400 hover:text-white transition-colors"
-                aria-label="Expand CoS panel"
-                title="Expand CoS panel"
-              >
-                <PanelLeftOpen size={18} />
-              </button>
-            </div>
+            <div className="hidden lg:block overflow-hidden min-w-0" />
           ) : (
             <div className="hidden lg:block relative">
               <button
@@ -476,18 +479,9 @@ export default function ChiefOfStaff() {
           </div>
         </>
       ) : desktopPanelCollapsed ? (
-        /* Collapsed SVG strip - desktop only, mobile shows nothing */
+        /* Collapsed SVG - desktop placeholder, mobile shows compact header */
         <>
-          <div className="hidden lg:flex flex-col items-center gap-3 py-4 border-r border-indigo-500/20 bg-gradient-to-b from-slate-900/80 to-slate-900/40 overflow-hidden">
-            <button
-              onClick={toggleDesktopPanel}
-              className="p-2 text-gray-400 hover:text-white transition-colors"
-              aria-label="Expand CoS panel"
-              title="Expand CoS panel"
-            >
-              <PanelLeftOpen size={18} />
-            </button>
-          </div>
+          <div className="hidden lg:block overflow-hidden min-w-0" />
           {/* Mobile: still show the compact header */}
           <div className="lg:hidden border-b border-indigo-500/20 bg-gradient-to-b from-slate-900/80 to-slate-900/40">
             <button
