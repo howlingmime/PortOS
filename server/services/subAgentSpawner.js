@@ -3433,6 +3433,13 @@ export async function handleOrphanedTask(taskId, agentId, getTaskById) {
     return;
   }
 
+  // Skip tasks already completed — prevents race where completeAgent() finishes
+  // before updateTask() and a health check calls handleOrphanedTask in between
+  if (task.status === 'completed') {
+    emitLog('debug', `⏭️ Skipping orphaned task ${taskId} — already completed`, { taskId, agentId });
+    return;
+  }
+
   // Check if the agent actually committed work before treating as orphaned
   const commitFound = checkForTaskCommit(taskId);
   if (commitFound) {

@@ -816,7 +816,18 @@ async function resetOrphanedTasks() {
     .filter(a => a.status === 'running')
     .map(a => a.taskId);
 
-  emitLog('debug', `Running agents: ${runningAgentTaskIds.length}`, { taskIds: runningAgentTaskIds });
+  // Also track tasks with recently-completed agents to avoid race condition:
+  // Between completeAgent() and updateTask(), the agent is "completed" but the
+  // task is still "in_progress". Without this check, resetOrphanedTasks treats
+  // such tasks as orphaned and increments orphanRetryCount spuriously.
+  const recentlyCompletedTaskIds = new Set(
+    Object.values(state.agents)
+      .filter(a => a.status === 'completed' && a.completedAt &&
+        (Date.now() - new Date(a.completedAt).getTime()) < 60000)
+      .map(a => a.taskId)
+  );
+
+  emitLog('debug', `Running agents: ${runningAgentTaskIds.length}, recently completed: ${recentlyCompletedTaskIds.size}`, { taskIds: runningAgentTaskIds });
 
   // Route orphaned tasks through handleOrphanedTask for consistent retry counting,
   // cooldown enforcement, and max-spawn limits (prevents runaway respawning)
@@ -824,10 +835,15 @@ async function resetOrphanedTasks() {
 
   const processOrphanedTasks = async (tasks) => {
     for (const task of tasks) {
-      if (!runningAgentTaskIds.includes(task.id)) {
-        emitLog('info', `Found orphaned in_progress task ${task.id}, routing through retry handler`, { taskId: task.id });
-        await handleOrphanedTask(task.id, 'unknown-reset', getTaskById);
+      if (runningAgentTaskIds.includes(task.id)) continue;
+      // Skip tasks whose agent just completed — updateTask will set them to
+      // completed shortly; treating them as orphaned causes spurious retries
+      if (recentlyCompletedTaskIds.has(task.id)) {
+        emitLog('debug', `Skipping task ${task.id} — agent recently completed, awaiting task status update`, { taskId: task.id });
+        continue;
       }
+      emitLog('info', `Found orphaned in_progress task ${task.id}, routing through retry handler`, { taskId: task.id });
+      await handleOrphanedTask(task.id, 'unknown-reset', getTaskById);
     }
   };
 
