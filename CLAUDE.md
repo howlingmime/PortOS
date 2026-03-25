@@ -69,6 +69,17 @@ PortOS depends on `portos-ai-toolkit` as an npm module for AI provider managemen
 - The toolkit uses spread in `updateProvider()` so existing providers preserve custom fields, but `createProvider()` has an explicit field list
 - After updating the toolkit, run `npm update portos-ai-toolkit` in PortOS to pull changes
 
+### Slashdo Commands (`lib/slashdo`)
+
+PortOS bundles [slashdo](https://github.com/atomantic/slashdo) as a git submodule at `lib/slashdo`. This provides slash commands (`/do:review`, `/do:pr`, `/do:push`, `/do:release`, etc.) and shared libraries without requiring a separate global install.
+
+**Key points:**
+- Submodule lives at `lib/slashdo`, symlinked into `.claude/commands/do/` and `.claude/lib/`
+- `npm run install:all` runs `git submodule update --init --recursive` automatically
+- To update slashdo: `git submodule update --remote lib/slashdo`
+- CoS agents can use `loadSlashdoCommand(name)` from `subAgentSpawner.js` to inline command content into prompts (resolves `!cat` lib includes automatically)
+- The `.claude/commands/do/` symlinks make all `/do:*` commands available as project-level Claude Code slash commands
+
 ## Scope Boundary
 
 When CoS agents or AI tools work on managed apps outside PortOS, all research, plans, docs, and code for those apps must be written to the target app's own repository/directory -- never to this repo. PortOS stores only its own features, plans, and documentation. If an agent generates a PLAN.md, research doc, or feature spec for another app, it goes in that app's directory.

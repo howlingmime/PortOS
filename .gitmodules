@@ -1,0 +1,3 @@
+[submodule "lib/slashdo"]
+	path = lib/slashdo
+	url = git@github.com:atomantic/slashdo.git

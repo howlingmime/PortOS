@@ -49,7 +49,8 @@ export const PATHS = {
   settings: join(__lib_dirname, '../../data/settings'),
   missions: join(__lib_dirname, '../../data/cos/missions'),
   tools: join(__lib_dirname, '../../data/tools'),
-  images: join(__lib_dirname, '../../data/images')
+  images: join(__lib_dirname, '../../data/images'),
+  slashdo: join(__lib_dirname, '../../lib/slashdo')
 };
 
 /**
