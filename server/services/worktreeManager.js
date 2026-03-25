@@ -112,32 +112,14 @@ export async function removeWorktree(agentId, sourceWorkspace, branchName, optio
     return { merged: false, removed: true, uncommittedSaved: false };
   }
 
-  // Safety check: detect uncommitted changes before removing the worktree
-  let uncommittedSaved = false;
+  // Safety check: abort removal when uncommitted changes are detected.
+  // Auto-committing dirty state is unreliable — if merge is false the commit
+  // would be dangling (branch gets deleted), and if merge is true it could
+  // merge partial/WIP changes. Preserve the worktree so the caller can handle.
   const dirtyFiles = (await execGit(['status', '--porcelain'], worktreePath).catch(() => '')).trim();
   if (dirtyFiles) {
-    console.log(`🌳 Worktree for ${agentId} has uncommitted changes — committing before cleanup`);
-    let addOk = true;
-    await execGit(['add', '-A'], worktreePath).catch(err => {
-      addOk = false;
-      console.log(`⚠️ git add failed in worktree ${agentId}: ${err.message}`);
-    });
-    if (addOk) {
-      await execGit(
-        ['commit', '-m', `chore: save uncommitted agent work (auto-committed during worktree cleanup)\n\nAgent ${agentId} had uncommitted changes that would have been lost during worktree removal.`],
-        worktreePath
-      ).then(() => {
-        uncommittedSaved = true;
-        console.log(`🌳 Auto-committed uncommitted changes for ${agentId}`);
-      }).catch(err => {
-        console.log(`⚠️ Auto-commit failed for worktree ${agentId}: ${err.message}`);
-      });
-    }
-    // If we couldn't save the dirty files, abort removal to prevent data loss
-    if (!uncommittedSaved) {
-      console.log(`⚠️ Preserving worktree for ${agentId} — uncommitted changes could not be saved`);
-      return { merged: false, removed: false, uncommittedSaved: false };
-    }
+    console.log(`⚠️ Preserving worktree for ${agentId} — uncommitted changes detected, aborting cleanup to avoid data loss`);
+    return { merged: false, removed: false, uncommittedSaved: false };
   }
 
   let merged = false;
@@ -183,9 +165,9 @@ export async function removeWorktree(agentId, sourceWorkspace, branchName, optio
       console.log(`⚠️ Branch delete failed for ${branchName}: ${err.message}`);
     });
 
-  console.log(`🌳 Removed worktree for ${agentId}${merged ? ' (merged)' : ''}${uncommittedSaved ? ' (auto-committed)' : ''}`);
+  console.log(`🌳 Removed worktree for ${agentId}${merged ? ' (merged)' : ''}`);
 
-  return { merged, removed: true, uncommittedSaved };
+  return { merged, removed: true, uncommittedSaved: false };
 }
 
 /**
