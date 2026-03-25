@@ -93,8 +93,8 @@ export default function ActionableInsightsBanner({ onTaskUnblocked }) {
     }
   };
 
-  const handleUnblockTask = async (taskId) => {
-    const result = await api.updateCosTask(taskId, { status: 'pending' }).catch(err => {
+  const handleUnblockTask = async (taskId, taskType) => {
+    const result = await api.updateCosTask(taskId, { status: 'pending', type: taskType }).catch(err => {
       toast.error(err.message);
       return null;
     });
@@ -177,7 +177,7 @@ export default function ActionableInsightsBanner({ onTaskUnblocked }) {
                     {task.description}
                   </span>
                   <button
-                    onClick={() => handleUnblockTask(task.id)}
+                    onClick={() => handleUnblockTask(task.id, task.taskType)}
                     className="flex items-center gap-1 px-2 py-1 text-xs font-medium bg-port-success/20 hover:bg-port-success/30 text-port-success rounded transition-colors shrink-0 min-h-[28px]"
                     title="Unblock and move to pending"
                   >
