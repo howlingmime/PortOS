@@ -19,7 +19,7 @@ const generateSchema = z.object({
   height: z.number().int().min(64).max(2048).optional(),
   steps: z.number().int().min(1).max(150).optional(),
   cfgScale: z.number().min(0).max(30).optional(),
-  seed: z.number().int().optional()
+  seed: z.number().int().min(0).optional()
 });
 
 const avatarSchema = z.object({

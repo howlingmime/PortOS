@@ -220,7 +220,7 @@ export default function CharacterSheet() {
         setChar(prev => ({ ...prev, avatarPath: result.path }));
         return put({ avatarPath: result.path });
       })
-      .catch(() => {})
+      .catch(err => toast.error(err.message || 'Failed to generate avatar'))
       .finally(() => {
         setGeneratingAvatar(false);
         setDiffusionProgress(null);
