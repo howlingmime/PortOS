@@ -52,25 +52,32 @@ export async function checkConnection() {
 
 function startProgressPolling(baseUrl, generationId) {
   let lastProgress = -1;
+  let inFlight = false;
   const interval = setInterval(async () => {
-    const res = await fetchWithTimeout(`${baseUrl}/sdapi/v1/progress`, {}, 5000).catch(() => null);
-    if (!res?.ok) return;
-    const data = await res.json().catch(() => null);
-    if (!data) return;
+    if (inFlight) return;
+    inFlight = true;
+    try {
+      const res = await fetchWithTimeout(`${baseUrl}/sdapi/v1/progress`, {}, 5000).catch(() => null);
+      if (!res?.ok) return;
+      const data = await res.json().catch(() => null);
+      if (!data) return;
 
-    // Only emit if progress actually changed
-    const progress = Math.round(data.progress * 100);
-    if (progress === lastProgress) return;
-    lastProgress = progress;
+      // Only emit if progress actually changed
+      const progress = Math.round(data.progress * 100);
+      if (progress === lastProgress) return;
+      lastProgress = progress;
 
-    imageGenEvents.emit('progress', {
-      generationId,
-      progress: data.progress,
-      eta: data.eta_relative,
-      step: data.state?.sampling_step,
-      totalSteps: data.state?.sampling_steps,
-      currentImage: data.current_image || null
-    });
+      imageGenEvents.emit('progress', {
+        generationId,
+        progress: data.progress,
+        eta: data.eta_relative,
+        step: data.state?.sampling_step,
+        totalSteps: data.state?.sampling_steps,
+        currentImage: data.current_image || null
+      });
+    } finally {
+      inFlight = false;
+    }
   }, PROGRESS_POLL_INTERVAL);
 
   return () => clearInterval(interval);

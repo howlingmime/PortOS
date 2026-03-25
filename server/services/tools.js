@@ -11,7 +11,18 @@ import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { ensureDir, readJSONFile, PATHS } from '../lib/fileUtils.js';
 
-const toolPath = (id) => join(PATHS.tools, `${id}.json`);
+const TOOL_ID_PATTERN = /^[a-zA-Z0-9_-]{1,100}$/;
+
+function validateToolId(id) {
+  if (typeof id !== 'string' || !TOOL_ID_PATTERN.test(id)) {
+    throw new Error(`Invalid tool id: must match ${TOOL_ID_PATTERN}`);
+  }
+}
+
+const toolPath = (id) => {
+  validateToolId(id);
+  return join(PATHS.tools, `${id}.json`);
+};
 
 let cache = null;
 

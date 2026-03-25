@@ -77,6 +77,7 @@ export default function CharacterSheet() {
   const [generatingAvatar, setGeneratingAvatar] = useState(false);
   const [diffusionProgress, setDiffusionProgress] = useState(null);
   const generatingRef = useRef(false);
+  const generationIdRef = useRef(null);
 
   // Form states
   const [dmgDice, setDmgDice] = useState('1d6');
@@ -109,16 +110,27 @@ export default function CharacterSheet() {
 
   // Listen for diffusion progress events while generating
   useEffect(() => {
+    const onStarted = (data) => {
+      if (generatingRef.current && !generationIdRef.current) {
+        generationIdRef.current = data.generationId;
+      }
+    };
     const onProgress = (data) => {
-      if (generatingRef.current) setDiffusionProgress(data);
+      if (generatingRef.current && data.generationId === generationIdRef.current) {
+        setDiffusionProgress(data);
+      }
     };
-    const onDone = () => {
-      if (generatingRef.current) setDiffusionProgress(null);
+    const onDone = (data) => {
+      if (generatingRef.current && data.generationId === generationIdRef.current) {
+        setDiffusionProgress(null);
+      }
     };
+    socket.on('image-gen:started', onStarted);
     socket.on('image-gen:progress', onProgress);
     socket.on('image-gen:completed', onDone);
     socket.on('image-gen:failed', onDone);
     return () => {
+      socket.off('image-gen:started', onStarted);
       socket.off('image-gen:progress', onProgress);
       socket.off('image-gen:completed', onDone);
       socket.off('image-gen:failed', onDone);
@@ -215,6 +227,7 @@ export default function CharacterSheet() {
     setGeneratingAvatar(true);
     setDiffusionProgress(null);
     generatingRef.current = true;
+    generationIdRef.current = null;
     generateAvatar({ name: char.name, characterClass: char.class })
       .then(result => {
         setChar(prev => ({ ...prev, avatarPath: result.path }));
@@ -225,6 +238,7 @@ export default function CharacterSheet() {
         setGeneratingAvatar(false);
         setDiffusionProgress(null);
         generatingRef.current = false;
+        generationIdRef.current = null;
       });
   };
 

@@ -915,11 +915,15 @@ function ImageGenTab() {
       promptHints: 'Use POST /api/image-gen/generate with { prompt, negativePrompt, width, height, steps, cfgScale }. Use POST /api/image-gen/avatar for character portraits.'
     };
     if (toolRegistered) {
-      await updateTool(SDAPI_TOOL_ID, toolData).catch(() => {});
+      await updateTool(SDAPI_TOOL_ID, toolData).catch(() => {
+        toast.error('Failed to update CoS tools registry');
+      });
     } else if (url) {
       await registerTool({ id: SDAPI_TOOL_ID, ...toolData })
         .then(() => setToolRegistered(true))
-        .catch(() => {});
+        .catch(() => {
+          toast.error('Failed to register in CoS tools registry');
+        });
     }
 
     setSaving(false);

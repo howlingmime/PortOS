@@ -314,7 +314,7 @@ export async function cleanupOrphanedWorktrees(sourceWorkspace, activeAgentIds) 
     const agentId = wt.path.split('/').pop();
     if (!activeAgentIds.has(agentId)) {
       const branchName = wt.branch?.replace('refs/heads/', '') || '';
-      await removeWorktree(agentId, sourceWorkspace, branchName, { merge: true })
+      await removeWorktree(agentId, sourceWorkspace, branchName, { merge: false })
         .catch(err => {
           console.log(`⚠️ Failed to clean orphaned worktree ${agentId}: ${err.message}`);
         });

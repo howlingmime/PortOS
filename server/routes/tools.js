@@ -12,8 +12,10 @@ import * as toolsService from '../services/tools.js';
 
 const router = Router();
 
+const toolIdSchema = z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/, 'Tool ID must contain only alphanumeric characters, hyphens, and underscores');
+
 const registerToolSchema = z.object({
-  id: z.string().max(100).optional(),
+  id: toolIdSchema.optional(),
   name: z.string().min(1).max(100),
   category: z.string().min(1).max(50),
   description: z.string().max(500).optional(),
@@ -44,7 +46,8 @@ router.get('/summary', asyncHandler(async (req, res) => {
 
 // GET /api/tools/:id - Get single tool
 router.get('/:id', asyncHandler(async (req, res) => {
-  const tool = await toolsService.getTool(req.params.id);
+  const id = validateRequest(toolIdSchema, req.params.id);
+  const tool = await toolsService.getTool(id);
   if (!tool) return res.status(404).json({ error: 'Tool not found' });
   res.json(tool);
 }));
@@ -58,15 +61,17 @@ router.post('/', asyncHandler(async (req, res) => {
 
 // PUT /api/tools/:id - Update a tool
 router.put('/:id', asyncHandler(async (req, res) => {
+  const id = validateRequest(toolIdSchema, req.params.id);
   const data = validateRequest(updateToolSchema, req.body);
-  const tool = await toolsService.updateTool(req.params.id, data);
+  const tool = await toolsService.updateTool(id, data);
   if (!tool) return res.status(404).json({ error: 'Tool not found' });
   res.json(tool);
 }));
 
 // DELETE /api/tools/:id - Delete a tool
 router.delete('/:id', asyncHandler(async (req, res) => {
-  await toolsService.deleteTool(req.params.id);
+  const id = validateRequest(toolIdSchema, req.params.id);
+  await toolsService.deleteTool(id);
   res.status(204).end();
 }));
 
