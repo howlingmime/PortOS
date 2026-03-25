@@ -119,7 +119,6 @@ export async function generateImage({ prompt, negativePrompt, width, height, ste
 
   imageGenEvents.emit('started', {
     generationId,
-    prompt: prompt.slice(0, 200),
     totalSteps: payload.steps
   });
 

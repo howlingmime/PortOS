@@ -875,6 +875,7 @@ function ImageGenTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sdapiUrl, setSdapiUrl] = useState('');
+  const [savedUrl, setSavedUrl] = useState('');
   const [status, setStatus] = useState(null);
   const [checking, setChecking] = useState(false);
   const [toolRegistered, setToolRegistered] = useState(false);
@@ -882,7 +883,9 @@ function ImageGenTab() {
   useEffect(() => {
     Promise.all([getSettings(), getToolsList()])
       .then(([settings, tools]) => {
-        setSdapiUrl(settings?.imageGen?.sdapiUrl || '');
+        const url = settings?.imageGen?.sdapiUrl || '';
+        setSdapiUrl(url);
+        setSavedUrl(url);
         setToolRegistered(tools.some(t => t.id === SDAPI_TOOL_ID));
       })
       .catch(() => toast.error('Failed to load image gen settings'))
@@ -903,7 +906,7 @@ function ImageGenTab() {
 
     let settingsSaved = false;
     await updateSettings({ imageGen: { sdapiUrl: url } })
-      .then(() => { settingsSaved = true; toast.success('Image gen settings saved'); })
+      .then(() => { settingsSaved = true; setSavedUrl(url || ''); toast.success('Image gen settings saved'); })
       .catch(() => toast.error('Failed to save settings'));
 
     if (!settingsSaved) {
@@ -970,8 +973,9 @@ function ImageGenTab() {
 
         <button
           onClick={checkStatus}
-          disabled={checking || !sdapiUrl.trim()}
+          disabled={checking || !sdapiUrl.trim() || sdapiUrl.trim().replace(/\/+$/, '') !== savedUrl}
           className="flex items-center gap-2 px-4 py-2 bg-port-border hover:bg-port-border/70 text-white text-sm rounded-lg transition-colors disabled:opacity-50"
+          title={sdapiUrl.trim().replace(/\/+$/, '') !== savedUrl ? 'Save settings first to test' : 'Test connection to SD API'}
         >
           {checking ? <BrailleSpinner /> : <Zap size={14} />}
           Test Connection
