@@ -17,8 +17,8 @@ import { imageGenEvents } from './imageGenEvents.js';
 
 const DEFAULT_NEGATIVE_PROMPT = 'blurry, low quality, distorted, deformed, ugly, watermark, text, signature';
 
-// Cache detected model to avoid extra HTTP round-trip per generation
-let cachedModel = { name: null, timestamp: 0 };
+// Cache detected model per baseUrl to avoid extra HTTP round-trip per generation
+let cachedModel = { name: null, timestamp: 0, baseUrl: null };
 const MODEL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 const PROGRESS_POLL_INTERVAL = 500; // ms between progress polls
@@ -29,14 +29,14 @@ async function getSdApiUrl() {
 }
 
 async function detectModel(baseUrl) {
-  if (cachedModel.name && Date.now() - cachedModel.timestamp < MODEL_CACHE_TTL) {
+  if (cachedModel.name && cachedModel.baseUrl === baseUrl && Date.now() - cachedModel.timestamp < MODEL_CACHE_TTL) {
     return cachedModel.name;
   }
   const res = await fetchWithTimeout(`${baseUrl}/sdapi/v1/options`, {}, 10000).catch(() => null);
   if (!res?.ok) return 'unknown';
   const options = await res.json().catch(() => null);
   const model = options?.sd_model_checkpoint || 'unknown';
-  cachedModel = { name: model, timestamp: Date.now() };
+  cachedModel = { name: model, timestamp: Date.now(), baseUrl };
   return model;
 }
 
@@ -53,7 +53,7 @@ export async function checkConnection() {
   const options = await res.json().catch(() => null);
   const model = options?.sd_model_checkpoint || 'unknown';
   // Update the cache while we're at it
-  cachedModel = { name: model, timestamp: Date.now() };
+  cachedModel = { name: model, timestamp: Date.now(), baseUrl };
   return { connected: true, model };
 }
 
