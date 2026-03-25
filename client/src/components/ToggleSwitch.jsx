@@ -19,7 +19,7 @@ export default function ToggleSwitch({ enabled, onChange, disabled, ariaLabel, s
     <button
       onClick={onChange}
       disabled={disabled}
-      className={`relative inline-flex ${s.track} items-center rounded-full transition-colors shrink-0 min-h-[44px] min-w-[44px] ${
+      className={`relative inline-flex ${s.track} items-center rounded-full transition-colors shrink-0 ${
         enabled ? activeColor : 'bg-gray-600'
       } ${disabled ? 'opacity-50' : ''} ${className}`}
       aria-label={ariaLabel}
