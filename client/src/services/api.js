@@ -359,6 +359,10 @@ export const deleteBranch = (path, branch, { local = false, remote = false } = {
     method: 'POST',
     body: JSON.stringify({ path, branch, local, remote })
   });
+export const cleanupMergedBranches = (path) => request('/git/cleanup-merged', {
+  method: 'POST',
+  body: JSON.stringify({ path })
+});
 export const mergeBranch = (path, branch) => request('/git/merge', {
   method: 'POST',
   body: JSON.stringify({ path, branch })

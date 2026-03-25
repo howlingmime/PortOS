@@ -235,6 +235,18 @@ router.post('/checkout-remote', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
+// POST /api/git/cleanup-merged - Delete all merged branches (local + remote)
+router.post('/cleanup-merged', asyncHandler(async (req, res) => {
+  const { path } = req.body;
+
+  if (!path) {
+    throw new ServerError('path is required', { status: 400, code: 'VALIDATION_ERROR' });
+  }
+
+  const result = await git.deleteMergedBranches(path);
+  res.json(result);
+}));
+
 // POST /api/git/delete-branch - Delete a branch locally and/or remotely
 router.post('/delete-branch', asyncHandler(async (req, res) => {
   const { path, branch, local, remote } = req.body;

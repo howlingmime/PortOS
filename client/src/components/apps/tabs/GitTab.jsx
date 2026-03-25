@@ -100,6 +100,8 @@ export default function GitTab({ appId: _appId, appName, repoPath }) {
   const [merging, setMerging] = useState(null);
   const [mergeConfirm, setMergeConfirm] = useState(null);
   const [checkingOutRemote, setCheckingOutRemote] = useState(null);
+  const [cleaningUp, setCleaningUp] = useState(false);
+  const [cleanupConfirm, setCleanupConfirm] = useState(false);
 
   const loadGitInfo = useCallback(async () => {
     if (!repoPath) return;
@@ -319,6 +321,34 @@ export default function GitTab({ appId: _appId, appName, repoPath }) {
         b.name === branchName ? { ...b, hasLocal: true } : b
       ));
       await loadGitInfo();
+    }
+  };
+
+  const mergedBranchCount = remoteBranches.filter(rb => rb.merged && !rb.isDefault).length;
+
+  const handleCleanupMerged = async () => {
+    if (!repoPath || cleaningUp) return;
+    setCleaningUp(true);
+    setCleanupConfirm(false);
+    const result = await api.cleanupMergedBranches(repoPath).catch((err) => {
+      toast.error(`Cleanup failed: ${err.message}`);
+      return null;
+    });
+    setCleaningUp(false);
+    if (result) {
+      const count = result.deleted.length;
+      if (count === 0) {
+        toast('No merged branches to clean up', { icon: 'ℹ️' });
+      } else {
+        toast.success(`Cleaned up ${count} merged branch${count === 1 ? '' : 'es'}`);
+        const deletedLocals = new Set(result.deleted.filter(d => d.local === 'deleted').map(d => d.name));
+        const deletedRemotes = new Set(result.deleted.filter(d => d.remote === 'deleted').map(d => d.name));
+        setBranches(prev => prev.filter(b => !deletedLocals.has(b.name)));
+        setRemoteBranches(prev => prev.filter(b => !deletedRemotes.has(b.name)));
+      }
+      if (result.skipped.length > 0) {
+        toast(`${result.skipped.length} branch${result.skipped.length === 1 ? '' : 'es'} skipped`, { icon: '⚠️' });
+      }
     }
   };
 
@@ -634,13 +664,42 @@ export default function GitTab({ appId: _appId, appName, repoPath }) {
                   <span className="text-xs text-gray-500">({remoteBranches.length})</span>
                 )}
               </div>
-              <button
-                onClick={loadRemoteBranches}
-                disabled={loadingRemote}
-                className="text-xs text-port-accent hover:underline disabled:opacity-50"
-              >
-                {loadingRemote ? 'Refreshing...' : 'Refresh'}
-              </button>
+              <div className="flex items-center gap-2">
+                {mergedBranchCount > 0 && !cleanupConfirm && (
+                  <button
+                    onClick={() => setCleanupConfirm(true)}
+                    disabled={cleaningUp}
+                    className="flex items-center gap-1 text-xs text-port-warning hover:text-port-error disabled:opacity-50"
+                  >
+                    <Trash2 size={12} />
+                    {cleaningUp ? 'Cleaning...' : `Clean ${mergedBranchCount} merged`}
+                  </button>
+                )}
+                {cleanupConfirm && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={handleCleanupMerged}
+                      disabled={cleaningUp}
+                      className="px-2 py-1 text-xs bg-port-error/20 text-port-error rounded hover:bg-port-error/30 disabled:opacity-50"
+                    >
+                      {cleaningUp ? 'Deleting...' : `Delete ${mergedBranchCount} merged`}
+                    </button>
+                    <button
+                      onClick={() => setCleanupConfirm(false)}
+                      className="px-2 py-1 text-xs text-gray-400 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+                <button
+                  onClick={loadRemoteBranches}
+                  disabled={loadingRemote}
+                  className="text-xs text-port-accent hover:underline disabled:opacity-50"
+                >
+                  {loadingRemote ? 'Refreshing...' : 'Refresh'}
+                </button>
+              </div>
             </div>
             {loadingRemote && remoteBranches.length === 0 ? (
               <div className="text-center py-4"><BrailleSpinner text="Loading remote branches" /></div>

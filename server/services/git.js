@@ -3,6 +3,8 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { safeJSONParse } from '../lib/fileUtils.js';
 
+const PROTECTED_BRANCHES = ['main', 'master', 'dev', 'develop', 'release'];
+
 /**
  * Execute a git command safely using spawn (prevents shell injection)
  * @param {string[]} args - Git command arguments
@@ -733,11 +735,10 @@ export async function getRemoteBranches(dir) {
  * @param {boolean} options.remote - Delete remote branch
  */
 export async function deleteBranch(dir, branchName, { local = false, remote = false } = {}) {
-  // Safety: never delete default branches
   const { baseBranch } = await getRepoBranches(dir);
-  const protectedBranches = ['main', 'master', 'dev', 'develop', 'release'];
-  if (baseBranch) protectedBranches.push(baseBranch);
-  if (protectedBranches.includes(branchName)) {
+  const protectedSet = new Set(PROTECTED_BRANCHES);
+  if (baseBranch) protectedSet.add(baseBranch);
+  if (protectedSet.has(branchName)) {
     throw new Error(`Cannot delete protected branch: ${branchName}`);
   }
 
@@ -790,6 +791,69 @@ export async function mergeBranch(dir, branchName) {
 export async function checkoutRemoteBranch(dir, branchName) {
   await execGit(['checkout', '-b', branchName, `origin/${branchName}`], dir);
   return { success: true, branch: branchName };
+}
+
+/**
+ * Delete all merged branches (local and remote) in one operation.
+ * Skips protected branches (main, master, dev, develop, release) and the current branch.
+ * @param {string} dir - Working directory
+ * @returns {Promise<{deleted: Array<{name: string, local: string, remote: string}>, skipped: string[], defaultBranch: string}>}
+ */
+export async function deleteMergedBranches(dir) {
+  const [{ baseBranch }, currentBranch] = await Promise.all([
+    getRepoBranches(dir),
+    getBranch(dir)
+  ]);
+  const defaultBranch = baseBranch || 'main';
+  const protectedSet = new Set(PROTECTED_BRANCHES);
+  if (baseBranch) protectedSet.add(baseBranch);
+
+  await execGit(['fetch', 'origin', '--prune'], dir, { ignoreExitCode: true });
+
+  const [localMerged, remoteMerged] = await Promise.all([
+    execGit(['branch', '--merged', defaultBranch, '--format=%(refname:short)'], dir, { ignoreExitCode: true }),
+    execGit(['branch', '-r', '--merged', `origin/${defaultBranch}`, '--format=%(refname:short)'], dir, { ignoreExitCode: true })
+  ]);
+
+  const mergedLocalNames = localMerged.stdout.trim().split('\n').filter(Boolean)
+    .filter(name => !protectedSet.has(name) && name !== currentBranch);
+
+  const mergedRemoteNames = remoteMerged.stdout.trim().split('\n').filter(Boolean)
+    .filter(ref => ref.startsWith('origin/'))
+    .map(ref => ref.replace(/^origin\//, ''))
+    .filter(name => !protectedSet.has(name) && name !== 'HEAD');
+
+  const allMerged = [...new Set([...mergedLocalNames, ...mergedRemoteNames])];
+  const localSet = new Set(mergedLocalNames);
+  const remoteSet = new Set(mergedRemoteNames);
+
+  const deleted = [];
+  const skipped = [];
+
+  for (const name of allMerged) {
+    const hasLocal = localSet.has(name);
+    const hasRemote = remoteSet.has(name);
+    const result = { name, local: null, remote: null };
+
+    // Local deletes are instant; remote deletes are sequential to avoid git lock contention
+    if (hasLocal) {
+      const r = await execGit(['branch', '-d', name], dir, { ignoreExitCode: true });
+      result.local = r.exitCode === 0 ? 'deleted' : 'failed';
+      if (r.exitCode !== 0) skipped.push(`${name} (local: ${r.stderr?.trim()})`);
+    }
+
+    if (hasRemote) {
+      const r = await execGit(['push', 'origin', '--delete', name], dir, { ignoreExitCode: true });
+      result.remote = r.exitCode === 0 ? 'deleted' : 'failed';
+      if (r.exitCode !== 0) skipped.push(`${name} (remote: ${r.stderr?.trim()})`);
+    }
+
+    if (result.local === 'deleted' || result.remote === 'deleted') {
+      deleted.push(result);
+    }
+  }
+
+  return { deleted, skipped, defaultBranch };
 }
 
 /**
