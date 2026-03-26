@@ -1424,13 +1424,21 @@ export async function spawnAgentForTask(task) {
   });
 
   // Determine workspace path and resolve app name
-  let workspacePath = task.metadata?.app
+  const isReadOnly = isTruthyMeta(task.metadata?.readOnly);
+  // Read-only tasks run in PortOS context since they call PortOS API endpoints
+  let workspacePath = task.metadata?.app && !isReadOnly
     ? await getAppWorkspace(task.metadata.app)
     : ROOT_DIR;
   const resolvedAppName = task.metadata?.app
     ? (await getAppById(task.metadata.app).catch(() => null))?.name || null
     : null;
 
+  // Skip git operations, JIRA branch creation, and worktree setup for read-only tasks
+  let jiraTicket = null;
+  let jiraBranchName = null;
+  let worktreeInfo = null;
+
+  if (!isReadOnly) {
   // Pull latest from git before starting work (scripted — no LLM needed)
   const pullResult = await git.ensureLatest(workspacePath).catch(err => {
     emitLog('warning', `⚠️ Pre-task git pull failed for ${workspacePath}: ${err.message}`, { taskId: task.id, workspace: workspacePath });
@@ -1477,8 +1485,6 @@ export async function spawnAgentForTask(task) {
   }
 
   // JIRA integration: create ticket + feature branch if app has JIRA enabled and task opted in
-  let jiraTicket = null;
-  let jiraBranchName = null;
   const appData = await getAppDataForTask(task);
 
   if (appData?.jira?.enabled && task.metadata?.createJiraTicket) {
@@ -1529,7 +1535,6 @@ export async function spawnAgentForTask(task) {
   // useWorktree: work in an isolated worktree branch
   // openPR: open a PR to default branch (implies useWorktree)
   // When neither is set, only create a worktree if conflict is detected with other running agents.
-  let worktreeInfo = null;
   const explicitOpenPR = isTruthyMeta(task.metadata?.openPR);
   const explicitWorktree = isTruthyMeta(task.metadata?.useWorktree) || explicitOpenPR;
 
@@ -1614,6 +1619,7 @@ export async function spawnAgentForTask(task) {
       emitLog('debug', `No conflicts for task ${task.id}, using shared workspace`, { taskId: task.id });
     }
   }
+  } // end !isReadOnly
 
   // Build the agent prompt (includes worktree and JIRA context if applicable)
   const prompt = await buildAgentPrompt(task, config, workspacePath, worktreeInfo);
@@ -2908,7 +2914,7 @@ ${skillSection ? `## Task-Type Skill Guidelines\n\n${skillSection}\n` : ''}${too
 - If blocked, explain clearly why
 - Never update the PortOS changelog (\`.changelog/\`) for work on managed apps — the PortOS changelog tracks PortOS core changes only
 - **BTW Messages**: The user may send you additional context while you work. Check for a \`BTW.md\` file in your working directory root — if it exists, read it for important messages from the user. Incorporate that context into your work. Do not delete or modify BTW.md.
-${task.metadata?.app && worktreeInfo && willOpenPR ? `- Commit code after each feature or bug fix using the git tools or /cam skill. A pull request will be automatically created when your task completes — do NOT open a PR manually.` : task.metadata?.app && worktreeInfo ? `- Commit code after each feature or bug fix using the git tools or /cam skill. Your worktree branch will be automatically merged back to the source branch when your task completes — do NOT open a PR.` : `- Commit code after each feature or bug fix using the git tools or /cam skill`}
+${isTruthyMeta(task.metadata?.readOnly) ? `- **This is a read-only task.** Do NOT commit, push, or modify any files in the repository. Only read data and generate reports.` : task.metadata?.app && worktreeInfo && willOpenPR ? `- Commit code after each feature or bug fix using the git tools or /cam skill. A pull request will be automatically created when your task completes — do NOT open a PR manually.` : task.metadata?.app && worktreeInfo ? `- Commit code after each feature or bug fix using the git tools or /cam skill. Your worktree branch will be automatically merged back to the source branch when your task completes — do NOT open a PR.` : `- Commit code after each feature or bug fix using the git tools or /cam skill`}
 
 ## Git Hygiene (CRITICAL)
 - **Before starting work**, run \`git status\` to verify a clean working tree. If there are uncommitted changes from a previous agent or manual work, **stash or discard them** before proceeding — do NOT commit someone else's changes.

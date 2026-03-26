@@ -20,7 +20,7 @@ import { cosEvents, emitLog } from './cos.js';
 import { DAY, ensureDir, HOUR, readJSONFile, PATHS, safeDate } from '../lib/fileUtils.js';
 import { getAdaptiveCooldownMultiplier } from './taskLearning.js';
 import { isTaskTypeEnabledForApp, getAppTaskTypeInterval, getActiveApps, getAppTaskTypeOverrides } from './apps.js';
-import { PORTOS_UI_URL } from '../lib/ports.js';
+import { PORTOS_UI_URL, PORTOS_API_URL } from '../lib/ports.js';
 import { getUserTimezone, getLocalParts } from '../lib/timezone.js';
 import { parseCronToNextRun } from './eventScheduler.js';
 
@@ -596,11 +596,10 @@ Do NOT comment on JIRA tickets directly — all action items go to the Review Hu
 
   'jira-status-report': `[Task: {appName}] JIRA Weekly Status Report
 
-Generate a JIRA status report for {appName}:
+Generate a JIRA status report for {appName} (App ID: {appId}).
 
-Repository: {repoPath}
-
-1. Call POST /api/jira/reports/generate with the app's ID to generate a fresh status report
+1. Call the PortOS API to generate a fresh status report:
+   curl -X POST ${PORTOS_API_URL}/api/jira/reports/generate -H "Content-Type: application/json" -d '{"appId": "{appId}"}'
 2. The report will be automatically saved and available at /devtools/jira/reports
 
 This task runs on a schedule and generates status reports summarizing:
@@ -914,7 +913,7 @@ const DEFAULT_TASK_INTERVALS = {
   'release-check':       { type: INTERVAL_TYPES.ON_DEMAND, enabled: false, providerId: null, model: null, prompt: null },
   'pr-reviewer':         { type: INTERVAL_TYPES.CUSTOM, intervalMs: 7200000, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null },
   'jira-sprint-manager': { type: INTERVAL_TYPES.DAILY, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null, taskMetadata: { useWorktree: true, openPR: true, simplify: true } },
-  'jira-status-report':  { type: INTERVAL_TYPES.WEEKLY, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null }
+  'jira-status-report':  { type: INTERVAL_TYPES.WEEKLY, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null, taskMetadata: { readOnly: true } }
 };
 
 /**

@@ -543,7 +543,7 @@ export function validateRequest(schema, data) {
 // TASK METADATA SANITIZATION
 // =============================================================================
 
-const ALLOWED_TASK_METADATA_KEYS = ['useWorktree', 'openPR', 'simplify', 'reviewLoop'];
+const ALLOWED_TASK_METADATA_KEYS = ['useWorktree', 'openPR', 'simplify', 'reviewLoop', 'readOnly'];
 
 /**
  * Sanitize taskMetadata to only allowed agent-option keys with boolean values.
