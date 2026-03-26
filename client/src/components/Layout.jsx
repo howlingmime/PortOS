@@ -152,6 +152,7 @@ const navItems = [
       { to: '/devtools/history', label: 'History', icon: History },
       { to: '/instances', label: 'Instances', icon: Network },
       { to: '/devtools/jira', label: 'JIRA', icon: Ticket },
+      { to: '/devtools/jira/reports', label: 'JIRA Reports', icon: FileText },
       { to: '/devtools/processes', label: 'Processes', icon: Activity },
       { to: '/shell', label: 'Shell', icon: SquareTerminal },
       { to: '/devtools/usage', label: 'Usage', icon: BarChart3 }

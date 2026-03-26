@@ -1644,6 +1644,15 @@ export const transitionJiraTicket = (instanceId, ticketId, transitionId, options
   ...options
 });
 
+// JIRA Status Reports
+export const getJiraReports = () => request('/jira/reports');
+export const generateJiraReport = (appId) => request('/jira/reports/generate', {
+  method: 'POST',
+  body: JSON.stringify(appId ? { appId } : {})
+});
+export const getJiraReport = (appId, date) => request(`/jira/reports/${appId}/${date}`);
+export const getLatestJiraReport = (appId) => request(`/jira/reports/${appId}/latest`);
+
 // Browser - CDP browser management
 export const getBrowserStatus = () => request('/browser');
 export const getBrowserConfig = () => request('/browser/config');

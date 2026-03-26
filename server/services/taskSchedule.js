@@ -594,6 +594,22 @@ Do NOT comment on JIRA tickets directly — all action items go to the Review Hu
 
 9. Generate a summary report covering triage actions taken and implementation work completed`,
 
+  'jira-status-report': `[Task: {appName}] JIRA Weekly Status Report
+
+Generate a JIRA status report for {appName}:
+
+Repository: {repoPath}
+
+1. Call POST /api/jira/reports/generate with the app's ID to generate a fresh status report
+2. The report will be automatically saved and available at /devtools/jira/reports
+
+This task runs on a schedule and generates status reports summarizing:
+- Sprint ticket counts by status (To Do, In Progress, Done)
+- Story point progress
+- Breakdown by assignee
+- Recently completed tickets (last 7 days)
+- Priority distribution`,
+
   'branch-cleanup': `[Improvement: {appName}] Branch Cleanup — Delete Merged Branches
 
 Clean up stale branches in {appName} that have already been merged into the default branch.
@@ -877,7 +893,7 @@ export const SELF_IMPROVEMENT_TASK_TYPES = [
   'security', 'code-quality', 'test-coverage', 'performance',
   'accessibility', 'branch-cleanup', 'console-errors', 'dependency-updates', 'documentation',
   'ui-bugs', 'mobile-responsive', 'feature-ideas', 'error-handling',
-  'typing', 'release-check', 'pr-reviewer', 'jira-sprint-manager'
+  'typing', 'release-check', 'pr-reviewer', 'jira-sprint-manager', 'jira-status-report'
 ];
 
 const DEFAULT_TASK_INTERVALS = {
@@ -897,7 +913,8 @@ const DEFAULT_TASK_INTERVALS = {
   'typing':              { type: INTERVAL_TYPES.ONCE, enabled: false, providerId: null, model: null, prompt: null },
   'release-check':       { type: INTERVAL_TYPES.ON_DEMAND, enabled: false, providerId: null, model: null, prompt: null },
   'pr-reviewer':         { type: INTERVAL_TYPES.CUSTOM, intervalMs: 7200000, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null },
-  'jira-sprint-manager': { type: INTERVAL_TYPES.DAILY, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null, taskMetadata: { useWorktree: true, openPR: true, simplify: true } }
+  'jira-sprint-manager': { type: INTERVAL_TYPES.DAILY, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null, taskMetadata: { useWorktree: true, openPR: true, simplify: true } },
+  'jira-status-report':  { type: INTERVAL_TYPES.WEEKLY, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null }
 };
 
 /**
@@ -1747,7 +1764,8 @@ function getTaskTypeDescription(taskType) {
     'error-handling': 'Improve error handling',
     'typing': 'Improve TypeScript types',
     'pr-reviewer': 'Review open PRs from contributors',
-    'jira-sprint-manager': 'Triage and implement JIRA sprint tickets'
+    'jira-sprint-manager': 'Triage and implement JIRA sprint tickets',
+    'jira-status-report': 'Generate JIRA weekly status report'
   };
   return descriptions[taskType] || taskType.replace(/-/g, ' ');
 }

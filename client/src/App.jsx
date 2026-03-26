@@ -18,6 +18,7 @@ import Settings from './pages/Settings';
 import Shell from './pages/Shell';
 import BrowserPage from './pages/Browser';
 import Jira from './pages/Jira';
+import JiraReports from './pages/JiraReports';
 import Insights from './pages/Insights';
 import Instances from './pages/Instances';
 import MeatSpace from './pages/MeatSpace';
@@ -132,6 +133,7 @@ export default function App() {
           <Route path="datadog" element={<Navigate to="/devtools/datadog" replace />} />
           <Route path="jira" element={<Navigate to="/devtools/jira" replace />} />
           <Route path="devtools/jira" element={<Jira />} />
+          <Route path="devtools/jira/reports" element={<JiraReports />} />
           <Route path="city" element={<CyberCity />} />
           <Route path="city/settings" element={<CyberCity />} />
           <Route path="character" element={<CharacterSheet />} />
