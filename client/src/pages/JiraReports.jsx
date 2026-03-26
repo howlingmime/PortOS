@@ -66,6 +66,16 @@ function ReportDetail({ report }) {
 
   const statusText = report.statusSummary || buildStatusText(report);
 
+  // Build ticket key → URL lookup from report data
+  const ticketUrls = {};
+  if (report.tickets) {
+    for (const group of Object.values(report.tickets)) {
+      for (const t of group || []) {
+        if (t.key && t.url) ticketUrls[t.key] = t.url;
+      }
+    }
+  }
+
   const handleCopy = async () => {
     const plain = statusText.replace(/\*\*/g, '');
     await navigator.clipboard.writeText(plain);
@@ -100,9 +110,14 @@ function ReportDetail({ report }) {
             if (line.startsWith('- ')) {
               const ticketMatch = line.match(/^- ([A-Z]+-\d+): (.+)/);
               if (ticketMatch) {
+                const url = ticketUrls[ticketMatch[1]];
                 return (
                   <div key={i} className="pl-3 py-0.5">
-                    <span className="text-port-accent font-mono text-xs">{ticketMatch[1]}</span>
+                    {url ? (
+                      <a href={url} target="_blank" rel="noopener noreferrer" className="text-port-accent hover:underline font-mono text-xs">{ticketMatch[1]}</a>
+                    ) : (
+                      <span className="text-port-accent font-mono text-xs">{ticketMatch[1]}</span>
+                    )}
                     <span className="text-gray-300 ml-1.5">{ticketMatch[2]}</span>
                   </div>
                 );
