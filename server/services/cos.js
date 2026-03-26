@@ -1363,7 +1363,8 @@ function getSelfImprovementTaskDescription(taskType) {
     'error-handling': 'Improve error handling patterns and recovery logic',
     'typing': 'Add or fix TypeScript/JSDoc type annotations',
     'release-check': 'Verify release readiness (changelog, version, tests)',
-    'jira-sprint-manager': 'Triage and implement JIRA sprint tickets (worktree+PR)'
+    'jira-sprint-manager': 'Triage and implement JIRA sprint tickets (worktree+PR)',
+    'jira-status-report': 'Generate JIRA weekly status report'
   };
   return descriptions[taskType] || null;
 }
@@ -1387,7 +1388,8 @@ function getAppImprovementTaskDescription(taskType, app) {
     'mobile-responsive': `Check mobile responsiveness of ${app.name}`,
     'feature-ideas': `Implement a feature idea for ${app.name} aligned with GOALS.md and PLAN.md (worktree+PR)`,
     'release-check': `Verify release readiness for ${app.name}`,
-    'jira-sprint-manager': `Triage and implement JIRA sprint tickets for ${app.name} (worktree+PR)`
+    'jira-sprint-manager': `Triage and implement JIRA sprint tickets for ${app.name} (worktree+PR)`,
+    'jira-status-report': `Generate JIRA weekly status report for ${app.name}`
   };
   return descriptions[taskType] || null;
 }
