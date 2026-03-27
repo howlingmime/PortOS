@@ -39,6 +39,7 @@ export const PATHS = {
   worktrees: join(__lib_dirname, '../../data/cos/worktrees'),
   repos: join(__lib_dirname, '../../data/repos'),
   browserProfile: join(__lib_dirname, '../../data/browser-profile'),
+  browserDownloads: join(__lib_dirname, '../../data/browser-downloads'),
   digests: join(__lib_dirname, '../../data/cos/digests'),
   promptSkills: join(__lib_dirname, '../../data/prompts/skills'),
   promptSkillsJobs: join(__lib_dirname, '../../data/prompts/skills/jobs'),

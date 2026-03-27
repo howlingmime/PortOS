@@ -14,6 +14,9 @@
 - Pipeline UI: tabbed prompt viewer shows each stage's full prompt with stage name tabs
 - MortalLoom export now includes goals, reads actual custom drink/nicotine presets, and parallelizes all I/O
 - MeatSpace Settings tab with import/export functionality
+- Browser download support via CDP `Browser.setDownloadBehavior` — downloads now land in `data/browser-downloads/`
+- Downloads section on Browser page showing file list with size and date
+- `/api/browser/downloads` endpoint for listing downloaded files
 
 ## Changed
 
