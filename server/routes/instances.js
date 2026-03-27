@@ -53,7 +53,7 @@ router.get('/', asyncHandler(async (req, res) => {
   const [self, peers, syncStatus] = await Promise.all([
     instances.getSelf(),
     instances.getPeers(),
-    getSyncStatus()
+    getSyncStatus({ includeChecksums: true })
   ]);
   res.json({ self, peers, syncStatus });
 }));
