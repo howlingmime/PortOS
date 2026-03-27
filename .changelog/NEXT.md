@@ -6,6 +6,7 @@
 
 ## Fixed
 
+- Digital twin sync now uses deep union merge for longevity/chronotype files, preserving genomic marker data across instances
 - Character avatar image now synced between instances alongside character metadata
 - Snapshot sync status no longer shows false "behind" when remote doesn't report checksums
 - Agent worktree branches now cleaned up even when worktree directory is already gone (fixes lingering branches after server restarts)
