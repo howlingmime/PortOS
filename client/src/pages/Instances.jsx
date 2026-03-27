@@ -141,9 +141,7 @@ function SelfCard({ self, onUpdate, syncStatus }) {
             <span className="flex items-center gap-1.5">
               <Database size={12} /> Memory seq: {syncStatus.local.memorySeq}
             </span>
-            {SYNC_CATEGORY_META
-              .filter(m => m.key !== 'brain' && m.key !== 'memory')
-              .map(({ key, label, icon: Icon }) => {
+            {SNAPSHOT_CATEGORIES.map(({ key, label, icon: Icon }) => {
                 const hasChecksum = !!syncStatus.local.checksums?.[key];
                 return (
                   <span key={key} className="flex items-center gap-1.5">
@@ -303,6 +301,9 @@ const SYNC_CATEGORY_META = [
   { key: 'meatspace', label: 'Meatspace', icon: HeartPulse, description: 'Daily logs, blood tests, body metrics, eyes' }
 ];
 
+// Snapshot categories (excludes delta-based brain/memory)
+const SNAPSHOT_CATEGORIES = SYNC_CATEGORY_META.filter(m => m.key !== 'brain' && m.key !== 'memory');
+
 function SyncCategoriesPanel({ peer, onRefresh }) {
   const [expanded, setExpanded] = useState(false);
   const categories = peer.syncCategories || {};
@@ -437,8 +438,7 @@ function SyncStatusSection({ peer, syncStatus }) {
   const cursorChecksums = cursor?.checksums || {};
   const remoteChecksums = remoteSyncSeqs?.checksums || {};
   const localChecksums = syncStatus.local?.checksums || {};
-  const enabledSnapshots = SYNC_CATEGORY_META
-    .filter(m => m.key !== 'brain' && m.key !== 'memory')
+  const enabledSnapshots = SNAPSHOT_CATEGORIES
     .map(m => m.key)
     .filter(cat => categories[cat]);
 

@@ -114,6 +114,10 @@ function validName(name, fallback) {
   return name.trim();
 }
 
+function isIPAddress(str) {
+  return /^\d+\.\d+\.\d+\.\d+$/.test(str);
+}
+
 // Default sync categories — all disabled until explicitly enabled per-peer
 const DEFAULT_SYNC_CATEGORIES = {
   brain: false,
@@ -239,7 +243,7 @@ export async function probePeer(peer) {
     if (status === 'online') entry.version = remoteVersion;
     // Auto-update name from hostname if current name is just an IP address
     const remoteHostname = validName(lastHealth?.hostname, null);
-    if (remoteHostname && /^\d+\.\d+\.\d+\.\d+$/.test(entry.name)) {
+    if (remoteHostname && isIPAddress(entry.name)) {
       entry.name = remoteHostname;
     }
 
@@ -337,7 +341,7 @@ export async function handleAnnounce({ address, port, instanceId, name }) {
       existing.port = port;
       // Only auto-update name if still an IP address (preserve user-set names)
       const sanitized = validName(name, null);
-      if (sanitized && /^\d+\.\d+\.\d+\.\d+$/.test(existing.name)) {
+      if (sanitized && isIPAddress(existing.name)) {
         existing.name = sanitized;
       }
       // Mark that this peer has announced to us (inbound connection)
