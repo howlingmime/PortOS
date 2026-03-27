@@ -6,7 +6,8 @@
  * Maintains per-peer cursors and triggers sync on peer connect + interval.
  */
 
-import { writeFile, rename } from 'fs/promises';
+import { writeFile, rename, access } from 'fs/promises';
+import { join } from 'path';
 import { readJSONFile, ensureDir, PATHS, dataPath } from '../lib/fileUtils.js';
 import { createMutex } from '../lib/asyncMutex.js';
 import { instanceEvents } from './instanceEvents.js';
@@ -67,6 +68,36 @@ async function fetchPeer(peer, path) {
     return await res.json();
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Fetch an image from a peer if we don't have it locally.
+ * avatarPath is like "/data/images/uuid.png"
+ */
+async function syncImageFromPeer(peer, avatarPath) {
+  const filename = avatarPath.split('/').pop();
+  if (!filename) return;
+  const localPath = join(PATHS.images, filename);
+
+  // Skip if we already have it
+  const exists = await access(localPath).then(() => true).catch(() => false);
+  if (exists) return;
+
+  const url = `http://${peer.address}:${peer.port}${avatarPath}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return;
+    const buffer = Buffer.from(await res.arrayBuffer());
+    await ensureDir(PATHS.images);
+    await writeFile(localPath, buffer);
+    console.log(`🔄 Synced avatar image: ${filename}`);
+  } catch {
+    // Non-critical — avatar will sync on next cycle
   } finally {
     clearTimeout(timeout);
   }
@@ -238,6 +269,12 @@ async function syncDataCategoryFromPeer(peer, peerId, category, cachedChecksums)
   if (!snapshot?.data) return { totalApplied: 0, checksum: null };
 
   const result = await dataSync.applyRemote(category, snapshot.data);
+
+  // After character sync, fetch avatar image if we don't have it locally
+  if (category === 'character' && snapshot.data?.avatarPath) {
+    await syncImageFromPeer(peer, snapshot.data.avatarPath);
+  }
+
   return { totalApplied: result.applied ? result.count : 0, checksum: snapshot.checksum };
 }
 

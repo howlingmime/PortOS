@@ -6,6 +6,8 @@
 
 ## Fixed
 
+- Character avatar image now synced between instances alongside character metadata
+- Snapshot sync status no longer shows false "behind" when remote doesn't report checksums
 - Agent worktree branches now cleaned up even when worktree directory is already gone (fixes lingering branches after server restarts)
 - Instance names like "null", "void", "NaN", "undefined" are now accepted as valid hostnames
 - Peer renames no longer revert when remote peer re-announces (handleAnnounce now preserves user-set names)
