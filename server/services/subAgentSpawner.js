@@ -24,7 +24,7 @@ import { getMemorySection } from './memoryRetriever.js';
 import { extractAndStoreMemories } from './memoryExtractor.js';
 import { getDigitalTwinForPrompt } from './digital-twin.js';
 import { suggestModelTier } from './taskLearning.js';
-import { ensureDir, readJSONFile, PATHS } from '../lib/fileUtils.js';
+import { ensureDir, readJSONFile, loadSlashdoFile, PATHS } from '../lib/fileUtils.js';
 import { getAppById } from './apps.js';
 import { createToolExecution, startExecution, updateExecution, completeExecution, errorExecution, getExecution, getStats as getToolStats } from './toolStateMachine.js';
 import { resolveThinkingLevel, getModelForLevel, isLocalPreferred } from './thinkingLevels.js';
@@ -75,7 +75,6 @@ async function cleanupBtwFile(workspacePath) {
 }
 
 const SKILLS_DIR = join(ROOT_DIR, 'data/prompts/skills');
-const SLASHDO_DIR = PATHS.slashdo;
 
 /**
  * Skill template keyword matchers
@@ -141,20 +140,8 @@ async function loadSkillTemplate(skillName) {
  * Load a slashdo command from the bundled submodule, resolving !`cat` lib includes inline.
  */
 export async function loadSlashdoCommand(commandName) {
-  const cmdPath = join(SLASHDO_DIR, 'commands/do', `${commandName}.md`);
-  if (!existsSync(cmdPath)) return null;
-  let content = await readFile(cmdPath, 'utf-8');
-  // Resolve !`cat ~/.claude/lib/...` includes using the bundled lib
-  const libDir = join(SLASHDO_DIR, 'lib');
-  const matches = [...content.matchAll(/!`cat ~\/.claude\/lib\/([^`]+)`/g)];
-  const replacements = await Promise.all(matches.map(async (match) => {
-    const libContent = await readFile(join(libDir, match[1]), 'utf-8').catch(() => null);
-    return { pattern: match[0], content: libContent };
-  }));
-  for (const { pattern, content: libContent } of replacements) {
-    if (libContent) content = content.replace(pattern, libContent);
-  }
-  console.log(`📋 Loaded slashdo command: do:${commandName}`);
+  const content = await loadSlashdoFile(commandName);
+  if (content) console.log(`📋 Loaded slashdo command: do:${commandName}`);
   return content;
 }
 

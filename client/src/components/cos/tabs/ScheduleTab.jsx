@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, RotateCcw, ChevronDown, ChevronRight, AlertCircle, RefreshCw, Package } from 'lucide-react';
+import { Play, RotateCcw, ChevronDown, ChevronRight, AlertCircle, RefreshCw, Package, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as api from '../../../services/api';
 import AppIcon from '../../AppIcon';
@@ -135,9 +135,11 @@ function GlobalConfigControls({ taskType, config, onUpdate, onTrigger, onReset, 
     setUpdating(false);
   };
 
+  const isPaused = !config.enabled;
+
   const handleToggleEnabled = async () => {
     setUpdating(true);
-    await onUpdate(taskType, { enabled: !config.enabled });
+    await onUpdate(taskType, { enabled: isPaused });
     setUpdating(false);
   };
 
@@ -180,14 +182,28 @@ function GlobalConfigControls({ taskType, config, onUpdate, onTrigger, onReset, 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <label className="text-sm text-gray-400">Enabled</label>
+        <div className="flex items-center gap-1.5">
+          <label className="text-sm text-gray-400">Global Pause</label>
+          <div className="group relative">
+            <Info size={14} className="text-gray-500 cursor-help" />
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-3 py-2 bg-gray-800 border border-port-border text-xs text-gray-300 rounded-lg shadow-lg w-56 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50">
+              When paused, no scheduled runs will execute for this task — even if individual apps are enabled.
+            </div>
+          </div>
+        </div>
         <ToggleSwitch
-          enabled={config.enabled}
+          enabled={isPaused}
           onChange={handleToggleEnabled}
           disabled={updating}
-          ariaLabel={config.enabled ? 'Disable task' : 'Enable task'}
+          ariaLabel={isPaused ? 'Resume runs' : 'Pause all runs'}
         />
       </div>
+      {isPaused && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-port-warning/10 border border-port-warning/30 rounded text-xs text-port-warning">
+          <AlertCircle size={14} className="shrink-0" />
+          All scheduled runs are paused for this task
+        </div>
+      )}
 
       <div>
         <label className="text-sm text-gray-400 block mb-2">Interval Type</label>
