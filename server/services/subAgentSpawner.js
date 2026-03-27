@@ -1050,8 +1050,8 @@ async function resolveFailedTaskUpdate(task, errorAnalysis, agentId) {
   }
 
   // Non-actionable errors: track retry count and block after max retries
-  const failureCount = (task.metadata?.failureCount || 0) + 1;
-  const totalSpawns = task.metadata?.totalSpawnCount || 0;
+  const failureCount = (Number(task.metadata?.failureCount) || 0) + 1;
+  const totalSpawns = Number(task.metadata?.totalSpawnCount) || 0;
   const lastErrorCategory = errorAnalysis?.category || 'unknown';
 
   if (totalSpawns >= MAX_TOTAL_SPAWNS || failureCount >= MAX_TASK_RETRIES) {
@@ -1275,7 +1275,7 @@ export async function spawnAgentForTask(task) {
   }
 
   // Check total spawn count across all retry types to prevent runaway respawning
-  const totalSpawns = task.metadata?.totalSpawnCount || 0;
+  const totalSpawns = Number(task.metadata?.totalSpawnCount) || 0;
   if (totalSpawns >= MAX_TOTAL_SPAWNS) {
     console.log(`🚫 Task ${task.id} hit max total spawns (${totalSpawns}/${MAX_TOTAL_SPAWNS}), blocking`);
     await updateTask(task.id, {
@@ -1676,7 +1676,7 @@ export async function spawnAgentForTask(task) {
   emitLog('info', `Agent ${agentId} initializing...${worktreeInfo ? ' (worktree)' : ''}${jiraBranchName ? ` (JIRA: ${jiraTicket?.ticketId})` : ''}`, { agentId, taskId: task.id });
 
   // Mark the task as in_progress and increment total spawn count
-  const newSpawnCount = (task.metadata?.totalSpawnCount || 0) + 1;
+  const newSpawnCount = (Number(task.metadata?.totalSpawnCount) || 0) + 1;
   const updateResult = await updateTask(task.id, {
     status: 'in_progress',
     metadata: {
@@ -3302,7 +3302,7 @@ export async function killAllAgents() {
 const MAX_ORPHAN_RETRIES = 3;
 const MAX_TASK_RETRIES = 3;
 // Absolute cap on total agent spawns per task (across all retry types)
-const MAX_TOTAL_SPAWNS = 5;
+export const MAX_TOTAL_SPAWNS = 5;
 // Minimum cooldown between orphan retries (30 minutes)
 const ORPHAN_RETRY_COOLDOWN_MS = 30 * 60 * 1000;
 
@@ -3451,8 +3451,8 @@ export async function handleOrphanedTask(taskId, agentId, getTaskById) {
   }
 
   // Get current retry count from task metadata
-  const retryCount = (task.metadata?.orphanRetryCount || 0) + 1;
-  const totalSpawns = task.metadata?.totalSpawnCount || 0;
+  const retryCount = (Number(task.metadata?.orphanRetryCount) || 0) + 1;
+  const totalSpawns = Number(task.metadata?.totalSpawnCount) || 0;
   const taskType = task.taskType || 'user';
 
   // Block if total spawn count across all retry types is exhausted

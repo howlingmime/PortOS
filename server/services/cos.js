@@ -44,6 +44,25 @@ const REPORTS_DIR = PATHS.reports;
 const SCRIPTS_DIR = PATHS.scripts;
 const ROOT_DIR = PATHS.root;
 
+// Must match MAX_TOTAL_SPAWNS in subAgentSpawner.js (dynamic import avoids circular dep)
+const MAX_TOTAL_SPAWNS = 5;
+
+/**
+ * Block a task that has exceeded the max spawn limit. Returns true if blocked.
+ */
+async function blockIfExceedsMaxSpawns(task, taskType) {
+  const totalSpawns = Number(task.metadata?.totalSpawnCount) || 0;
+  if (totalSpawns < MAX_TOTAL_SPAWNS) return false;
+  emitLog('info', `🚫 Blocking task ${task.id} — exceeded max spawns (${totalSpawns}/${MAX_TOTAL_SPAWNS})`, { taskId: task.id });
+  await updateTask(task.id, {
+    status: 'blocked',
+    metadata: { ...task.metadata, blockedReason: `Max total spawns exceeded (${totalSpawns}/${MAX_TOTAL_SPAWNS})`, blockedCategory: 'max-spawns', blockedAt: new Date().toISOString() }
+  }, taskType).catch(err => {
+    emitLog('warn', `Failed to block task ${task.id}: ${err.message}`, { taskId: task.id });
+  });
+  return true;
+}
+
 /**
  * Emit a log event for UI display
  * Exported for use by other CoS-related services
@@ -1032,6 +1051,7 @@ export async function evaluateTasks() {
   const pendingUserTasks = userTaskData.grouped?.pending || [];
   for (const task of pendingUserTasks) {
     if (tasksToSpawn.length >= availableSlots) break;
+    if (await blockIfExceedsMaxSpawns(task, 'user')) continue;
     const userTask = { ...task, taskType: 'user' };
     if (!canSpawnTask(userTask)) {
       const project = task.metadata?.app || '_self';
@@ -1052,6 +1072,8 @@ export async function evaluateTasks() {
     const autoApproved = cosTaskData.autoApproved || [];
     for (const task of autoApproved) {
       if (tasksToSpawn.length >= availableSlots) break;
+
+      if (await blockIfExceedsMaxSpawns(task, 'internal')) continue;
 
       // Check if task's app is on cooldown
       const appId = task.metadata?.app;
@@ -3495,6 +3517,7 @@ async function dequeueNextTask() {
 
   for (const task of pendingUserTasks) {
     if (spawned >= availableSlots) break;
+    if (await blockIfExceedsMaxSpawns(task, 'user')) continue;
     const userTask = { ...task, taskType: 'user' };
     if (!canSpawn(userTask)) continue;
     cosEvents.emit('task:ready', userTask);
@@ -3507,6 +3530,7 @@ async function dequeueNextTask() {
 
   for (const task of autoApproved) {
     if (spawned >= availableSlots) break;
+    if (await blockIfExceedsMaxSpawns(task, 'internal')) continue;
     const appId = task.metadata?.app;
     if (appId) {
       const onCooldown = await isAppOnCooldown(appId, state.config.appReviewCooldownMs);
