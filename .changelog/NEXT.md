@@ -13,10 +13,11 @@
 - Pipeline UI: collapsed row shows purple "2-stage" badge, expanded view shows stage flow visualization
 - Pipeline UI: tabbed prompt viewer shows each stage's full prompt with stage name tabs
 - MortalLoom export now includes goals, reads actual custom drink/nicotine presets, and parallelizes all I/O
-- Export to MortalLoom button in MeatSpace Import tab
+- MeatSpace Settings tab with import/export functionality
 
 ## Changed
 
+- MeatSpace Import tab renamed to Settings — consolidates import and export in one place
 - PR reviewer prompt no longer requires global `slash-do` install — review checklist is inlined from bundled submodule
 - Removed duplicate pr-reviewer skill template from data.sample (single source of truth in taskSchedule.js)
 

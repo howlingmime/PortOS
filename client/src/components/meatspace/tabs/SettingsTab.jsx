@@ -4,7 +4,7 @@ import * as api from '../../../services/api';
 import socket from '../../../services/socket';
 import BrailleSpinner from '../../BrailleSpinner';
 
-export default function ImportTab({ onRefresh }) {
+export default function SettingsTab({ onRefresh }) {
   // JSON import state
   const [jsonImporting, setJsonImporting] = useState(false);
   const [jsonResult, setJsonResult] = useState(null);

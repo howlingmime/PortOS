@@ -190,7 +190,7 @@ const navItems = [
       { to: '/meatspace/body', label: 'Body', icon: Scale },
       { to: '/meatspace/genome', label: 'Genome', icon: Dna },
       { to: '/meatspace/health', label: 'Health', icon: Heart },
-      { to: '/meatspace/import', label: 'Import', icon: Upload },
+      { to: '/meatspace/settings', label: 'Settings', icon: Settings },
       { to: '/meatspace/lifestyle', label: 'Lifestyle', icon: ClipboardList },
       { to: '/meatspace/nicotine', label: 'Nicotine', icon: Cigarette },
       { to: '/meatspace/overview', label: 'Overview', icon: Activity },
