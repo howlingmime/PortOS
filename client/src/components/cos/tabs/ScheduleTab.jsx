@@ -157,6 +157,94 @@ function PromptEditor({ config, promptValue, setPromptValue, editingPrompt, setE
   );
 }
 
+function PipelineStageConfig({ taskType, config, providers, onUpdate, updating, setUpdating }) {
+  const stages = config.taskMetadata?.pipeline?.stages || [];
+
+  const handleStageUpdate = async (stageIndex, field, value) => {
+    setUpdating(true);
+    const updatedStages = stages.map((stage, i) => {
+      if (i !== stageIndex) return stage;
+      const updated = { ...stage };
+      if (value === '' || value === null) {
+        delete updated[field];
+      } else {
+        updated[field] = value;
+      }
+      // When provider changes, clear model (it may not be valid for new provider)
+      if (field === 'providerId') {
+        delete updated.model;
+      }
+      return updated;
+    });
+    const updatedMeta = {
+      ...config.taskMetadata,
+      pipeline: { ...config.taskMetadata.pipeline, stages: updatedStages }
+    };
+    await onUpdate(taskType, { taskMetadata: updatedMeta }).catch(() => {});
+    setUpdating(false);
+  };
+
+  return (
+    <div>
+      <h4 className="text-sm font-medium text-gray-400 mb-3">Pipeline Stages</h4>
+      <div className="space-y-3">
+        {stages.map((stage, i) => {
+          const stageProvider = providers?.find(p => p.id === stage.providerId);
+          const stageModels = stageProvider?.models || [];
+          return (
+            <div key={i} className="bg-port-card border border-port-border rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-medium text-purple-400">Stage {i + 1}</span>
+                {stage.readOnly && (
+                  <span className="text-[10px] px-1 py-0.5 bg-gray-600/30 text-gray-400 rounded">read-only</span>
+                )}
+                <span className="text-sm text-white font-medium">{stage.name}</span>
+                {i < stages.length - 1 && (
+                  <span className="text-gray-500 ml-auto text-xs">→ Stage {i + 2}</span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Provider</label>
+                  <select
+                    value={stage.providerId || ''}
+                    onChange={(e) => handleStageUpdate(i, 'providerId', e.target.value || null)}
+                    disabled={updating}
+                    className="w-full bg-port-bg border border-port-border rounded px-2 py-1.5 text-white text-xs"
+                  >
+                    <option value="">Default (task-level)</option>
+                    {providers?.map(provider => (
+                      <option key={provider.id} value={provider.id}>{provider.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Model</label>
+                  <select
+                    value={stage.model || ''}
+                    onChange={(e) => handleStageUpdate(i, 'model', e.target.value || null)}
+                    disabled={updating}
+                    className="w-full bg-port-bg border border-port-border rounded px-2 py-1.5 text-white text-xs"
+                  >
+                    <option value="">Default (task-level)</option>
+                    {stage.model && !stageModels.includes(stage.model) && (
+                      <option value={stage.model}>{stage.model}</option>
+                    )}
+                    {stageModels.map(model => (
+                      <option key={model} value={model}>{model}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-xs text-gray-500 mt-2">Each stage runs as a separate agent. Configure different providers per stage (e.g., Codex for review, Claude for implementation).</p>
+    </div>
+  );
+}
+
 function GlobalConfigControls({ taskType, config, onUpdate, onTrigger, onReset, category: _category, providers, apps, updating, setUpdating, allTaskTypes }) {
   const [selectedType, setSelectedType] = useState(config.type);
   const [selectedProviderId, setSelectedProviderId] = useState(config.providerId || '');
@@ -709,36 +797,14 @@ function AppTaskTypeRow({ taskType, config, onUpdate, onTrigger, onReset, provid
       {expanded && (
         <div className="p-4 border-t border-port-border bg-port-bg/50 space-y-6">
           {config.taskMetadata?.pipeline?.stages?.length > 0 && (
-            <div>
-              <h4 className="text-sm font-medium text-gray-400 mb-3">Pipeline Stages</h4>
-              <div className="flex items-stretch gap-0">
-                {config.taskMetadata.pipeline.stages.map((stage, i) => (
-                  <div key={i} className="flex items-stretch">
-                    <div className="flex flex-col items-center px-4 py-3 bg-port-card border border-port-border rounded-lg min-w-[140px]">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-xs font-medium text-purple-400">Stage {i + 1}</span>
-                        {stage.readOnly && (
-                          <span className="text-[10px] px-1 py-0.5 bg-gray-600/30 text-gray-400 rounded">read-only</span>
-                        )}
-                      </div>
-                      <span className="text-sm text-white text-center">{stage.name}</span>
-                      {(stage.providerId || stage.model) && (
-                        <span className="text-[10px] text-blue-400 mt-1 font-mono">
-                          {[stage.providerId, stage.model].filter(Boolean).join(' / ')}
-                        </span>
-                      )}
-                      {stage.promptKey && (
-                        <span className="text-[10px] text-gray-500 mt-1 font-mono">{stage.promptKey}</span>
-                      )}
-                    </div>
-                    {i < config.taskMetadata.pipeline.stages.length - 1 && (
-                      <div className="flex items-center px-2 text-gray-500">→</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-gray-500 mt-2">Each stage runs as a separate agent. The next stage only runs if the previous stage succeeds.</p>
-            </div>
+            <PipelineStageConfig
+              taskType={taskType}
+              config={config}
+              providers={providers}
+              onUpdate={onUpdate}
+              updating={updating}
+              setUpdating={setUpdating}
+            />
           )}
 
           <div>
