@@ -398,8 +398,7 @@ When PLAN.md is missing, empty, or fully completed, brainstorm and implement a n
 
 Perform a comprehensive review of {appName} and write your findings to REVIEW.md.
 The goal is to provide actionable recommendations that another AI or developer can
-pick up and implement. Use case: a different model (e.g., Gemini or Codex) reviews,
-then a coding model (e.g., Claude Opus) implements the best recommendations.
+pick up and implement.
 
 Repository: {repoPath}
 
@@ -454,8 +453,7 @@ Generated: <today's date>
 
 Order recommendations by priority (HIGH first), then by effort (Small first).
 
-18. Do NOT implement any changes — this is a review-only stage
-19. Commit REVIEW.md: "chore: add codebase review for {appName}"`,
+18. Do NOT implement any changes — this is a review-only stage`,
 
   'code-reviewer-implement': `[Review: {appName}] Triage & Implement Review (Stage 2)
 
