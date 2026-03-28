@@ -402,38 +402,31 @@ pick up and implement.
 
 Repository: {repoPath}
 
-## Phase 1 — Check for Existing Review
+## Phase 1 — Gather Context
 
-1. Check if REVIEW.md exists in {repoPath}
-2. If REVIEW.md exists, STOP immediately. Output:
-   "⏭️ REVIEW.md already exists — skipping review to avoid overwriting pending recommendations."
-   A previous review has not been processed yet. Do not overwrite it.
+1. Read GOALS.md (if exists) for project goals and priorities
+2. Read PLAN.md (if exists) to understand already-planned work — do NOT re-suggest items already planned
+3. Read DONE.md (if exists) to understand completed work — do NOT re-suggest items already done
+4. Read REJECTED.md (if exists) to understand previously rejected recommendations — do NOT re-suggest rejected items
+5. Read CLAUDE.md for project conventions and architecture
+6. Review the codebase structure, key files, recent git log (last 20 commits)
 
-## Phase 2 — Gather Context
-
-3. Read GOALS.md (if exists) for project goals and priorities
-4. Read PLAN.md (if exists) to understand already-planned work — do NOT re-suggest items already planned
-5. Read DONE.md (if exists) to understand completed work — do NOT re-suggest items already done
-6. Read REJECTED.md (if exists) to understand previously rejected recommendations — do NOT re-suggest rejected items
-7. Read CLAUDE.md for project conventions and architecture
-8. Review the codebase structure, key files, recent git log (last 20 commits)
-
-## Phase 3 — Deep Review
+## Phase 2 — Deep Review
 
 Examine the codebase thoroughly across these dimensions. Skip any recommendations that overlap with PLAN.md, DONE.md, or REJECTED.md items:
 
-9. **Code Quality**: DRY violations, dead code, overly complex functions, missing error handling, inconsistent patterns, tech debt
-10. **Architecture**: Component organization, separation of concerns, data flow issues, coupling problems, missing abstractions (or unnecessary abstractions)
-11. **Features**: Missing capabilities that would make the app more useful, based on GOALS.md priorities and codebase gaps
-12. **UX/Design**: UI inconsistencies, accessibility issues, mobile responsiveness gaps, confusing user flows, missing feedback/loading states
-13. **Performance**: N+1 queries, unnecessary re-renders, large bundle imports, missing caching, slow operations
-14. **Security**: Input validation gaps, injection risks, exposed secrets, unsafe defaults
-15. **Testing**: Missing test coverage, brittle tests, untested edge cases
-16. **Developer Experience**: Missing docs, confusing setup, poor error messages
+7. **Code Quality**: DRY violations, dead code, overly complex functions, missing error handling, inconsistent patterns, tech debt
+8. **Architecture**: Component organization, separation of concerns, data flow issues, coupling problems, missing abstractions (or unnecessary abstractions)
+9. **Features**: Missing capabilities that would make the app more useful, based on GOALS.md priorities and codebase gaps
+10. **UX/Design**: UI inconsistencies, accessibility issues, mobile responsiveness gaps, confusing user flows, missing feedback/loading states
+11. **Performance**: N+1 queries, unnecessary re-renders, large bundle imports, missing caching, slow operations
+12. **Security**: Input validation gaps, injection risks, exposed secrets, unsafe defaults
+13. **Testing**: Missing test coverage, brittle tests, untested edge cases
+14. **Developer Experience**: Missing docs, confusing setup, poor error messages
 
-## Phase 4 — Write REVIEW.md
+## Phase 3 — Write REVIEW.md
 
-17. Write findings to REVIEW.md in {repoPath} using this format:
+15. Write findings to REVIEW.md in {repoPath} using this format:
 
 \\\`\\\`\\\`markdown
 # Code Review — {appName}
@@ -453,7 +446,7 @@ Generated: <today's date>
 
 Order recommendations by priority (HIGH first), then by effort (Small first).
 
-18. Do NOT implement any changes — this is a review-only stage`,
+16. Do NOT implement any changes — this is a review-only stage`,
 
   'code-reviewer-implement': `[Review: {appName}] Triage & Implement Review (Stage 2)
 
@@ -464,11 +457,10 @@ Repository: {repoPath}
 ## Phase 1 — Read Context
 
 1. Read REVIEW.md from {repoPath} — this contains the recommendations from Stage 1
-2. If REVIEW.md does not exist, STOP — output: "No REVIEW.md found, nothing to triage."
-3. Read GOALS.md (if exists) for alignment context
-4. Read PLAN.md (if exists) for current planned work
-5. Read DONE.md (if exists) for completed work
-6. Read CLAUDE.md for project conventions
+2. Read GOALS.md (if exists) for alignment context
+3. Read PLAN.md (if exists) for current planned work
+4. Read DONE.md (if exists) for completed work
+5. Read CLAUDE.md for project conventions
 
 ## Phase 2 — Triage Each Recommendation
 
@@ -504,11 +496,10 @@ Categorize into:
 ## Phase 5 — Cleanup
 
 12. Delete REVIEW.md from {repoPath} — all items have been triaged
-13. Commit: "chore: remove processed REVIEW.md"
 
 ## Phase 6 — Report
 
-14. Summarize:
+13. Summarize:
     - Recommendations implemented (with brief descriptions)
     - Items added to PLAN.md
     - Items rejected (with reasons)
@@ -1208,7 +1199,7 @@ export const SELF_IMPROVEMENT_TASK_TYPES = [
 ];
 
 // Shared config for code-reviewer-a and code-reviewer-b (two instances for independent provider/model configuration)
-const CODE_REVIEWER_INTERVAL = { type: INTERVAL_TYPES.WEEKLY, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null, taskMetadata: { useWorktree: true, openPR: true, simplify: true, pipeline: { stages: [{ name: 'Codebase Review', promptKey: 'code-reviewer-review', readOnly: true, providerId: null, model: null }, { name: 'Triage & Implement', promptKey: 'code-reviewer-implement', readOnly: false, providerId: null, model: null }] } } };
+const CODE_REVIEWER_INTERVAL = { type: INTERVAL_TYPES.WEEKLY, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null, taskMetadata: { useWorktree: true, openPR: true, simplify: true, pipeline: { stages: [{ name: 'Codebase Review', promptKey: 'code-reviewer-review', readOnly: true, providerId: null, model: null, precondition: { fileNotExists: 'REVIEW.md' } }, { name: 'Triage & Implement', promptKey: 'code-reviewer-implement', readOnly: false, providerId: null, model: null, precondition: { fileExists: 'REVIEW.md' } }] } } };
 
 const DEFAULT_TASK_INTERVALS = {
   'security':            { type: INTERVAL_TYPES.WEEKLY, enabled: false, providerId: null, model: null, prompt: null },

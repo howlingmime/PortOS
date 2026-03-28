@@ -1824,6 +1824,20 @@ async function handlePipelineProgression(task, agentId, success) {
   }
 
   const nextStage = stages[nextStageIndex];
+
+  // Check next stage's precondition before advancing
+  if (nextStage.precondition && task.metadata.repoPath) {
+    const { checkStagePrecondition } = await import('./cos.js');
+    const check = checkStagePrecondition(nextStage, task.metadata.repoPath);
+    if (!check.passed) {
+      await updateTask(task.id, {
+        metadata: { ...task.metadata, pipeline: { ...pipeline, status: 'failed', stageResults: updatedResults } }
+      }, task.taskType);
+      emitLog('warn', `⏭️ Pipeline ${pipeline.id} stage ${nextStageIndex} precondition failed: ${check.reason}`, { pipelineId: pipeline.id });
+      return;
+    }
+  }
+
   const taskScheduleMod = await import('./taskSchedule.js');
   let prompt = await taskScheduleMod.getStagePrompt(task.metadata.analysisType, nextStageIndex);
   if (task.metadata.appName) prompt = prompt.replace(/\{appName\}/g, task.metadata.appName);

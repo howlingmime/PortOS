@@ -1934,6 +1934,25 @@ Use model: claude-opus-4-5-20251101 for thorough security analysis`
  * Initialize pipeline runtime state on metadata if pipeline stages are configured.
  * Mutates the metadata object in place.
  */
+/**
+ * Check if a pipeline stage's precondition is met.
+ * Supports { fileExists: 'path' } and { fileNotExists: 'path' }.
+ * Paths are relative to repoPath.
+ */
+export function checkStagePrecondition(stage, repoPath) {
+  const pre = stage?.precondition;
+  if (!pre || !repoPath) return { passed: true };
+  if (pre.fileExists) {
+    const fullPath = join(repoPath, pre.fileExists);
+    if (!existsSync(fullPath)) return { passed: false, reason: `${pre.fileExists} does not exist` };
+  }
+  if (pre.fileNotExists) {
+    const fullPath = join(repoPath, pre.fileNotExists);
+    if (existsSync(fullPath)) return { passed: false, reason: `${pre.fileNotExists} already exists` };
+  }
+  return { passed: true };
+}
+
 function initializePipelineMetadata(metadata) {
   if (!metadata.pipeline?.stages?.length) return;
   metadata.pipeline = {
@@ -2067,6 +2086,16 @@ async function generateManagedAppImprovementTask(app, state) {
 
   initializePipelineMetadata(metadata);
 
+  // Check stage 0 precondition before creating the task
+  const stage0 = metadata.pipeline?.stages?.[0];
+  if (stage0?.precondition) {
+    const check = checkStagePrecondition(stage0, app.repoPath);
+    if (!check.passed) {
+      emitLog('info', `⏭️ Skipping ${nextType} for ${app.name}: ${check.reason}`, { appId: app.id, analysisType: nextType });
+      return null;
+    }
+  }
+
   const promptTemplate = metadata.pipeline?.stages
     ? await taskSchedule.getStagePrompt(nextType, 0)
     : await taskSchedule.getTaskPrompt(nextType);
@@ -2147,6 +2176,16 @@ async function generateManagedAppImprovementTaskForType(taskType, app, state) {
   }
 
   initializePipelineMetadata(metadata);
+
+  // Check stage 0 precondition before creating the task
+  const stage0 = metadata.pipeline?.stages?.[0];
+  if (stage0?.precondition) {
+    const check = checkStagePrecondition(stage0, app.repoPath);
+    if (!check.passed) {
+      emitLog('info', `⏭️ Skipping ${taskType} for ${app.name}: ${check.reason}`, { appId: app.id, analysisType: taskType });
+      return null;
+    }
+  }
 
   const promptTemplate = metadata.pipeline?.stages
     ? await taskSchedule.getStagePrompt(taskType, 0)
