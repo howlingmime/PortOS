@@ -12,7 +12,7 @@ import { writeFile, mkdir, readFile, readdir, rm, stat } from 'fs/promises'; // 
 import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
-import { cosEvents, registerAgent, updateAgent, completeAgent, appendAgentOutput, getConfig, updateTask, addTask, emitLog, getTaskById } from './cos.js';
+import { cosEvents, registerAgent, updateAgent, completeAgent, appendAgentOutput, getConfig, updateTask, addTask, emitLog, getTaskById, checkStagePrecondition } from './cos.js';
 import { startAppCooldown, markAppReviewCompleted } from './appActivity.js';
 import { isRunnerAvailable, spawnAgentViaRunner, terminateAgentViaRunner, killAgentViaRunner, getAgentStatsFromRunner, initCosRunnerConnection, onCosRunnerEvent, getActiveAgentsFromRunner, getRunnerHealth } from './cosRunnerClient.js';
 import { getActiveProvider, getProviderById, getAllProviders } from './providers.js';
@@ -1827,7 +1827,6 @@ async function handlePipelineProgression(task, agentId, success) {
 
   // Check next stage's precondition before advancing
   if (nextStage.precondition && task.metadata.repoPath) {
-    const { checkStagePrecondition } = await import('./cos.js');
     const check = checkStagePrecondition(nextStage, task.metadata.repoPath);
     if (!check.passed) {
       await updateTask(task.id, {

@@ -1931,10 +1931,6 @@ Use model: claude-opus-4-5-20251101 for thorough security analysis`
  * @returns {Object} Generated task
  */
 /**
- * Initialize pipeline runtime state on metadata if pipeline stages are configured.
- * Mutates the metadata object in place.
- */
-/**
  * Check if a pipeline stage's precondition is met.
  * Supports { fileExists: 'path' } and { fileNotExists: 'path' }.
  * Paths are relative to repoPath.
@@ -1953,6 +1949,25 @@ export function checkStagePrecondition(stage, repoPath) {
   return { passed: true };
 }
 
+/**
+ * Check stage 0 precondition after pipeline initialization.
+ * Returns true if the task should be skipped (precondition failed).
+ */
+function shouldSkipForPrecondition(metadata, app, analysisType) {
+  const stage0 = metadata.pipeline?.stages?.[0];
+  if (!stage0?.precondition) return false;
+  const check = checkStagePrecondition(stage0, app.repoPath);
+  if (!check.passed) {
+    emitLog('info', `⏭️ Skipping ${analysisType} for ${app.name}: ${check.reason}`, { appId: app.id, analysisType });
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Initialize pipeline runtime state on metadata if pipeline stages are configured.
+ * Mutates the metadata object in place.
+ */
 function initializePipelineMetadata(metadata) {
   if (!metadata.pipeline?.stages?.length) return;
   metadata.pipeline = {
@@ -2085,16 +2100,7 @@ async function generateManagedAppImprovementTask(app, state) {
   }
 
   initializePipelineMetadata(metadata);
-
-  // Check stage 0 precondition before creating the task
-  const stage0 = metadata.pipeline?.stages?.[0];
-  if (stage0?.precondition) {
-    const check = checkStagePrecondition(stage0, app.repoPath);
-    if (!check.passed) {
-      emitLog('info', `⏭️ Skipping ${nextType} for ${app.name}: ${check.reason}`, { appId: app.id, analysisType: nextType });
-      return null;
-    }
-  }
+  if (shouldSkipForPrecondition(metadata, app, nextType)) return null;
 
   const promptTemplate = metadata.pipeline?.stages
     ? await taskSchedule.getStagePrompt(nextType, 0)
@@ -2176,16 +2182,7 @@ async function generateManagedAppImprovementTaskForType(taskType, app, state) {
   }
 
   initializePipelineMetadata(metadata);
-
-  // Check stage 0 precondition before creating the task
-  const stage0 = metadata.pipeline?.stages?.[0];
-  if (stage0?.precondition) {
-    const check = checkStagePrecondition(stage0, app.repoPath);
-    if (!check.passed) {
-      emitLog('info', `⏭️ Skipping ${taskType} for ${app.name}: ${check.reason}`, { appId: app.id, analysisType: taskType });
-      return null;
-    }
-  }
+  if (shouldSkipForPrecondition(metadata, app, taskType)) return null;
 
   const promptTemplate = metadata.pipeline?.stages
     ? await taskSchedule.getStagePrompt(taskType, 0)
