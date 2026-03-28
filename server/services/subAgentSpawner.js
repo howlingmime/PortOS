@@ -2203,8 +2203,10 @@ async function handleAgentCompletion(agentId, exitCode, success, duration) {
     const cleanupWarnings = await cleanupAgentWorktree(agentId, success, { openPR: taskOpenPR && !taskReviewLoop, description: task?.description, agentOutput: outputBuffer });
 
     if (cleanupWarnings?.length > 0) {
-      // Attach warnings to agent result so they're visible in the UI
-      await updateAgent(agentId, { result: { warnings: cleanupWarnings } });
+      // Merge warnings into existing result (updateAgent shallow-merges, so spread existing result to preserve fields)
+      const { getAgent: getAgentForResult } = await import('./cos.js');
+      const currentAgent = await getAgentForResult(agentId).catch(() => null);
+      await updateAgent(agentId, { result: { ...currentAgent?.result, warnings: cleanupWarnings } });
 
       // Create a notification for significant cleanup issues
       const { addNotification, NOTIFICATION_TYPES, PRIORITY_LEVELS } = await import('./notifications.js');
