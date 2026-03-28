@@ -17,6 +17,8 @@
 - Browser download support via CDP `Browser.setDownloadBehavior` — downloads now land in `data/browser-downloads/`
 - Downloads section on Browser page showing file list with size and date
 - `/api/browser/downloads` endpoint for listing downloaded files
+- Genome markers: summary dashboard with tappable status filter pills, "Attention Needed" section surfacing concerns first, category quick-jump dropdown, categories collapsed by default for mobile
+- Genome markers: friendlier card UX with "What this means for you" framing, status-colored backgrounds, and renamed labels (Details, Your Notes, Learn More)
 
 ## Changed
 
