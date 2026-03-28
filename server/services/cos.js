@@ -23,7 +23,7 @@ import { generateProactiveTasks as generateMissionTasks, getStats as getMissionS
 import { generateTaskFromJob, recordJobExecution, recordJobGateSkip, isScriptJob, executeScriptJob, isShellJob, executeShellJob } from './autonomousJobs.js';
 import { checkJobGate, hasGate } from './jobGates.js';
 import { ensureDir, ensureDirs, formatDuration, safeJSONParse, PATHS } from '../lib/fileUtils.js';
-import { sanitizeTaskMetadata } from '../lib/validation.js';
+import { sanitizeTaskMetadata, PIPELINE_BEHAVIOR_FLAGS } from '../lib/validation.js';
 import { addNotification, NOTIFICATION_TYPES } from './notifications.js';
 import { recordDecision, DECISION_TYPES } from './decisionLog.js';
 import { getUserTimezone, getLocalParts, nextLocalTime, todayInTimezone } from '../lib/timezone.js';
@@ -1988,15 +1988,12 @@ function initializePipelineMetadata(metadata) {
     metadata.provider = stage0.providerId;
     metadata.providerId = stage0.providerId;
   }
-  // Save task-level behavior flags so pipeline progression can restore them for later stages
+  // Save task-level defaults and apply stage 0 overrides in one pass
+  // Read-only stages default flags to false to prevent worktree/PR/simplify on review-only stages
   metadata.pipeline.taskDefaults = {};
-  for (const flag of ['useWorktree', 'openPR', 'simplify', 'reviewLoop']) {
-    if (metadata[flag] !== undefined) metadata.pipeline.taskDefaults[flag] = metadata[flag];
-  }
-  // Apply per-stage overrides for agent behavior flags
-  // Read-only stages default these to false to prevent worktree/PR/simplify on review-only stages
   const stageReadOnly = stage0.readOnly ?? false;
-  for (const flag of ['useWorktree', 'openPR', 'simplify', 'reviewLoop']) {
+  for (const flag of PIPELINE_BEHAVIOR_FLAGS) {
+    if (metadata[flag] !== undefined) metadata.pipeline.taskDefaults[flag] = metadata[flag];
     if (flag in stage0) {
       metadata[flag] = stage0[flag];
     } else if (stageReadOnly) {

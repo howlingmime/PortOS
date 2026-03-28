@@ -20,6 +20,7 @@ import { recordSession, recordMessages } from './usage.js';
 import { isProviderAvailable, markProviderUsageLimit, markProviderRateLimited, getFallbackProvider, getProviderStatus, initProviderStatus } from './providerStatus.js';
 import { buildPrompt } from './promptService.js';
 import { registerSpawnedAgent, unregisterSpawnedAgent } from './agents.js';
+import { PIPELINE_BEHAVIOR_FLAGS } from '../lib/validation.js';
 import { getMemorySection } from './memoryRetriever.js';
 import { extractAndStoreMemories } from './memoryExtractor.js';
 import { getDigitalTwinForPrompt } from './digital-twin.js';
@@ -1868,7 +1869,7 @@ async function handlePipelineProgression(task, agentId, success) {
   // Read-only stages default to false; write stages restore task-level defaults
   const stageReadOnly = nextStage.readOnly ?? false;
   const taskDefaults = pipeline.taskDefaults || {};
-  for (const flag of ['useWorktree', 'openPR', 'simplify', 'reviewLoop']) {
+  for (const flag of PIPELINE_BEHAVIOR_FLAGS) {
     if (flag in nextStage) {
       nextTask.metadata[flag] = nextStage[flag];
     } else if (stageReadOnly) {
