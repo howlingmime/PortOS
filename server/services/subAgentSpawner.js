@@ -1864,6 +1864,19 @@ async function handlePipelineProgression(task, agentId, success) {
     nextTask.metadata.provider = nextStage.providerId;
     nextTask.metadata.providerId = nextStage.providerId;
   }
+  // Apply per-stage overrides for agent behavior flags
+  // Read-only stages default to false; write stages restore task-level defaults
+  const stageReadOnly = nextStage.readOnly ?? false;
+  const taskDefaults = pipeline.taskDefaults || {};
+  for (const flag of ['useWorktree', 'openPR', 'simplify', 'reviewLoop']) {
+    if (flag in nextStage) {
+      nextTask.metadata[flag] = nextStage[flag];
+    } else if (stageReadOnly) {
+      nextTask.metadata[flag] = false;
+    } else if (flag in taskDefaults) {
+      nextTask.metadata[flag] = taskDefaults[flag];
+    }
+  }
 
   await addTask(nextTask, 'internal', { raw: true });
   emitLog('info', `🔗 Pipeline ${pipeline.id} advancing to stage ${nextStageIndex}: ${nextStage.name}`, { pipelineId: pipeline.id, agentId });

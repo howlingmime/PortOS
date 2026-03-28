@@ -1988,6 +1988,21 @@ function initializePipelineMetadata(metadata) {
     metadata.provider = stage0.providerId;
     metadata.providerId = stage0.providerId;
   }
+  // Save task-level behavior flags so pipeline progression can restore them for later stages
+  metadata.pipeline.taskDefaults = {};
+  for (const flag of ['useWorktree', 'openPR', 'simplify', 'reviewLoop']) {
+    if (metadata[flag] !== undefined) metadata.pipeline.taskDefaults[flag] = metadata[flag];
+  }
+  // Apply per-stage overrides for agent behavior flags
+  // Read-only stages default these to false to prevent worktree/PR/simplify on review-only stages
+  const stageReadOnly = stage0.readOnly ?? false;
+  for (const flag of ['useWorktree', 'openPR', 'simplify', 'reviewLoop']) {
+    if (flag in stage0) {
+      metadata[flag] = stage0[flag];
+    } else if (stageReadOnly) {
+      metadata[flag] = false;
+    }
+  }
 }
 
 // Apply app-level worktree/PR defaults only when not already set by task-type metadata.
