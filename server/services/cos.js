@@ -1944,8 +1944,15 @@ function initializePipelineMetadata(metadata) {
     previousStageAgentId: null,
     status: 'running'
   };
-  if (metadata.pipeline.stages[0].readOnly !== undefined) {
-    metadata.readOnly = metadata.pipeline.stages[0].readOnly;
+  const stage0 = metadata.pipeline.stages[0];
+  if (stage0.readOnly !== undefined) {
+    metadata.readOnly = stage0.readOnly;
+  }
+  // Propagate stage 0's provider/model so the first agent uses per-stage config
+  if (stage0.model) metadata.model = stage0.model;
+  if (stage0.providerId) {
+    metadata.provider = stage0.providerId;
+    metadata.providerId = stage0.providerId;
   }
 }
 
@@ -2071,6 +2078,7 @@ async function generateManagedAppImprovementTask(app, state) {
   applyAppWorktreeDefault(metadata, app);
 
   if (interval.providerId) {
+    metadata.provider = interval.providerId;
     metadata.providerId = interval.providerId;
   }
   if (interval.model) {
@@ -2152,6 +2160,7 @@ async function generateManagedAppImprovementTaskForType(taskType, app, state) {
 
   // Use configured model/provider if specified, otherwise use default
   if (interval.providerId) {
+    metadata.provider = interval.providerId;
     metadata.providerId = interval.providerId;
   }
   if (interval.model) {

@@ -12,6 +12,9 @@
 - `getStagePrompt()` export in taskSchedule for resolving pipeline stage-specific prompts
 - Pipeline UI: collapsed row shows purple "2-stage" badge, expanded view shows stage flow visualization
 - Pipeline UI: tabbed prompt viewer shows each stage's full prompt with stage name tabs
+- Code reviewer pipeline tasks (`code-reviewer-a`, `code-reviewer-b`) — 2-stage pipeline where stage 1 reviews the codebase and writes REVIEW.md, stage 2 triages and implements recommendations
+- Per-stage provider/model support for multi-stage pipelines — each stage can use a different AI provider (e.g., Gemini reviews, Claude Opus implements)
+- REVIEW.md and REJECTED.md added to allowed app documents
 - MortalLoom export now includes goals, reads actual custom drink/nicotine presets, and parallelizes all I/O
 - MeatSpace Settings tab with import/export functionality
 - Browser download support via CDP `Browser.setDownloadBehavior` — downloads now land in `data/browser-downloads/`
@@ -23,6 +26,8 @@
 ## Changed
 
 - MeatSpace Import tab renamed to Settings — consolidates import and export in one place
+- Pipeline stages now display per-stage provider/model in Schedule tab UI
+- Fixed `metadata.provider` field mapping so scheduled task provider overrides are correctly passed to the agent spawner
 - PR reviewer prompt no longer requires global `slash-do` install — review checklist is inlined from bundled submodule
 - Removed duplicate pr-reviewer skill template from data.sample (single source of truth in taskSchedule.js)
 

@@ -722,6 +722,11 @@ function AppTaskTypeRow({ taskType, config, onUpdate, onTrigger, onReset, provid
                         )}
                       </div>
                       <span className="text-sm text-white text-center">{stage.name}</span>
+                      {(stage.providerId || stage.model) && (
+                        <span className="text-[10px] text-blue-400 mt-1 font-mono">
+                          {[stage.providerId, stage.model].filter(Boolean).join(' / ')}
+                        </span>
+                      )}
                       {stage.promptKey && (
                         <span className="text-[10px] text-gray-500 mt-1 font-mono">{stage.promptKey}</span>
                       )}

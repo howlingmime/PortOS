@@ -394,6 +394,128 @@ When PLAN.md is missing, empty, or fully completed, brainstorm and implement a n
    \`\`\`
 8. Commit with a clear description of the feature and rationale`,
 
+  'code-reviewer-review': `[Review: {appName}] Deep Codebase Review (Stage 1)
+
+Perform a comprehensive review of {appName} and write your findings to REVIEW.md.
+The goal is to provide actionable recommendations that another AI or developer can
+pick up and implement. Use case: a different model (e.g., Gemini or Codex) reviews,
+then a coding model (e.g., Claude Opus) implements the best recommendations.
+
+Repository: {repoPath}
+
+## Phase 1 — Check for Existing Review
+
+1. Check if REVIEW.md exists in {repoPath}
+2. If REVIEW.md exists, STOP immediately. Output:
+   "⏭️ REVIEW.md already exists — skipping review to avoid overwriting pending recommendations."
+   A previous review has not been processed yet. Do not overwrite it.
+
+## Phase 2 — Gather Context
+
+3. Read GOALS.md (if exists) for project goals and priorities
+4. Read PLAN.md (if exists) to understand already-planned work — do NOT re-suggest items already planned
+5. Read DONE.md (if exists) to understand completed work — do NOT re-suggest items already done
+6. Read REJECTED.md (if exists) to understand previously rejected recommendations — do NOT re-suggest rejected items
+7. Read CLAUDE.md for project conventions and architecture
+8. Review the codebase structure, key files, recent git log (last 20 commits)
+
+## Phase 3 — Deep Review
+
+Examine the codebase thoroughly across these dimensions. Skip any recommendations that overlap with PLAN.md, DONE.md, or REJECTED.md items:
+
+9. **Code Quality**: DRY violations, dead code, overly complex functions, missing error handling, inconsistent patterns, tech debt
+10. **Architecture**: Component organization, separation of concerns, data flow issues, coupling problems, missing abstractions (or unnecessary abstractions)
+11. **Features**: Missing capabilities that would make the app more useful, based on GOALS.md priorities and codebase gaps
+12. **UX/Design**: UI inconsistencies, accessibility issues, mobile responsiveness gaps, confusing user flows, missing feedback/loading states
+13. **Performance**: N+1 queries, unnecessary re-renders, large bundle imports, missing caching, slow operations
+14. **Security**: Input validation gaps, injection risks, exposed secrets, unsafe defaults
+15. **Testing**: Missing test coverage, brittle tests, untested edge cases
+16. **Developer Experience**: Missing docs, confusing setup, poor error messages
+
+## Phase 4 — Write REVIEW.md
+
+17. Write findings to REVIEW.md in {repoPath} using this format:
+
+\\\`\\\`\\\`markdown
+# Code Review — {appName}
+Generated: <today's date>
+
+## Summary
+<2-3 sentence overview of codebase health and top priorities>
+
+## Recommendations
+
+### [HIGH|MEDIUM|LOW] <Short title>
+- **Category**: <Code Quality|Architecture|Feature|UX|Performance|Security|Testing|DX>
+- **Effort**: <Small|Medium|Large>
+- **Files**: <key files involved>
+- **Description**: <What to do and why>
+\\\`\\\`\\\`
+
+Order recommendations by priority (HIGH first), then by effort (Small first).
+
+18. Do NOT implement any changes — this is a review-only stage
+19. Commit REVIEW.md: "chore: add codebase review for {appName}"`,
+
+  'code-reviewer-implement': `[Review: {appName}] Triage & Implement Review (Stage 2)
+
+You are the implementation stage of a code review pipeline. A different AI model reviewed the codebase and wrote recommendations to REVIEW.md. Your job is to evaluate each recommendation, implement the best ones, and triage the rest.
+
+Repository: {repoPath}
+
+## Phase 1 — Read Context
+
+1. Read REVIEW.md from {repoPath} — this contains the recommendations from Stage 1
+2. If REVIEW.md does not exist, STOP — output: "No REVIEW.md found, nothing to triage."
+3. Read GOALS.md (if exists) for alignment context
+4. Read PLAN.md (if exists) for current planned work
+5. Read DONE.md (if exists) for completed work
+6. Read CLAUDE.md for project conventions
+
+## Phase 2 — Triage Each Recommendation
+
+For each recommendation in REVIEW.md, evaluate:
+- Does it align with GOALS.md?
+- Is it already in PLAN.md or DONE.md?
+- What is the actual value vs effort?
+
+Categorize into:
+- **IMPLEMENT**: High value, achievable in this session (small/medium effort, clear scope)
+- **PLAN**: High value but too large for this session — add to PLAN.md
+- **REJECT**: Low value, misaligned with goals, or already addressed
+- **DONE**: Already implemented (found in DONE.md or codebase)
+
+## Phase 3 — Implement
+
+6. For each IMPLEMENT item:
+   - Implement the change following existing code patterns and CLAUDE.md conventions
+   - Run tests to verify nothing is broken
+   - Commit with a clear message referencing the review recommendation
+
+7. Run \`/simplify\` to review all changed code for reuse, quality, and efficiency
+
+## Phase 4 — Update Project Files
+
+8. For PLAN items: Add as unchecked items (\`- [ ]\`) to PLAN.md (create if needed)
+9. For DONE items: Add as checked items (\`- [x]\`) to DONE.md (create if needed)
+10. For REJECT items: Append to REJECTED.md with brief rationale:
+    \`- <title> — <reason for rejection>\`
+    Create REJECTED.md if it doesn't exist
+11. Commit project file updates: "chore: triage code review recommendations for {appName}"
+
+## Phase 5 — Cleanup
+
+12. Delete REVIEW.md from {repoPath} — all items have been triaged
+13. Commit: "chore: remove processed REVIEW.md"
+
+## Phase 6 — Report
+
+14. Summarize:
+    - Recommendations implemented (with brief descriptions)
+    - Items added to PLAN.md
+    - Items rejected (with reasons)
+    - Items already done`,
+
   'error-handling': `[Improvement: {appName}] Improve Error Handling
 
 Enhance error handling in {appName}:
@@ -778,7 +900,9 @@ Repository: {repoPath}
 // Only non-customized prompts (promptCustomized !== true) are upgraded.
 const PROMPT_VERSIONS = {
   'feature-ideas': 5,  // v5: read DONE.md to avoid re-implementing completed features
-  'pr-reviewer': 3     // v3: multi-stage pipeline (security scan → code review + merge)
+  'pr-reviewer': 3,    // v3: multi-stage pipeline (security scan → code review + merge)
+  'code-reviewer-a': 1, // v1: 2-stage pipeline (codebase review → triage & implement)
+  'code-reviewer-b': 1  // v1: 2-stage pipeline (codebase review → triage & implement)
 };
 
 // Known previous default prompts for legacy migration.
@@ -1076,13 +1200,17 @@ Before reviewing code quality, scan each PR for malicious content:
   ]
 };
 
-// Unified default interval settings for all 17 task types
+// Unified default interval settings for all 19 task types
 export const SELF_IMPROVEMENT_TASK_TYPES = [
   'security', 'code-quality', 'test-coverage', 'performance',
   'accessibility', 'branch-cleanup', 'console-errors', 'dependency-updates', 'documentation',
   'ui-bugs', 'mobile-responsive', 'feature-ideas', 'error-handling',
-  'typing', 'release-check', 'pr-reviewer', 'jira-sprint-manager', 'jira-status-report'
+  'typing', 'release-check', 'pr-reviewer', 'code-reviewer-a', 'code-reviewer-b',
+  'jira-sprint-manager', 'jira-status-report'
 ];
+
+// Shared config for code-reviewer-a and code-reviewer-b (two instances for independent provider/model configuration)
+const CODE_REVIEWER_INTERVAL = { type: INTERVAL_TYPES.WEEKLY, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null, taskMetadata: { useWorktree: true, openPR: true, simplify: true, pipeline: { stages: [{ name: 'Codebase Review', promptKey: 'code-reviewer-review', readOnly: true, providerId: null, model: null }, { name: 'Triage & Implement', promptKey: 'code-reviewer-implement', readOnly: false, providerId: null, model: null }] } } };
 
 const DEFAULT_TASK_INTERVALS = {
   'security':            { type: INTERVAL_TYPES.WEEKLY, enabled: false, providerId: null, model: null, prompt: null },
@@ -1101,6 +1229,8 @@ const DEFAULT_TASK_INTERVALS = {
   'typing':              { type: INTERVAL_TYPES.ONCE, enabled: false, providerId: null, model: null, prompt: null },
   'release-check':       { type: INTERVAL_TYPES.ON_DEMAND, enabled: false, providerId: null, model: null, prompt: null },
   'pr-reviewer':         { type: INTERVAL_TYPES.CUSTOM, intervalMs: 7200000, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null, taskMetadata: { readOnly: true, pipeline: { stages: [{ name: 'Security Scan', promptKey: 'pr-reviewer-security', readOnly: true }, { name: 'Code Review & Merge', promptKey: 'pr-reviewer-review', readOnly: false }] } } },
+  'code-reviewer-a':     { ...CODE_REVIEWER_INTERVAL },
+  'code-reviewer-b':     { ...CODE_REVIEWER_INTERVAL },
   'jira-sprint-manager': { type: INTERVAL_TYPES.DAILY, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null, taskMetadata: { useWorktree: true, openPR: true, simplify: true } },
   'jira-status-report':  { type: INTERVAL_TYPES.WEEKLY, enabled: false, weekdaysOnly: true, providerId: null, model: null, prompt: null, taskMetadata: { readOnly: true } }
 };

@@ -1847,6 +1847,10 @@ async function handlePipelineProgression(task, agentId, success) {
     autoApproved: true
   };
   if (nextStage.model) nextTask.metadata.model = nextStage.model;
+  if (nextStage.providerId) {
+    nextTask.metadata.provider = nextStage.providerId;
+    nextTask.metadata.providerId = nextStage.providerId;
+  }
 
   await addTask(nextTask, 'internal', { raw: true });
   emitLog('info', `🔗 Pipeline ${pipeline.id} advancing to stage ${nextStageIndex}: ${nextStage.name}`, { pipelineId: pipeline.id, agentId });
