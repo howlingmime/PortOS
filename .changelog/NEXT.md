@@ -23,6 +23,7 @@
 - Genome markers: summary dashboard with tappable status filter pills, "Attention Needed" section surfacing concerns first, category quick-jump dropdown, categories collapsed by default for mobile
 - Genome markers: friendlier card UX with "What this means for you" framing, status-colored backgrounds, and renamed labels (Details, Your Notes, Learn More)
 - Voice capture for Brain — microphone button on inbox uses Web Speech API to transcribe speech into thoughts
+- Legacy Portrait export format — comprehensive human-readable Markdown document consolidating identity docs, traits, chronotype, taste profile, genome, longevity, goals, autobiography, and social presence
 
 ## Changed
 
