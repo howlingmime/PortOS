@@ -2200,8 +2200,26 @@ async function handleAgentCompletion(agentId, exitCode, success, duration) {
   if (!jiraBranch) {
     const taskOpenPR = isTruthyMeta(agent.task?.metadata?.openPR);
     const taskReviewLoop = isTruthyMeta(agent.task?.metadata?.reviewLoop);
-    // When reviewLoop + openPR are both enabled, the agent handles the PR during its run — skip post-exit PR creation
-    await cleanupAgentWorktree(agentId, success, { openPR: taskOpenPR && !taskReviewLoop, description: task?.description, agentOutput: outputBuffer });
+    const cleanupWarnings = await cleanupAgentWorktree(agentId, success, { openPR: taskOpenPR && !taskReviewLoop, description: task?.description, agentOutput: outputBuffer });
+
+    if (cleanupWarnings?.length > 0) {
+      // Attach warnings to agent result so they're visible in the UI
+      await updateAgent(agentId, { result: { warnings: cleanupWarnings } });
+
+      // Create a notification for significant cleanup issues
+      const { addNotification, NOTIFICATION_TYPES, PRIORITY_LEVELS } = await import('./notifications.js');
+      const appName = task?.metadata?.appName || task?.metadata?.app || 'PortOS';
+      await addNotification({
+        type: NOTIFICATION_TYPES.AGENT_WARNING,
+        title: `Agent cleanup issue: ${appName}`,
+        description: cleanupWarnings.join('\n'),
+        priority: PRIORITY_LEVELS.HIGH,
+        link: '/cos/agents',
+        metadata: { agentId, taskId: task?.id, warnings: cleanupWarnings }
+      }).catch(err => {
+        emitLog('warn', `Failed to create cleanup warning notification: ${err.message}`, { agentId });
+      });
+    }
   }
 
   runnerAgents.delete(agentId);
@@ -2216,12 +2234,13 @@ async function handleAgentCompletion(agentId, exitCode, success, duration) {
 export async function cleanupAgentWorktree(agentId, success, { openPR = false, description = null, agentOutput = null } = {}) {
   const { getAgent: getAgentState } = await import('./cos.js');
   const agentState = await getAgentState(agentId).catch(() => null);
-  if (!agentState?.metadata?.isWorktree) return;
-  // Skip cleanup for persistent feature agent worktrees (they survive across runs)
-  if (agentState?.metadata?.isPersistentWorktree) return;
+  if (!agentState?.metadata?.isWorktree) return [];
+  if (agentState?.metadata?.isPersistentWorktree) return [];
 
   const { sourceWorkspace, worktreeBranch } = agentState.metadata;
-  if (!sourceWorkspace || !worktreeBranch) return;
+  if (!sourceWorkspace || !worktreeBranch) return [];
+
+  const warnings = [];
 
   // When openPR is set and task succeeded, push branch and create PR instead of auto-merging
   if (openPR && success) {
@@ -2229,7 +2248,6 @@ export async function cleanupAgentWorktree(agentId, success, { openPR = false, d
 
     const worktreePath = agentState.metadata.workspacePath || join(PATHS.worktrees, agentId);
 
-    // Push branch and resolve target branch in parallel
     const [pushResult, branchInfo] = await Promise.all([
       git.push(worktreePath, worktreeBranch).then(() => true).catch(err => {
         emitLog('warn', `🌳 Failed to push worktree branch ${worktreeBranch}: ${err.message}`, { agentId });
@@ -2238,9 +2256,7 @@ export async function cleanupAgentWorktree(agentId, success, { openPR = false, d
       git.getRepoBranches(sourceWorkspace).catch(() => ({ baseBranch: null, devBranch: null }))
     ]);
 
-    // Only create PR if push succeeded; preserve worktree/branch for manual intervention if push fails
     if (pushResult) {
-      // Use baseBranch (not devBranch) since worktrees are created from the default branch
       const targetBranch = branchInfo.baseBranch || 'main';
       const taskDesc = description || 'CoS automated task';
       const prTitle = taskDesc.replace(/[\r\n]+/g, ' ').trim().substring(0, 100);
@@ -2260,22 +2276,24 @@ export async function cleanupAgentWorktree(agentId, success, { openPR = false, d
       if (!prResult?.success) {
         const reason = prResult?.error || 'unknown error (createPR returned null or threw)';
         emitLog('error', `🌳 PR creation failed for ${worktreeBranch}: ${reason}`, { agentId, branchName: worktreeBranch });
-        // Preserve worktree/branch for manual PR creation
-        return;
+        warnings.push(`PR creation failed for branch ${worktreeBranch}: ${reason}. Worktree preserved for manual PR creation.`);
+        return warnings;
       }
 
       emitLog('success', `🌳 Created PR: ${prResult.url}`, { agentId, branchName: worktreeBranch });
 
-      // Remove worktree without merging (PR handles merge)
-      await removeWorktree(agentId, sourceWorkspace, worktreeBranch, { merge: false }).catch(err => {
+      const result = await removeWorktree(agentId, sourceWorkspace, worktreeBranch, { merge: false }).catch(err => {
         emitLog('warn', `🌳 Worktree cleanup failed for ${agentId}: ${err.message}`, { agentId });
+        return { warnings: [`Worktree cleanup failed: ${err.message}`] };
       });
-      return;
+      warnings.push(...(result?.warnings || []));
+      return warnings;
     }
 
-    // Push failed — preserve worktree/branch for manual intervention (do NOT auto-merge in openPR mode)
+    // Push failed — preserve worktree/branch for manual intervention
+    warnings.push(`Push failed for branch ${worktreeBranch} — worktree preserved at ${worktreePath} for manual retry`);
     emitLog('warn', `🌳 Push failed for ${worktreeBranch} — worktree preserved at ${worktreePath} for manual retry`, { agentId, branchName: worktreeBranch });
-    return;
+    return warnings;
   }
 
   // Default: auto-merge on success, just cleanup on failure
@@ -2283,9 +2301,12 @@ export async function cleanupAgentWorktree(agentId, success, { openPR = false, d
     agentId, branchName: worktreeBranch, merge: success
   });
 
-  await removeWorktree(agentId, sourceWorkspace, worktreeBranch, { merge: success }).catch(err => {
+  const result = await removeWorktree(agentId, sourceWorkspace, worktreeBranch, { merge: success }).catch(err => {
     emitLog('warn', `🌳 Worktree cleanup failed for ${agentId}: ${err.message}`, { agentId });
+    return { warnings: [`Worktree cleanup failed: ${err.message}`] };
   });
+  warnings.push(...(result?.warnings || []));
+  return warnings;
 }
 
 /**

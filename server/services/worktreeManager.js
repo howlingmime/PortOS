@@ -106,12 +106,12 @@ export async function createWorktree(agentId, sourceWorkspace, taskId, options =
  */
 export async function removeWorktree(agentId, sourceWorkspace, branchName, options = {}) {
   const worktreePath = join(WORKTREES_DIR, agentId);
+  const warnings = [];
 
   if (!existsSync(worktreePath)) {
     console.log(`🌳 Worktree already removed for ${agentId}, cleaning up branch`);
-    // Worktree dir is gone but branch may still exist — delete it
     await execGit(['branch', '-D', branchName], sourceWorkspace).catch(() => {});
-    return { merged: false, removed: true, uncommittedSaved: false };
+    return { merged: false, removed: true, uncommittedSaved: false, warnings };
   }
 
   // Safety check: abort removal when uncommitted changes are detected.
@@ -121,41 +121,39 @@ export async function removeWorktree(agentId, sourceWorkspace, branchName, optio
     dirtyFiles = (await execGit(['status', '--porcelain'], worktreePath)).trim();
   } catch (err) {
     console.log(`⚠️ git status failed for worktree ${agentId}, preserving to avoid data loss: ${err.message}`);
-    return { merged: false, removed: false, uncommittedSaved: false };
+    warnings.push(`Worktree preserved — git status failed: ${err.message}`);
+    return { merged: false, removed: false, uncommittedSaved: false, warnings };
   }
   if (dirtyFiles) {
     console.log(`⚠️ Preserving worktree for ${agentId} — uncommitted changes detected, aborting cleanup to avoid data loss`);
-    return { merged: false, removed: false, uncommittedSaved: false };
+    warnings.push(`Worktree preserved — uncommitted changes detected in ${worktreePath}`);
+    return { merged: false, removed: false, uncommittedSaved: false, warnings };
   }
 
   let merged = false;
 
-  // If merge requested, check if there are commits to merge
   if (options.merge) {
     const currentBranch = (await execGit(
       ['rev-parse', '--abbrev-ref', 'HEAD'],
       sourceWorkspace
     )).trim();
 
-    // Check if worktree branch has commits ahead of the source branch
     const aheadCount = (await execGit(
       ['rev-list', '--count', `${currentBranch}..${branchName}`],
       sourceWorkspace
     ).catch(() => '0')).trim();
 
     if (parseInt(aheadCount, 10) > 0) {
-      // Merge worktree branch back to the source branch
       await execGit(['merge', branchName, '--no-edit'], sourceWorkspace)
         .then(() => { merged = true; })
         .catch(async (err) => {
           console.log(`⚠️ Could not auto-merge ${branchName}: ${err.message}`);
-          // Abort the failed merge to leave sourceWorkspace in a clean state
           await execGit(['merge', '--abort'], sourceWorkspace).catch(() => {});
+          warnings.push(`Auto-merge failed for branch ${branchName} — branch preserved for manual recovery`);
         });
     }
   }
 
-  // Remove the worktree
   await execGit(['worktree', 'remove', worktreePath, '--force'], sourceWorkspace)
     .catch(async (err) => {
       console.log(`⚠️ Worktree remove failed for ${agentId}, falling back to manual cleanup: ${err.message}`);
@@ -167,8 +165,6 @@ export async function removeWorktree(agentId, sourceWorkspace, branchName, optio
       });
     });
 
-  // Only delete the branch if merge succeeded or wasn't requested.
-  // When merge was requested but failed, preserve the branch so commits can be recovered.
   const shouldDeleteBranch = merged || !options.merge;
   if (shouldDeleteBranch) {
     await execGit(['branch', '-D', branchName], sourceWorkspace)
@@ -181,7 +177,7 @@ export async function removeWorktree(agentId, sourceWorkspace, branchName, optio
 
   console.log(`🌳 Removed worktree for ${agentId}${merged ? ' (merged)' : ''}`);
 
-  return { merged, removed: true, uncommittedSaved: false };
+  return { merged, removed: true, uncommittedSaved: false, warnings };
 }
 
 /**

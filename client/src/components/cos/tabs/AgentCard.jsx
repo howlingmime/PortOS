@@ -4,6 +4,7 @@ import {
   Trash2,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   RotateCcw,
   Loader2,
   Skull,
@@ -662,6 +663,17 @@ export default function AgentCard({ agent, onKill, onDelete, onResume, completed
                 <><AlertCircle size={14} aria-hidden="true" /> {agent.result.error || 'Failed'}</>
               )}
             </div>
+            {/* Cleanup warnings */}
+            {agent.result.warnings?.length > 0 && (
+              <div className="text-sm text-port-warning flex items-start gap-2">
+                <AlertTriangle size={14} className="shrink-0 mt-0.5" aria-hidden="true" />
+                <div>
+                  {agent.result.warnings.map((w, i) => (
+                    <p key={i}>{w}</p>
+                  ))}
+                </div>
+              </div>
+            )}
             {/* Memory extraction status */}
             {agent.result.success && (
               <div className={`text-sm flex items-center gap-1 ${

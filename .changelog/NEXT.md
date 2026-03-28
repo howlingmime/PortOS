@@ -30,6 +30,7 @@
 - AI-powered goal check-ins — "Run Check-In" button on goal detail panel generates LLM assessment of goal health (on-track/behind/at-risk), actionable recommendations, and motivational encouragement based on progress, velocity, milestones, and activity attendance
 - Chronotype-aware scheduling — Calendar Day and Week views now show genome-derived energy zone overlays (peak focus, exercise, wind-down) and cutoff markers (caffeine, last meal) based on the user's chronotype profile
 - Pipeline agent cards: stage-tabbed output view — Show button displays separate output panes for each pipeline stage with status indicators and on-demand loading
+- Agent cleanup warnings now surface in the UI — worktree merge failures, PR creation failures, and preserved worktrees show as yellow warnings in the agent card, completion toast, and notification bell
 
 ## Changed
 
