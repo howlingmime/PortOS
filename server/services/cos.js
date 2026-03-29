@@ -823,6 +823,24 @@ export async function getTaskById(taskId) {
 }
 
 /**
+ * Force-spawn a pending task by ID, bypassing cooldowns and evaluation intervals.
+ */
+export async function forceSpawnTask(taskId) {
+  const task = await getTaskById(taskId);
+  if (!task) return { error: 'Task not found' };
+  if (task.status !== 'pending') return { error: `Task is ${task.status}, not pending` };
+
+  const state = await loadState();
+  const runningAgents = Object.values(state.agents).filter(a => a.status === 'running').length;
+  if (runningAgents >= state.config.maxConcurrentAgents) {
+    return { error: `No available agent slots (${runningAgents}/${state.config.maxConcurrentAgents})` };
+  }
+
+  cosEvents.emit('task:ready', { ...task, taskType: task.taskType || 'internal' });
+  return { success: true, taskId };
+}
+
+/**
  * Reset orphaned in_progress tasks back to pending
  * (tasks marked in_progress but no running agent)
  */

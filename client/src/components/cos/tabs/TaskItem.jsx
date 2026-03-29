@@ -14,7 +14,8 @@ import {
   FileText,
   ExternalLink,
   AlertCircle,
-  TrendingUp
+  TrendingUp,
+  Play
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as api from '../../../services/api';
@@ -384,7 +385,20 @@ export default function TaskItem({ task, isSystem, awaitingApproval, onRefresh, 
         <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           {!editing && (
             <>
-              {/* Mark as Blocked button - only show for non-blocked, non-completed tasks */}
+              {task.status === 'pending' && (
+                <button
+                  onClick={async () => {
+                    const result = await api.forceSpawnTask(task.id).catch(err => { toast.error(err.message); return null; });
+                    if (result?.success) toast.success(`Spawning ${task.id}`);
+                    if (onRefresh) onRefresh();
+                  }}
+                  className="p-1 text-gray-500 hover:text-port-success transition-colors"
+                  title="Process now"
+                  aria-label="Process task now"
+                >
+                  <Play size={14} aria-hidden="true" />
+                </button>
+              )}
               {task.status !== 'blocked' && task.status !== 'completed' && (
                 <button
                   onClick={handleMarkBlocked}

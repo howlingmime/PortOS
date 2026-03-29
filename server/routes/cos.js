@@ -277,6 +277,15 @@ router.post('/evaluate', asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Evaluation triggered' });
 }));
 
+// POST /api/cos/tasks/:id/spawn - Force-spawn a pending task
+router.post('/tasks/:id/spawn', asyncHandler(async (req, res) => {
+  const result = await cos.forceSpawnTask(req.params.id);
+  if (result.error) {
+    throw new ServerError(result.error, { status: 400, code: 'SPAWN_FAILED' });
+  }
+  res.json(result);
+}));
+
 // GET /api/cos/health - Get health status
 router.get('/health', asyncHandler(async (req, res) => {
   const health = await cos.getHealthStatus();

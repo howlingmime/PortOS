@@ -680,6 +680,7 @@ export const reorderCosTasks = (taskIds) => request('/cos/tasks/reorder', {
 });
 export const approveCosTask = (id) => request(`/cos/tasks/${id}/approve`, { method: 'POST' });
 export const forceCosEvaluate = () => request('/cos/evaluate', { method: 'POST' });
+export const forceSpawnTask = (taskId) => request(`/cos/tasks/${taskId}/spawn`, { method: 'POST' });
 export const getCosHealth = () => request('/cos/health');
 export const forceHealthCheck = () => request('/cos/health/check', { method: 'POST' });
 export const getCosAgents = () => request('/cos/agents');

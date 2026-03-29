@@ -13,3 +13,4 @@
 ### Added
 
 - Toggle to enable/disable all automations for an app on the Automation tab
+- "Process Now" button on pending task cards to force-spawn a specific task, bypassing cooldowns and evaluation intervals
