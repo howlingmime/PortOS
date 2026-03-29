@@ -1902,6 +1902,8 @@ async function handlePipelineProgression(task, agentId, success) {
   if (task.metadata.app) prompt = prompt.replace(/\{appId\}/g, task.metadata.app);
 
   const nextTask = {
+    id: `${task.id || 'sys'}-stage${nextStageIndex}-${Date.now().toString(36)}`,
+    status: 'pending',
     description: prompt,
     priority: task.priority || 'MEDIUM',
     metadata: {
