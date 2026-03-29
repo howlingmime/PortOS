@@ -2407,15 +2407,27 @@ async function spawnDirectly(agentId, task, prompt, workspacePath, model, provid
 
   claudeProcess.stderr.on('data', async (data) => {
     const text = data.toString();
-    // Codex dumps its entire prompt/config to stderr — filter to useful lines only
+    // Codex stderr: show thinking + tool names, skip config dump and command output
     if (provider.id === 'codex') {
       for (const line of text.split('\n')) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         if (trimmed.startsWith('Reading prompt from stdin')) continue;
         if (trimmed.startsWith('OpenAI Codex v')) continue;
-        outputBuffer += `[stderr] ${trimmed}\n`;
-        await appendAgentOutput(agentId, `[stderr] ${trimmed}`);
+        if (trimmed.startsWith('succeeded in')) continue;
+        // Tool calls: show just the command, strip output after "succeeded"
+        if (trimmed.startsWith('exec ')) {
+          const match = trimmed.match(/^exec\s+\S+\s+-lc\s+(['"])(.*?)\1/);
+          const cmd = match ? match[2] : trimmed.split(' in /')[0];
+          const display = `🔧 ${cmd}`;
+          outputBuffer += display + '\n';
+          await appendAgentOutput(agentId, display);
+          continue;
+        }
+        // Skip long lines (command output like file contents, directory listings)
+        if (trimmed.length > 300) continue;
+        outputBuffer += trimmed + '\n';
+        await appendAgentOutput(agentId, trimmed);
       }
       await writeFile(outputFile, outputBuffer).catch(() => {});
       return;
