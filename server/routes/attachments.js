@@ -9,10 +9,9 @@ import { existsSync } from 'fs';
 import { join, basename, extname, resolve } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { asyncHandler, ServerError } from '../lib/errorHandler.js';
-import { ensureDir, PATHS } from '../lib/fileUtils.js';
+import { ensureDir, PATHS, RISKY_MIME_TYPES } from '../lib/fileUtils.js';
 
 const ATTACHMENTS_DIR = PATHS.cosAttachments;
-const RISKY_MIME_TYPES = new Set(['text/html', 'image/svg+xml', 'application/javascript', 'text/javascript', 'application/xml']);
 
 const router = Router();
 

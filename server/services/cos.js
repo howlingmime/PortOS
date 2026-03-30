@@ -450,6 +450,7 @@ export async function forceSpawnTask(taskId) {
   if (task.approvalRequired) return { error: 'Task requires approval before it can be spawned' };
 
   const state = await loadState();
+  if (state.paused) return { error: 'CoS daemon is paused — resume before force-spawning tasks' };
   const runningAgents = Object.values(state.agents).filter(a => a.status === 'running').length;
   if (runningAgents >= state.config.maxConcurrentAgents) {
     return { error: `No available agent slots (${runningAgents}/${state.config.maxConcurrentAgents})` };
