@@ -158,7 +158,8 @@ export default function TaskItem({ task, isSystem, awaitingApproval, onRefresh, 
     if (newStatus === 'blocked' && blockedReasonText) {
       updates.blockedReason = blockedReasonText;
     }
-    await api.updateCosTask(task.id, updates).catch(err => toast.error(err.message));
+    const result = await api.updateCosTask(task.id, updates).catch(err => { toast.error(err.message); return null; });
+    if (!result) return;
     toast.success(`Task marked as ${newStatus}`);
     onRefresh();
   };
@@ -175,7 +176,8 @@ export default function TaskItem({ task, isSystem, awaitingApproval, onRefresh, 
   };
 
   const handleSave = async () => {
-    await api.updateCosTask(task.id, editData).catch(err => toast.error(err.message));
+    const result = await api.updateCosTask(task.id, editData).catch(err => { toast.error(err.message); return null; });
+    if (!result) return;
     toast.success('Task updated');
     setEditing(false);
     onRefresh();
@@ -183,7 +185,8 @@ export default function TaskItem({ task, isSystem, awaitingApproval, onRefresh, 
 
   const handleDelete = async () => {
     const taskType = isSystem ? 'internal' : 'user';
-    await api.deleteCosTask(task.id, taskType).catch(err => toast.error(err.message));
+    const result = await api.deleteCosTask(task.id, taskType).catch(err => { toast.error(err.message); return null; });
+    if (!result) return;
     toast.success('Task deleted');
     onRefresh();
   };
