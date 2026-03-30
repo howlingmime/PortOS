@@ -74,7 +74,6 @@ let initialStartup = false;
 
 // Internal imports for functions used in this module
 import { pruneOldAgentArchives, archiveStaleAgents as _archiveStaleAgents, loadAgentIndex } from './cosAgents.js';
-import { DEFAULT_CONFIG } from './cosState.js';
 
 /**
  * Get current CoS status

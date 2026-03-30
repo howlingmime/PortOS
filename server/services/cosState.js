@@ -8,7 +8,7 @@ import { readFile, writeFile, rename, readdir, rm } from 'fs/promises'
 import { existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { createMutex } from '../lib/asyncMutex.js'
-import { ensureDir, ensureDirs, safeJSONParse, PATHS } from '../lib/fileUtils.js'
+import { ensureDirs, safeJSONParse, PATHS } from '../lib/fileUtils.js'
 
 export const STATE_FILE = join(PATHS.cos, 'state.json')
 export const AGENTS_DIR = join(PATHS.cos, 'agents')

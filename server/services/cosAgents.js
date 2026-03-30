@@ -9,9 +9,8 @@
 import { readFile, writeFile, rename, readdir, rm, stat } from 'fs/promises'
 import { existsSync } from 'fs'
 import { join } from 'path'
-import { cosEvents } from './cosEvents.js'
-import { emitLog } from './cosEvents.js'
-import { loadState, saveState, withStateLock, AGENTS_DIR, ensureDirectories } from './cosState.js'
+import { cosEvents, emitLog } from './cosEvents.js'
+import { loadState, saveState, withStateLock, AGENTS_DIR } from './cosState.js'
 import { ensureDir, safeJSONParse } from '../lib/fileUtils.js'
 
 const INDEX_FILE = join(AGENTS_DIR, 'index.json')
