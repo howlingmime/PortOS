@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
 import { existsSync } from 'fs';
-import { readFile, writeFile } from 'fs/promises';
+import { readFile, writeFile, stat } from 'fs/promises';
 import { join, resolve } from 'path';
 import * as appsService from '../services/apps.js';
 import { notifyAppsChanged, PORTOS_APP_ID } from '../services/apps.js';
@@ -203,9 +203,19 @@ router.get('/:id/icon', loadApp, asyncHandler(async (req, res) => {
   }
 
   const contentType = getIconContentType(iconPath);
-  const iconData = await readFile(iconPath);
+  const iconStat = await stat(iconPath);
+  const etag = `W/"${iconStat.mtimeMs.toString(36)}-${iconStat.size.toString(36)}"`;
+
   res.set('Content-Type', contentType);
   res.set('Cache-Control', 'public, max-age=3600');
+  res.set('ETag', etag);
+
+  const ifNoneMatch = req.headers['if-none-match'];
+  if (ifNoneMatch === etag || ifNoneMatch === '*') {
+    return res.status(304).end();
+  }
+
+  const iconData = await readFile(iconPath);
   res.send(iconData);
 }));
 
@@ -547,7 +557,7 @@ router.post('/:id/build', loadApp, asyncHandler(async (req, res) => {
       console.log(`📦 Installing ${label} dependencies for ${app.name}`);
       const INSTALL_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
       const installResult = await new Promise((resolve) => {
-        const child = spawn('npm', ['install'], { cwd: subDir, shell: true, windowsHide: true });
+        const child = spawn(resolveCmd('npm'), ['install'], { cwd: subDir, windowsHide: true });
         let stdout = '';
         let stderr = '';
         let settled = false;
@@ -570,7 +580,7 @@ router.post('/:id/build', loadApp, asyncHandler(async (req, res) => {
 
   const BUILD_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
   const result = await new Promise((resolve) => {
-    const child = spawn(cmd, args, { cwd: app.repoPath, shell: true, windowsHide: true });
+    const child = spawn(resolveCmd(cmd), args, { cwd: app.repoPath, windowsHide: true });
     let stdout = '';
     let stderr = '';
     let settled = false;
@@ -662,6 +672,10 @@ const ALLOWED_BUILD_CMDS = new Set([
   'make',       // Make
   'cargo'       // Rust
 ]);
+
+// On Windows, Node-based CLI tools resolve to .cmd shims
+const WIN_CMD_SHIMS = new Set(['npm', 'npx']);
+const resolveCmd = (cmd) => process.platform === 'win32' && WIN_CMD_SHIMS.has(cmd) ? `${cmd}.cmd` : cmd;
 
 // Allowlist of safe editor commands
 // Security: Only allow known-safe editor commands to prevent arbitrary code execution
