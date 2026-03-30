@@ -85,7 +85,7 @@ export async function ensureDirectories() {
   await ensureDirs([PATHS.data, PATHS.cos, AGENTS_DIR, REPORTS_DIR, SCRIPTS_DIR]);
 }
 
-export function isValidJSON(str) {
+function isValidJSON(str) {
   if (!str || !str.trim()) return false;
   const trimmed = str.trim();
   if (!(trimmed.startsWith('{') && trimmed.endsWith('}'))) return false;
