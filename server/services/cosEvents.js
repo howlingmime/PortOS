@@ -5,10 +5,10 @@
  * Separated to avoid circular dependencies between cos.js and other modules.
  */
 
-import { EventEmitter } from 'events'
+import { EventEmitter } from 'events';
 
 // Event emitter for CoS events
-export const cosEvents = new EventEmitter()
+export const cosEvents = new EventEmitter();
 
 /**
  * Emit a log event for UI display
@@ -23,12 +23,12 @@ export function emitLog(level, message, data = {}, prefix = '') {
     level,
     message,
     ...data
-  }
+  };
   // Debug messages go to socket only (UI), not console — set COS_LOG_LEVEL=debug to include them
   if (level !== 'debug' || process.env.COS_LOG_LEVEL === 'debug') {
-    const emoji = level === 'error' ? '❌' : level === 'warn' ? '⚠️' : level === 'success' ? '✅' : level === 'debug' ? '🔍' : 'ℹ️'
-    const prefixStr = prefix ? ` ${prefix}` : ''
-    console.log(`${emoji}${prefixStr} ${message}`)
+    const emoji = level === 'error' ? '❌' : level === 'warn' ? '⚠️' : level === 'success' ? '✅' : level === 'debug' ? '🔍' : 'ℹ️';
+    const prefixStr = prefix ? ` ${prefix}` : '';
+    console.log(`${emoji}${prefixStr} ${message}`);
   }
-  cosEvents.emit('log', logEntry)
+  cosEvents.emit('log', logEntry);
 }

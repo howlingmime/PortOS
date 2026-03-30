@@ -658,8 +658,9 @@ export async function submitAgentFeedback(agentId, feedback) {
       state.agents[agentId].feedback = feedbackData
       await saveState(state)
 
-      // Also update on-disk metadata
-      const agentDir = getAgentDir(agentId)
+      // Also update on-disk metadata (derive date bucket from completedAt if archived)
+      const dateBucket = agent.completedAt ? agent.completedAt.slice(0, 10) : null
+      const agentDir = getAgentDir(agentId, dateBucket)
       const metaPath = join(agentDir, 'metadata.json')
       if (existsSync(metaPath)) {
         const content = await readFile(metaPath, 'utf-8').catch(() => null)
