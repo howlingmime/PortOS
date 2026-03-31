@@ -53,3 +53,4 @@
 
 ## Fixed
 - JIRA report provider discovery now tries all available API providers instead of failing on first unreachable one
+- `agentCliSpawning.js` imported `completeExecution`/`errorExecution` from `executionLanes.js` (wrong module); corrected to import from `toolStateMachine.js`, fixing server crash on startup
