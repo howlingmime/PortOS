@@ -30,6 +30,6 @@
     "test": "npm test --prefix server"
   },
   "devDependencies": {
-    "pm2": "^6.0.14"
+    "pm2": "6.0.14"
   }
 }
