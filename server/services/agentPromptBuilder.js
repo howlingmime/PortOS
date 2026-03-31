@@ -8,7 +8,6 @@
 
 import { join } from 'path';
 import { readFile, stat } from 'fs/promises';
-import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { getMemorySection } from './memoryRetriever.js';
 import { getDigitalTwinForPrompt } from './digital-twin.js';
@@ -77,10 +76,8 @@ export function detectSkillTemplate(task) {
  * @returns {Promise<string|null>} Template content or null
  */
 export async function loadSkillTemplate(skillName) {
-  const templatePath = join(SKILLS_DIR, `${skillName}.md`);
-  if (!existsSync(templatePath)) return null;
-  const content = await readFile(templatePath, 'utf-8');
-  console.log(`🎯 Loaded skill template: ${skillName}`);
+  const content = await readFile(join(SKILLS_DIR, `${skillName}.md`), 'utf-8').catch(() => null);
+  if (content) console.log(`🎯 Loaded skill template: ${skillName}`);
   return content;
 }
 
@@ -92,37 +89,17 @@ export async function getClaudeMdContext(workspaceDir) {
   const contexts = [];
 
   // Try to read global CLAUDE.md from ~/.claude/CLAUDE.md
-  try {
-    const globalPath = join(homedir(), '.claude', 'CLAUDE.md');
-    if (existsSync(globalPath)) {
-      const content = await readFile(globalPath, 'utf-8');
-      if (content.trim()) {
-        contexts.push({
-          type: 'Global Instructions',
-          path: globalPath,
-          content: content.trim()
-        });
-      }
-    }
-  } catch (err) {
-    // Silently ignore if global CLAUDE.md doesn't exist or can't be read
+  const globalPath = join(homedir(), '.claude', 'CLAUDE.md');
+  const globalContent = await readFile(globalPath, 'utf-8').catch(() => null);
+  if (globalContent?.trim()) {
+    contexts.push({ type: 'Global Instructions', path: globalPath, content: globalContent.trim() });
   }
 
   // Try to read project-specific CLAUDE.md from workspace directory
-  try {
-    const projectPath = join(workspaceDir, 'CLAUDE.md');
-    if (existsSync(projectPath)) {
-      const content = await readFile(projectPath, 'utf-8');
-      if (content.trim()) {
-        contexts.push({
-          type: 'Project Instructions',
-          path: projectPath,
-          content: content.trim()
-        });
-      }
-    }
-  } catch (err) {
-    // Silently ignore if project CLAUDE.md doesn't exist or can't be read
+  const projectPath = join(workspaceDir, 'CLAUDE.md');
+  const projectContent = await readFile(projectPath, 'utf-8').catch(() => null);
+  if (projectContent?.trim()) {
+    contexts.push({ type: 'Project Instructions', path: projectPath, content: projectContent.trim() });
   }
 
   if (contexts.length === 0) {
@@ -176,27 +153,15 @@ ${hints.map(h => `- ${h}`).join('\n')}
  * @param {Function} isTruthyMetaFn - isTruthyMeta function (passed to avoid circular dep)
  */
 export async function buildAgentPrompt(task, config, workspaceDir, worktreeInfo = null, isTruthyMetaFn = (v) => v === true || v === 'true') {
-  // Get relevant memories for context injection
-  const memorySection = await getMemorySection(task, {
-    maxTokens: config.memory?.maxContextTokens || 2000
-  }).catch(err => {
-    console.log(`⚠️ Memory retrieval failed: ${err.message}`);
-    return null;
-  });
-
-  // Get CLAUDE.md instructions for context injection
-  const claudeMdSection = await getClaudeMdContext(workspaceDir).catch(err => {
-    console.log(`⚠️ CLAUDE.md retrieval failed: ${err.message}`);
-    return null;
-  });
-
-  // Get digital twin context for persona alignment
-  const digitalTwinSection = await getDigitalTwinForPrompt({
-    maxTokens: config.digitalTwin?.maxContextTokens || config.soul?.maxContextTokens || 2000
-  }).catch(err => {
-    console.log(`⚠️ Digital twin context retrieval failed: ${err.message}`);
-    return null;
-  });
+  // Fetch independent context sections in parallel
+  const [memorySection, claudeMdSection, digitalTwinSection] = await Promise.all([
+    getMemorySection(task, { maxTokens: config.memory?.maxContextTokens || 2000 })
+      .catch(err => { console.log(`⚠️ Memory retrieval failed: ${err.message}`); return null; }),
+    getClaudeMdContext(workspaceDir)
+      .catch(err => { console.log(`⚠️ CLAUDE.md retrieval failed: ${err.message}`); return null; }),
+    getDigitalTwinForPrompt({ maxTokens: config.digitalTwin?.maxContextTokens || config.soul?.maxContextTokens || 2000 })
+      .catch(err => { console.log(`⚠️ Digital twin context retrieval failed: ${err.message}`); return null; })
+  ]);
 
   // Build context compaction section if task is retrying after a context-limit failure
   const compactionSection = task.metadata?.compaction?.needed ? buildCompactionSection(task) : '';
@@ -274,11 +239,13 @@ ${task.metadata.jiraBranch ? 'Commit your changes to this branch. Do NOT switch 
     const hasPlanningDir = await stat(planningPath).then(s => s.isDirectory()).catch(() => false);
     if (hasPlanningDir) {
       const planningParts = [];
-      const stateContent = await readFile(join(planningPath, 'STATE.md'), 'utf-8').catch(() => null);
+      const [stateContent, concernsContent, roadmapContent] = await Promise.all([
+        readFile(join(planningPath, 'STATE.md'), 'utf-8').catch(() => null),
+        readFile(join(planningPath, 'CONCERNS.md'), 'utf-8').catch(() => null),
+        readFile(join(planningPath, 'ROADMAP.md'), 'utf-8').catch(() => null)
+      ]);
       if (stateContent) planningParts.push(`### Current State\n\`\`\`\n${stateContent.slice(0, 1000)}\n\`\`\``);
-      const concernsContent = await readFile(join(planningPath, 'CONCERNS.md'), 'utf-8').catch(() => null);
       if (concernsContent) planningParts.push(`### Known Concerns\n\`\`\`\n${concernsContent.slice(0, 1500)}\n\`\`\``);
-      const roadmapContent = await readFile(join(planningPath, 'ROADMAP.md'), 'utf-8').catch(() => null);
       if (roadmapContent) planningParts.push(`### Roadmap\n\`\`\`\n${roadmapContent.slice(0, 1000)}\n\`\`\``);
       if (planningParts.length > 0) {
         planningContextSection = `\n## Project Planning Context (.planning/)\nThis project has GSD planning documents. Use this context to understand priorities and known issues.\n\n${planningParts.join('\n\n')}\n`;

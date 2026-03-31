@@ -20,7 +20,7 @@ import { analyzeAgentFailure, resolveFailedTaskUpdate } from './agentErrorAnalys
 import { completeAgentRun } from './agentRunTracking.js';
 import { processAgentCompletion } from './agentCompletion.js';
 import { activeAgents, userTerminatedAgents } from './agentState.js';
-import { PATHS } from '../lib/fileUtils.js';
+import { safeJSONParse, PATHS } from '../lib/fileUtils.js';
 
 const AGENTS_DIR = PATHS.cosAgents;
 
@@ -65,9 +65,7 @@ export function summarizeToolInput(toolName, input) {
   }
 }
 
-export function safeParse(str) {
-  try { return JSON.parse(str); } catch { return null; }
-}
+export const safeParse = (str) => safeJSONParse(str, null);
 
 /**
  * Create a Claude stream-json parser that extracts human-readable text from JSON stream events.

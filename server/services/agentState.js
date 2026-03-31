@@ -18,3 +18,7 @@ export const spawningTasks = new Set();
 // useRunner: whether CoS Runner mode is active
 export let useRunner = false;
 export const setUseRunner = (val) => { useRunner = val; };
+
+// Metadata booleans may arrive as true/'true' or false/'false' (JSON vs TASKS.md string round-trip)
+export const isTruthyMeta = (value) => value === true || value === 'true';
+export const isFalsyMeta = (value) => value === false || value === 'false';

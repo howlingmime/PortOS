@@ -26,36 +26,39 @@ const MAX_ORPHAN_RETRIES = 3;
 const ORPHAN_RETRY_COOLDOWN_MS = 30 * 60 * 1000;
 
 /**
+ * Shared runner-mode termination path for terminateAgent and killAgent.
+ * Calls runnerFn, marks the task blocked, and cleans up.
+ */
+async function terminateRunnerAgent(agentId, runnerFn, errorMessage, blockedReason) {
+  const agentInfo = runnerAgents.get(agentId);
+  if (agentInfo?.initializationTimeout) clearTimeout(agentInfo.initializationTimeout);
+  const result = await runnerFn(agentId).catch(err => ({ success: false, error: err.message }));
+  if (result.success) {
+    await completeAgent(agentId, { success: false, error: errorMessage });
+    const task = agentInfo?.task;
+    if (task) {
+      await updateTask(task.id, {
+        status: 'blocked',
+        metadata: {
+          ...task.metadata,
+          blockedReason,
+          blockedCategory: 'user-terminated',
+          blockedAt: new Date().toISOString()
+        }
+      }, task.taskType || 'user');
+    }
+    runnerAgents.delete(agentId);
+  }
+  return result;
+}
+
+/**
  * Terminate an agent (graceful SIGTERM with SIGKILL fallback).
  */
 export async function terminateAgent(agentId) {
   // Check if agent is in runner mode
   if (runnerAgents.has(agentId)) {
-    const agentInfo = runnerAgents.get(agentId);
-    if (agentInfo?.initializationTimeout) {
-      clearTimeout(agentInfo.initializationTimeout);
-    }
-    const result = await terminateAgentViaRunner(agentId).catch(err => ({
-      success: false,
-      error: err.message
-    }));
-    if (result.success) {
-      await completeAgent(agentId, { success: false, error: 'Agent terminated by user' });
-      const task = agentInfo?.task;
-      if (task) {
-        await updateTask(task.id, {
-          status: 'blocked',
-          metadata: {
-            ...task.metadata,
-            blockedReason: 'Terminated by user',
-            blockedCategory: 'user-terminated',
-            blockedAt: new Date().toISOString()
-          }
-        }, task.taskType || 'user');
-      }
-      runnerAgents.delete(agentId);
-    }
-    return result;
+    return terminateRunnerAgent(agentId, terminateAgentViaRunner, 'Agent terminated by user', 'Terminated by user');
   }
 
   // Direct mode
@@ -139,31 +142,7 @@ export function getActiveAgents() {
 export async function killAgent(agentId) {
   // Check if agent is in runner mode
   if (runnerAgents.has(agentId)) {
-    const agentInfo = runnerAgents.get(agentId);
-    if (agentInfo?.initializationTimeout) {
-      clearTimeout(agentInfo.initializationTimeout);
-    }
-    const result = await killAgentViaRunner(agentId).catch(err => ({
-      success: false,
-      error: err.message
-    }));
-    if (result.success) {
-      await completeAgent(agentId, { success: false, error: 'Agent force killed by user (SIGKILL)' });
-      const task = agentInfo?.task;
-      if (task) {
-        await updateTask(task.id, {
-          status: 'blocked',
-          metadata: {
-            ...task.metadata,
-            blockedReason: 'Force killed by user',
-            blockedCategory: 'user-terminated',
-            blockedAt: new Date().toISOString()
-          }
-        }, task.taskType || 'user');
-      }
-      runnerAgents.delete(agentId);
-    }
-    return result;
+    return terminateRunnerAgent(agentId, killAgentViaRunner, 'Agent force killed by user (SIGKILL)', 'Force killed by user');
   }
 
   // Direct mode
@@ -257,14 +236,7 @@ export async function killAllAgents() {
   const directIds = Array.from(activeAgents.keys());
   const runnerIds = Array.from(runnerAgents.keys());
 
-  for (const agentId of directIds) {
-    await terminateAgent(agentId);
-  }
-
-  for (const agentId of runnerIds) {
-    await terminateAgent(agentId);
-  }
-
+  await Promise.all([...directIds, ...runnerIds].map(agentId => terminateAgent(agentId)));
   return { killed: directIds.length + runnerIds.length };
 }
 

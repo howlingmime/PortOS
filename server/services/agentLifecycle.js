@@ -24,24 +24,19 @@ import { detectConflicts } from './taskConflict.js';
 import { createWorktree, removeWorktree } from './worktreeManager.js';
 import * as jiraService from './jira.js';
 import * as git from './git.js';
-import { analyzeAgentFailure } from './agentErrorAnalysis.js';
-import { resolveFailedTaskUpdate } from './agentErrorAnalysis.js';
-import { completeAgentRun, checkForTaskCommit } from './agentRunTracking.js';
-import { createAgentRun } from './agentRunTracking.js';
+import { analyzeAgentFailure, resolveFailedTaskUpdate } from './agentErrorAnalysis.js';
+import { createAgentRun, completeAgentRun, checkForTaskCommit } from './agentRunTracking.js';
 import { buildAgentPrompt, getAppWorkspace, getAppDataForTask, createJiraTicketForTask } from './agentPromptBuilder.js';
 import { buildCliSpawnConfig, isClaudeCliProvider, getClaudeSettingsEnv, spawnDirectly } from './agentCliSpawning.js';
 import { selectModelForTask } from './agentModelSelection.js';
 import { processAgentCompletion } from './agentCompletion.js';
-import { activeAgents, runnerAgents, spawningTasks, useRunner } from './agentState.js';
+import { activeAgents, runnerAgents, spawningTasks, useRunner, isTruthyMeta, isFalsyMeta } from './agentState.js';
 import { v4 as uuidv4 } from '../lib/uuid.js';
 import { writeFile } from 'fs/promises';
 
 const ROOT_DIR = PATHS.root;
 const AGENTS_DIR = PATHS.cosAgents;
 
-// Metadata booleans may arrive as true/'true' or false/'false' (from JSON vs TASKS.md string round-trip)
-const isTruthyMeta = (value) => value === true || value === 'true';
-const isFalsyMeta = (value) => value === false || value === 'false';
 
 /**
  * Remove BTW.md from agent workspace after completion.

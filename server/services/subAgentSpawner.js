@@ -16,7 +16,7 @@ import { onCosRunnerEvent, initCosRunnerConnection, isRunnerAvailable } from './
 import { ensureDir, loadSlashdoFile, PATHS } from '../lib/fileUtils.js';
 
 // ─── Shared state (imported from agentState.js) ──────────────────────────────
-export { activeAgents, runnerAgents, userTerminatedAgents, spawningTasks, useRunner } from './agentState.js';
+export { activeAgents, runnerAgents, userTerminatedAgents, spawningTasks, useRunner, isTruthyMeta, isFalsyMeta } from './agentState.js';
 import { activeAgents, runnerAgents, setUseRunner } from './agentState.js';
 
 // ─── Sub-module re-exports ────────────────────────────────────────────────────
@@ -32,9 +32,6 @@ export { processAgentCompletion } from './agentCompletion.js';
 const ROOT_DIR = PATHS.root;
 const RUNS_DIR = PATHS.runs;
 
-// Metadata booleans may arrive as true/'true' or false/'false' (from JSON vs TASKS.md string round-trip)
-export const isTruthyMeta = (value) => value === true || value === 'true';
-export const isFalsyMeta = (value) => value === false || value === 'false';
 
 /**
  * Load a slashdo command from the bundled submodule, resolving !`cat` lib includes inline.
