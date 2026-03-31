@@ -42,5 +42,14 @@
 - `getAllTwinContent()` now parallelizes all `readFile()` calls with `Promise.all`
 - Added `extractJSON()` and `ensureDocumentInMeta()` helpers to `digital-twin-helpers.js`; three duplicate document-push blocks in enrichment module replaced with helper calls
 
+## Changed
+- God file decomposition: split `server/services/subAgentSpawner.js` (3,820 lines) into 9 focused modules (`agentState`, `agentModelSelection`, `agentRunTracking`, `agentErrorAnalysis`, `agentCompletion`, `agentPromptBuilder`, `agentCliSpawning`, `agentLifecycle`, `agentManagement`); main file is now a 187-line orchestrator with re-exports for backward compatibility
+- `isTruthyMeta`/`isFalsyMeta` consolidated into `agentState.js` (single source of truth)
+- `terminateAgent`/`killAgent` runner path de-duplicated via shared `terminateRunnerAgent` helper
+- `killAllAgents` now terminates all agents in parallel with `Promise.all`
+- `buildAgentPrompt` context fetches (memory, CLAUDE.md, digital twin, tools) and `.planning/` file reads now run in parallel
+- `safeParse` in `agentCliSpawning.js` replaced with `safeJSONParse` from fileUtils
+- Removed TOCTOU `existsSync` guards in `agentPromptBuilder.js`; rely on `.catch(() => null)` instead
+
 ## Fixed
 - JIRA report provider discovery now tries all available API providers instead of failing on first unreachable one
