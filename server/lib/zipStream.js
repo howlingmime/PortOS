@@ -28,7 +28,6 @@ const LOCAL_HEADER_SIZE = 30; // fixed portion (before variable-length name + ex
 
 export function parseZip() {
   const emitter = new EventEmitter();
-  const chunks = [];
   let buf = Buffer.alloc(0);
   let closed = false;
 
@@ -48,7 +47,7 @@ export function parseZip() {
 
   let state = 'HEADER'; // HEADER | ENTRY | SKIP_CENTRAL
   let currentEntry = null;
-  let entryBytesRemaining = 0; // compressed size remaining to push to entry stream
+  let entryBytesRemaining = 0; // compressed size remaining; only used when !dataDescriptor
 
   function processBuffer() {
     while (true) {
@@ -86,7 +85,6 @@ export function parseZip() {
         buf = buf.slice(headerSize);
 
         const passThrough = new PassThrough();
-        const entryEmitter = new EventEmitter();
         let piped = false;
 
         const entry = {
@@ -114,11 +112,9 @@ export function parseZip() {
         emitter.emit('entry', entry);
 
         if (dataDescriptor) {
-          // Unknown compressed size — read until data descriptor signature
-          currentEntry = { passThrough, method, name, dataDescriptor: true, compSize: 0 };
-          entryBytesRemaining = -1; // signal: scan mode
+          currentEntry = { passThrough, method, name, dataDescriptor: true };
         } else {
-          currentEntry = { passThrough, method, name, dataDescriptor: false, compSize };
+          currentEntry = { passThrough, method, name, dataDescriptor: false };
           entryBytesRemaining = compSize;
         }
         state = 'ENTRY';
@@ -128,27 +124,21 @@ export function parseZip() {
         if (!currentEntry) { state = 'HEADER'; continue; }
 
         if (currentEntry.dataDescriptor) {
-          // Scan for data descriptor: PK\x07\x08 or PK\x07\x08 without sig
-          // Data descriptor is 12 or 16 bytes (with/without sig)
-          // Strategy: find end of compressed data by looking for next local header or descriptor
-          const descSig = Buffer.from([0x50, 0x4b, 0x07, 0x08]);
-          const localSig = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
-          const centralSig = Buffer.from([0x50, 0x4b, 0x01, 0x02]);
-
+          // Unknown compressed size — scan for data descriptor or next local/central header
           let found = -1;
           let descLen = 0;
           for (let i = 0; i <= buf.length - 4; i++) {
             if (buf.readUInt32LE(i) === DATA_DESC_SIG) {
               found = i; descLen = 16; break;
             }
-            // Some ZIPs omit the descriptor signature — look for next local/central
+            // Some ZIPs omit the descriptor signature — boundary is next local/central header
             if (i > 0 && (buf.readUInt32LE(i) === LOCAL_SIG || buf.readUInt32LE(i) === CENTRAL_SIG || buf.readUInt32LE(i) === EOCD_SIG)) {
               found = i; descLen = 0; break;
             }
           }
 
           if (found === -1) {
-            // Flush safe bytes to entry stream (keep last 16 bytes for boundary detection)
+            // Flush safe bytes (keep last 16 for boundary overlap)
             const safe = buf.length - 16;
             if (safe > 0) {
               currentEntry.passThrough.write(buf.slice(0, safe));
@@ -157,7 +147,6 @@ export function parseZip() {
             return;
           }
 
-          // Push all bytes up to the descriptor to the entry
           currentEntry.passThrough.write(buf.slice(0, found));
           currentEntry.passThrough.end();
           buf = buf.slice(found + descLen);
@@ -183,11 +172,10 @@ export function parseZip() {
     }
   }
 
-  // Allow .pipe() syntax: readStream.pipe(parseZip())
-  sink.on = emitter.on.bind(emitter);
-  sink.once = emitter.once.bind(emitter);
-  sink.emit = emitter.emit.bind(emitter);
-  sink.removeListener = emitter.removeListener.bind(emitter);
+  // Delegate EventEmitter interface to emitter so .pipe() syntax works
+  for (const m of ['on', 'once', 'off', 'emit', 'addListener', 'removeListener', 'removeAllListeners', 'listenerCount']) {
+    sink[m] = emitter[m].bind(emitter);
+  }
 
   return sink;
 }

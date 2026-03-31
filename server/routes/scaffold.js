@@ -15,6 +15,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const TEMPLATES_DIR = join(__dirname, '../../templates');
 
+// Inline CORS middleware snippet for generated projects (no cors package dependency)
+const CORS_SNIPPET = `app.use((req, res, next) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});`;
+
 const router = Router();
 
 // GET /api/directories - Browse directories for directory picker
@@ -299,13 +308,7 @@ async function scaffoldApp(req, res) {
 const app = express();
 const PORT = process.env.PORT || ${apiPort || 3001};
 
-app.use((req, res, next) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-});
+${CORS_SNIPPET}
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {
@@ -352,13 +355,7 @@ app.listen(PORT, '0.0.0.0', () => {
 const app = express();
 const PORT = process.env.PORT || ${apiPort || 3000};
 
-app.use((req, res, next) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-});
+${CORS_SNIPPET}
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {
@@ -1009,13 +1006,7 @@ const io = new Server(httpServer, {
 
 const PORT = process.env.PORT || ${apiPort || 3001};
 
-app.use((req, res, next) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-});
+${CORS_SNIPPET}
 app.use(express.json());
 
 // Initialize AI Toolkit with routes for providers, runs, and prompts

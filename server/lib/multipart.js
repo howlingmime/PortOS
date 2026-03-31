@@ -27,14 +27,17 @@ function parseStream(stream, boundary, fieldName, maxSize, fileFilter, next) {
   const END_MARKER = Buffer.from('\r\n--' + boundary);
   const HEADER_END = Buffer.from('\r\n\r\n');
 
-  let buf = Buffer.alloc(0);      // lookahead buffer while streaming file content
-  let ws = null;                   // WriteStream for current file
+  let buf = Buffer.alloc(0);    // lookahead buffer while streaming file content
+  let ws = null;                 // WriteStream for current file
   let filePath = null;
   let fileMeta = null;
   let fileSize = 0;
-  let streaming = false;           // true once past headers, writing file bytes
+  let streaming = false;         // true once past headers, writing file bytes
   let done = false;
-  const headerChunks = [];         // accumulates chunks until headers are parsed
+
+  // Header accumulation: keep prior chunks + a spillover window to detect \r\n\r\n across boundaries
+  const headerChunks = [];
+  let headerSpill = Buffer.alloc(0); // last (HEADER_END.length - 1) bytes from previous chunk
 
   const fail = (err) => {
     if (!done) { done = true; if (ws) ws.destroy(); next(err); }
@@ -45,7 +48,6 @@ function parseStream(stream, boundary, fieldName, maxSize, fileFilter, next) {
     const combined = buf.length ? Buffer.concat([buf, chunk]) : chunk;
     const idx = combined.indexOf(END_MARKER);
     if (idx !== -1) {
-      // End of file content found
       const tail = combined.slice(0, idx);
       fileSize += tail.length;
       if (fileSize > maxSize) return fail(new Error(`File too large (max ${maxSize} bytes)`));
@@ -76,13 +78,21 @@ function parseStream(stream, boundary, fieldName, maxSize, fileFilter, next) {
     if (done) return;
     if (streaming) return writeChunk(chunk);
 
-    headerChunks.push(chunk);
-    const combined = Buffer.concat(headerChunks);
-    const hEnd = combined.indexOf(HEADER_END);
-    if (hEnd === -1) return;
+    // Search for \r\n\r\n only in the window of spillover + new chunk (O(n) per chunk)
+    const window = headerSpill.length ? Buffer.concat([headerSpill, chunk]) : chunk;
+    const hEnd = window.indexOf(HEADER_END);
+    if (hEnd === -1) {
+      headerChunks.push(chunk);
+      // Keep last (HEADER_END.length - 1) bytes as spillover for next chunk
+      headerSpill = window.length >= HEADER_END.length
+        ? window.slice(window.length - (HEADER_END.length - 1))
+        : window;
+      return;
+    }
 
-    // Parse Content-Disposition and Content-Type from headers
-    const headerStr = combined.slice(0, hEnd).toString('utf-8');
+    // Headers found — reconstruct full header block from prior chunks + window up to hEnd
+    const fullHeader = Buffer.concat([...headerChunks, window.slice(0, hEnd)]);
+    const headerStr = fullHeader.toString('utf-8');
     const dispMatch = headerStr.match(/Content-Disposition:[^\r\n]*name="([^"]+)"[^\r\n]*filename="([^"]+)"/i);
     if (!dispMatch || dispMatch[1] !== fieldName) return fail(new Error(`Expected field "${fieldName}"`));
 
@@ -99,11 +109,11 @@ function parseStream(stream, boundary, fieldName, maxSize, fileFilter, next) {
       if (!fr.accept) return fail(new Error('File type not allowed'));
     }
 
-    filePath = join(tmpdir(), `upload-${Date.now()}-${randomUUID()}${ext}`);
+    filePath = join(tmpdir(), `upload-${randomUUID()}${ext}`);
     ws = createWriteStream(filePath);
     ws.on('error', fail);
     streaming = true;
-    writeChunk(combined.slice(hEnd + HEADER_END.length));
+    writeChunk(window.slice(hEnd + HEADER_END.length));
   });
 
   stream.on('end', () => {
