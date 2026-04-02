@@ -430,6 +430,17 @@ export default function OpenClaw() {
             return;
           }
 
+          // Fallback: unnamed SSE events (no event: line) arrive as eventName "message".
+          // Map data.type to the same actions as named events so streams that omit event
+          // lines (e.g. plain data: JSON) still render correctly.
+          if (eventName === 'message') {
+            if (data?.type === 'text_delta' && data?.text) {
+              setActivityLabel('Responding…');
+              updateAssistant(item => ({ content: `${item.content || ''}${data.text}`, status: 'streaming' }));
+            }
+            return;
+          }
+
           if (eventName === 'response.output_text.done') {
             const finalText = normalizeContent(data?.text || data?.output_text || data);
             if (finalText) updateAssistant({ content: finalText, status: 'streaming' });
