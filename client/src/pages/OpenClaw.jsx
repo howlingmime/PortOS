@@ -154,6 +154,7 @@ export default function OpenClaw() {
   const abortControllerRef = useRef(null);
   const scrollAnimationFrameRef = useRef(null);
   const selectedSessionIdRef = useRef(selectedSessionId);
+  const attachmentsRef = useRef(attachments);
   const runtimeState = useMemo(() => getRuntimeState(status), [status]);
   const visibleSessions = useMemo(
     () => partitionSessions(sessions, selectedSessionId, status?.defaultSession),
@@ -232,6 +233,17 @@ export default function OpenClaw() {
   }, [selectedSessionId]);
 
   useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+
+  // Revoke any remaining object URLs when the component unmounts
+  useEffect(() => {
+    return () => {
+      attachmentsRef.current.forEach(a => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl); });
+    };
+  }, []);
+
+  useEffect(() => {
     if (!status?.configured || !selectedSessionId) {
       setMessages([]);
       setMessagesError('');
@@ -261,7 +273,8 @@ export default function OpenClaw() {
   useEffect(() => () => abortControllerRef.current?.abort(), []);
 
   const MAX_ATTACHMENTS = 8;
-  const MAX_ATTACHMENT_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
+  // Matches server-side ATTACHMENT_BASE64_MAX_CHARS (13,333,333 chars ≈ 10,000,000 raw bytes)
+  const MAX_ATTACHMENT_FILE_SIZE = 10_000_000; // 10MB per file (metric, not binary)
   // Matches server-side ATTACHMENTS_TOTAL_BASE64_MAX_CHARS (50,000,000 chars ≈ 37.5MB raw)
   const MAX_ATTACHMENTS_TOTAL_BASE64_CHARS = 50_000_000;
 
