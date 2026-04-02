@@ -68,17 +68,6 @@ router.get('/status', asyncHandler(async (req, res) => {
 }));
 
 router.get('/sessions', asyncHandler(async (req, res) => {
-  const status = await getRuntimeStatus();
-  if (!status.configured) {
-    return res.json({
-      configured: false,
-      reachable: false,
-      sessions: [],
-      defaultSession: status.defaultSession || null,
-      label: status.label
-    });
-  }
-
   const result = await listSessions();
   res.json(result);
 }));

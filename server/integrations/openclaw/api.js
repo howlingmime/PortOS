@@ -300,7 +300,7 @@ function buildInput(message, context = {}, attachments = []) {
     if (normalized) input.push(normalized);
   }
 
-  return input.length === 1 ? text : input;
+  return input;
 }
 
 async function invokeTool(config, tool, args = {}, sessionKey = 'main') {
@@ -342,6 +342,16 @@ export async function getRuntimeStatus() {
 
 export async function listSessions() {
   const config = await loadConfig();
+  if (!config.configured) {
+    return {
+      configured: false,
+      reachable: false,
+      sessions: [],
+      defaultSession: config.defaultSession || null,
+      label: config.label
+    };
+  }
+
   const payload = await invokeTool(config, 'sessions_list', {});
   const sessions = (payload?.sessions || [])
     .map(normalizeSession)

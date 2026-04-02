@@ -152,6 +152,7 @@ export default function OpenClaw() {
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const abortControllerRef = useRef(null);
+  const scrollAnimationFrameRef = useRef(null);
   const selectedSessionIdRef = useRef(selectedSessionId);
   const runtimeState = useMemo(() => getRuntimeState(status), [status]);
   const visibleSessions = useMemo(
@@ -241,7 +242,14 @@ export default function OpenClaw() {
   }, [loadMessages, selectedSessionId, status?.configured]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    if (!messagesEndRef.current) return;
+    if (scrollAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(scrollAnimationFrameRef.current);
+    }
+    scrollAnimationFrameRef.current = requestAnimationFrame(() => {
+      scrollAnimationFrameRef.current = null;
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+    });
   }, [messages]);
 
   useEffect(() => () => abortControllerRef.current?.abort(), []);
@@ -274,7 +282,12 @@ export default function OpenClaw() {
 
     try {
       const next = await filesToAttachments(limitedFiles);
-      setAttachments(current => [...current, ...next]);
+      setAttachments(current => {
+        const currentCount = Array.isArray(current) ? current.length : 0;
+        const remaining = MAX_ATTACHMENTS - currentCount;
+        if (remaining <= 0) return current;
+        return [...current, ...next.slice(0, remaining)];
+      });
       setMessagesError('');
     } catch (err) {
       setMessagesError(err.message || 'Failed to prepare attachment');
