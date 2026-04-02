@@ -327,7 +327,7 @@ export default function OpenClaw() {
       if (existingBase64Chars + newBase64Chars > MAX_ATTACHMENTS_TOTAL_BASE64_CHARS) {
         next.forEach(a => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl); });
         const totalMB = Math.round((existingBase64Chars + newBase64Chars) * 0.75 / (1024 * 1024));
-        setMessagesError(`Combined attachments (~${totalMB}MB) exceed the 50MB total limit.`);
+        setMessagesError(`Combined attachments exceed the 50MB encoded total limit (~${totalMB}MB decoded).`);
         return;
       }
 
