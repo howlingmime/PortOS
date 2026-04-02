@@ -188,6 +188,10 @@ async function openClawFetch(config, path, { method = 'GET', headers = {}, body,
     }, timeoutMs ?? config.timeoutMs);
   } catch (err) {
     if (err?.name === 'AbortError') {
+      // If the caller's signal triggered the abort, rethrow the AbortError so
+      // the caller can distinguish a client-disconnect abort from a timeout.
+      // Only emit OPENCLAW_TIMEOUT when the internal timeout actually fired.
+      if (signal?.aborted) throw err;
       throw new ServerError('OpenClaw request timed out', {
         status: 504,
         code: 'OPENCLAW_TIMEOUT'
