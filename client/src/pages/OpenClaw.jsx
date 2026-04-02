@@ -374,7 +374,7 @@ export default function OpenClaw() {
       content: message || `[Sent ${attachments.length} attachment${attachments.length === 1 ? '' : 's'}]`,
       createdAt: new Date().toISOString(),
       status: 'completed',
-      attachments: attachments.map(({ id, data, ...attachment }) => ({ id, ...attachment }))
+      attachments: attachments.map(({ id, data, previewUrl, ...attachment }) => ({ id, ...attachment }))
     };
 
     setMessages(current => [...current, userMessage, {

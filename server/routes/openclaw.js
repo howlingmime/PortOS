@@ -25,7 +25,10 @@ const attachmentSchema = z.object({
   mediaType: z.string().trim().min(1).optional(),
   mimeType: z.string().trim().min(1).optional(),
   data: z.string().trim().min(1).max(ATTACHMENT_BASE64_MAX_CHARS, 'Attachment base64 data exceeds the 10 MB per-attachment limit.').optional(),
-  url: z.string().trim().url().optional()
+  url: z.string().trim().url().refine(
+    url => url.startsWith('http://') || url.startsWith('https://'),
+    'Attachment url must use http or https scheme.'
+  ).optional()
 }).superRefine((value, ctx) => {
   const hasData = typeof value.data === 'string' && value.data.trim().length > 0;
   const hasUrl = typeof value.url === 'string' && value.url.trim().length > 0;
