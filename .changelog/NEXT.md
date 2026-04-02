@@ -54,9 +54,35 @@
 ## Fixed
 - JIRA report provider discovery now tries all available API providers instead of failing on first unreachable one
 - `agentCliSpawning.js` imported `completeExecution`/`errorExecution` from `executionLanes.js` (wrong module); corrected to import from `toolStateMachine.js`, fixing server crash on startup
+- OpenClaw stream route now calls `res.flushHeaders()` before proxying SSE so headers reach the client immediately
+- OpenClaw stream reader loop wrapped in try/catch to handle AbortError on client disconnect without unhandled rejection
+- Orphaned `htmlFor="compact-task-app"` sr-only label in `TaskAddForm` compact mode removed (referenced select id that no longer exists after AppContextPicker refactor)
 - XSS: `MarkdownOutput.jsx` links now validate `href` protocol (allow `http://`, `https://`, `/` only); unsafe URIs render as plain text
 - Toast notifications missing background color — added `bg-port-card` with border
 - `InlineDiff` word diff used `Set` which collapsed duplicate common words; replaced with sequential LCS pointer matching
 - `httpClient.js` now auto-sets `Content-Type: application/json` when sending JSON body
 - `zipStream.js` sanitizes ZIP entry paths (normalizes separators, strips `..` and `.` components)
 - `multipart.js` sanitizes file extension to alphanumeric characters only
+
+## Added
+- `AppContextPicker` component — reusable app selector with repo path display; replaces inline `<select>` in `TaskAddForm` (compact and full modes)
+- OpenClaw operator chat: SSE streaming with optimistic UI (user + streaming assistant placeholder appear immediately)
+- OpenClaw: file/image attachment support — drag & drop, paste screenshots, file picker
+- OpenClaw: app context, directory context, and extra instructions fields sent with messages
+- OpenClaw: Stop/Cancel button aborts in-flight stream via AbortController
+- OpenClaw: Cmd/Ctrl+Enter keyboard shortcut submits the composer
+- OpenClaw: auto-scroll to latest message during streaming
+- OpenClaw: collapsible "older chats" section for sessions beyond the top 6 non-empty ones
+- OpenClaw: synthetic default session injected when `defaultSession` config key has no matching session
+- `formatDateTime` added to `client/src/utils/formatters.js` (medium date + short time via `Intl.DateTimeFormat`)
+- `readFileAsBase64` exported from `client/src/utils/fileUpload.js` for reuse across components
+
+## Changed
+- OpenClaw integration rewritten to use OpenResponses `/v1/responses` API and `/tools/invoke` for session discovery
+- `normalizeAttachment` builds OpenAI-compatible `input_image`/`input_file` blocks from base64 or URL sources
+- `streamSessionMessage` proxies upstream SSE with `timeoutMs: 0` for long-running streaming responses
+- `fetchWithTimeout` accepts `timeoutMs: 0` to opt out of the timeout (needed for streaming)
+- `loadRuntime` stabilized via `selectedSessionIdRef` — session switches no longer trigger a full runtime reload
+- After send, session `lastMessageAt` updated locally instead of triggering a full `loadRuntime()` reload
+- `context` state in OpenClaw simplified — removed derived `appName`/`repoPath`; computed at send time
+- Duplicate `setMessages` update pattern in `handleSend` extracted into `updateAssistant(updater)` helper

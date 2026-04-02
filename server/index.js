@@ -67,6 +67,7 @@ import loopsRoutes from './routes/loops.js';
 import characterRoutes from './routes/character.js';
 import toolsRoutes from './routes/tools.js';
 import imageGenRoutes from './routes/imageGen.js';
+import openclawRoutes from './routes/openclaw.js';
 import { ensureSelf, startPolling } from './services/instances.js';
 import { initSyncLog } from './services/brainSyncLog.js';
 import { backfillOriginInstanceId } from './services/brainStorage.js';
@@ -201,8 +202,10 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Body limit is set slightly above the 50MB combined base64 cap enforced by sendMessageSchema
+// so the Zod validation (not the body parser) is the binding constraint for attachment payloads.
+app.use(express.json({ limit: '55mb' }));
+app.use(express.urlencoded({ limit: '55mb', extended: true }));
 
 // Make io available to routes
 app.set('io', io);
@@ -276,6 +279,7 @@ app.use('/api/loops', loopsRoutes);
 app.use('/api/character', characterRoutes);
 app.use('/api/tools', toolsRoutes);
 app.use('/api/image-gen', imageGenRoutes);
+app.use('/api/openclaw', openclawRoutes);
 
 // Initialize agent automation scheduler and action executor
 automationScheduler.init().catch(err => console.error(`❌ Agent scheduler init failed: ${err.message}`));
