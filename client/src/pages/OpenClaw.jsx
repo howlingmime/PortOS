@@ -17,7 +17,8 @@ import AppContextPicker from '../components/AppContextPicker';
 import * as api from '../services/apiOpenClaw';
 import * as coreApi from '../services/api';
 import { formatDateTime } from '../utils/formatters';
-import { readFileAsBase64 } from '../utils/fileUpload';
+import { useOpenClawAttachments } from '../hooks/useOpenClawAttachments';
+import { useOpenClawStream } from '../hooks/useOpenClawStream';
 
 function getRuntimeState(status) {
   if (!status?.configured) {
@@ -94,118 +95,79 @@ function partitionSessions(sessions = [], selectedSessionId = '', defaultSession
   return { primary, older };
 }
 
-function getAttachmentKind(file) {
-  return file.type.startsWith('image/') ? 'image' : 'file';
-}
-
-const ALLOWED_ATTACHMENT_MIME_PREFIXES = ['image/'];
-const ALLOWED_ATTACHMENT_MIME_TYPES = new Set([
-  'text/plain', 'text/markdown', 'text/x-markdown',
-  'application/json', 'text/csv', 'application/csv', 'text/x-csv',
-  'application/pdf'
-]);
-const ALLOWED_ATTACHMENT_EXTENSIONS = new Set(['.txt', '.md', '.json', '.csv', '.pdf']);
-
-function isAllowedAttachmentType(file) {
-  if (ALLOWED_ATTACHMENT_MIME_PREFIXES.some(p => file.type?.startsWith(p))) return true;
-  const mimeBase = file.type ? file.type.split(';')[0].trim().toLowerCase() : '';
-  if (mimeBase && ALLOWED_ATTACHMENT_MIME_TYPES.has(mimeBase)) return true;
-  const ext = file.name ? `.${file.name.split('.').pop().toLowerCase()}` : '';
-  return ALLOWED_ATTACHMENT_EXTENSIONS.has(ext);
-}
-
-function normalizeContent(content) {
-  if (typeof content === 'string') return content;
-  if (!content) return '';
-  if (Array.isArray(content)) return content.map(normalizeContent).filter(Boolean).join('\n\n');
-  if (typeof content === 'object') {
-    if (typeof content.text === 'string') return content.text;
-    if (typeof content.content === 'string') return content.content;
-  }
-  return '';
-}
-
-async function filesToAttachments(files) {
-  const createdPreviewUrls = [];
-  try {
-    return await Promise.all(files.map(async (file) => {
-      const kind = getAttachmentKind(file);
-      const mediaType = file.type || 'application/octet-stream';
-      const base64 = await readFileAsBase64(file);
-      const previewUrl = kind === 'image' ? URL.createObjectURL(file) : '';
-      if (previewUrl) createdPreviewUrls.push(previewUrl);
-      return {
-        id: `attachment-${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
-        name: file.name,
-        filename: file.name,
-        mediaType,
-        kind,
-        size: file.size,
-        data: base64,
-        previewUrl
-      };
-    }));
-  } catch (err) {
-    createdPreviewUrls.forEach(url => URL.revokeObjectURL(url));
-    throw err;
-  }
-}
-
 export default function OpenClaw() {
   const [status, setStatus] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [apps, setApps] = useState([]);
   const [selectedSessionId, setSelectedSessionId] = useState('');
-  const [messages, setMessages] = useState([]);
   const [composer, setComposer] = useState('');
   const [context, setContext] = useState({
     appId: '',
     directoryPath: '',
     extraInstructions: ''
   });
-  const [attachments, setAttachments] = useState([]);
   const [statusLoading, setStatusLoading] = useState(true);
   const [sessionsLoading, setSessionsLoading] = useState(false);
-  const [messagesLoading, setMessagesLoading] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [activityLabel, setActivityLabel] = useState('');
   const [pageError, setPageError] = useState('');
-  const [messagesError, setMessagesError] = useState('');
-  const [isDragActive, setIsDragActive] = useState(false);
   const [showOlderChats, setShowOlderChats] = useState(false);
-  const fileInputRef = useRef(null);
-  const messagesEndRef = useRef(null);
-  const abortControllerRef = useRef(null);
-  const scrollAnimationFrameRef = useRef(null);
-  const dragCounterRef = useRef(0);
+  // sending is hoisted to the component so both hooks share the same boolean without a
+  // circular hook dependency: useOpenClawAttachments reads it; useOpenClawStream updates it.
+  const [sending, setSending] = useState(false);
+  // messagesError is hoisted so it can be written by both hooks and read in the JSX.
+  const [messagesError, setMessagesError] = useState('');
   const selectedSessionIdRef = useRef(selectedSessionId);
-  const attachmentsRef = useRef(attachments);
+
+  const {
+    attachments,
+    setAttachments,
+    isDragActive,
+    fileInputRef,
+    removeAttachment,
+    handleAttachmentSelect,
+    handlePaste,
+    handleDragEnter,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop
+  } = useOpenClawAttachments({
+    sending,
+    onError: setMessagesError
+  });
+
+  const handleSendComplete = useCallback(({ sessionId }) => {
+    const now = new Date().toISOString();
+    setSessions(prev => prev.map(s =>
+      s.id === sessionId ? { ...s, lastMessageAt: now } : s
+    ));
+  }, []);
+
+  const {
+    messages,
+    activityLabel,
+    messagesLoading,
+    messagesEndRef,
+    loadMessages,
+    handleSend,
+    handleStop
+  } = useOpenClawStream({
+    selectedSessionId,
+    attachments,
+    setAttachments,
+    composer,
+    setComposer,
+    context,
+    apps,
+    sending,
+    setSending,
+    onError: setMessagesError,
+    onSendComplete: handleSendComplete
+  });
+
   const runtimeState = useMemo(() => getRuntimeState(status), [status]);
   const visibleSessions = useMemo(
     () => partitionSessions(sessions, selectedSessionId, status?.defaultSession),
     [sessions, selectedSessionId, status?.defaultSession]
   );
-
-  const loadMessages = useCallback(async (sessionId) => {
-    if (!sessionId) {
-      setMessages([]);
-      setMessagesError('');
-      return;
-    }
-
-    setMessagesLoading(true);
-    setMessagesError('');
-
-    try {
-      const data = await api.getOpenClawMessages(sessionId, { limit: 50 });
-      setMessages(data?.messages || []);
-    } catch (err) {
-      setMessages([]);
-      setMessagesError(err.message || 'Failed to load messages');
-    } finally {
-      setMessagesLoading(false);
-    }
-  }, []);
 
   const loadRuntime = useCallback(async () => {
     setStatusLoading(true);
@@ -219,8 +181,7 @@ export default function OpenClaw() {
       if (!statusData?.configured) {
         setSessions([]);
         setSelectedSessionId('');
-        setMessages([]);
-        setMessagesError('');
+        loadMessages('');
         return;
       }
 
@@ -246,13 +207,13 @@ export default function OpenClaw() {
       setStatus(null);
       setSessions([]);
       setSelectedSessionId('');
-      setMessages([]);
+      loadMessages('');
       setPageError(err instanceof Error ? err.message : String(err) || 'Failed to load OpenClaw status');
     } finally {
       setStatusLoading(false);
       setSessionsLoading(false);
     }
-  }, []);
+  }, [loadMessages]);
 
   useEffect(() => {
     loadRuntime();
@@ -264,299 +225,13 @@ export default function OpenClaw() {
   }, [selectedSessionId]);
 
   useEffect(() => {
-    attachmentsRef.current = attachments;
-  }, [attachments]);
-
-  // Revoke any remaining object URLs when the component unmounts
-  useEffect(() => {
-    return () => {
-      attachmentsRef.current.forEach(a => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl); });
-    };
-  }, []);
-
-  useEffect(() => {
     if (!status?.configured || !selectedSessionId) {
-      setMessages([]);
-      setMessagesError('');
+      loadMessages('');
       return;
     }
 
     loadMessages(selectedSessionId);
   }, [loadMessages, selectedSessionId, status?.configured]);
-
-  useEffect(() => {
-    if (!messagesEndRef.current) return;
-    if (scrollAnimationFrameRef.current !== null) {
-      cancelAnimationFrame(scrollAnimationFrameRef.current);
-    }
-    scrollAnimationFrameRef.current = requestAnimationFrame(() => {
-      scrollAnimationFrameRef.current = null;
-      messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
-    });
-    return () => {
-      if (scrollAnimationFrameRef.current !== null) {
-        cancelAnimationFrame(scrollAnimationFrameRef.current);
-        scrollAnimationFrameRef.current = null;
-      }
-    };
-  }, [messages]);
-
-  useEffect(() => () => abortControllerRef.current?.abort(), []);
-
-  const MAX_ATTACHMENTS = 8;
-  // Matches server-side ATTACHMENT_BASE64_MAX_CHARS (13,333,333 chars). Base64 expands raw bytes
-  // by 4/3, so 13,333,333 chars ≈ 9,999,999 raw bytes after block-rounding. Use that as the limit
-  // so a file that passes client validation is guaranteed to pass server validation too.
-  const MAX_ATTACHMENT_FILE_SIZE = 9_999_999; // effective per-file server limit in raw bytes
-  // Matches server-side ATTACHMENTS_TOTAL_BASE64_MAX_CHARS (50,000,000 chars ≈ 37.5MB raw)
-  const MAX_ATTACHMENTS_TOTAL_BASE64_CHARS = 50_000_000;
-
-  const appendFiles = useCallback(async (files) => {
-    if (!files || files.length === 0) return;
-    if (sending) return;
-
-    const currentCount = Array.isArray(attachments) ? attachments.length : 0;
-    const remainingSlots = MAX_ATTACHMENTS - currentCount;
-
-    if (remainingSlots <= 0) {
-      setMessagesError(`You can attach up to ${MAX_ATTACHMENTS} files per message.`);
-      return;
-    }
-
-    const limitedFiles = files.slice(0, remainingSlots);
-    const tooLargeFile = limitedFiles.find(
-      (file) => typeof file.size === 'number' && file.size > MAX_ATTACHMENT_FILE_SIZE
-    );
-
-    if (tooLargeFile) {
-      setMessagesError(
-        `"${tooLargeFile.name}" is too large. Maximum attachment size is ${Math.round(MAX_ATTACHMENT_FILE_SIZE / (1024 * 1024))}MB.`
-      );
-      return;
-    }
-
-    const disallowedFile = limitedFiles.find(file => !isAllowedAttachmentType(file));
-    if (disallowedFile) {
-      setMessagesError(`"${disallowedFile.name}" is not a supported file type. Allowed: images, .txt, .md, .json, .csv, .pdf`);
-      return;
-    }
-
-    try {
-      const next = await filesToAttachments(limitedFiles);
-      const newBase64Chars = next.reduce((sum, a) => sum + (typeof a.data === 'string' ? a.data.length : 0), 0);
-
-      setAttachments(current => {
-        // All limit checks use `current` (live state) to avoid stale-closure races
-        // when appendFiles is called concurrently before the previous async read resolves.
-        const currentBase64Chars = current.reduce((sum, a) => sum + (typeof a.data === 'string' ? a.data.length : 0), 0);
-        if (currentBase64Chars + newBase64Chars > MAX_ATTACHMENTS_TOTAL_BASE64_CHARS) {
-          next.forEach(a => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl); });
-          const totalMB = Math.round((currentBase64Chars + newBase64Chars) * 0.75 / (1024 * 1024));
-          setMessagesError(`Combined attachments exceed the 50MB encoded total limit (~${totalMB}MB decoded).`);
-          return current;
-        }
-        const currentCount = Array.isArray(current) ? current.length : 0;
-        const remaining = MAX_ATTACHMENTS - currentCount;
-        if (remaining <= 0) {
-          next.forEach(a => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl); });
-          return current;
-        }
-        const accepted = next.slice(0, remaining);
-        next.slice(remaining).forEach(a => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl); });
-        setMessagesError('');
-        return [...current, ...accepted];
-      });
-    } catch (err) {
-      setMessagesError(err.message || 'Failed to prepare attachment');
-    }
-  }, [attachments, sending]);
-
-  const handleAttachmentSelect = async (event) => {
-    const files = Array.from(event.target.files || []);
-    await appendFiles(files);
-    event.target.value = '';
-  };
-
-  const handlePaste = async (event) => {
-    const items = Array.from(event.clipboardData?.items || []);
-    const files = items
-      .map(item => item.getAsFile())
-      .filter(Boolean);
-
-    if (files.length === 0) return;
-    event.preventDefault();
-    await appendFiles(files);
-  };
-
-  const handleDragEnter = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (event.dataTransfer?.types?.includes('Files')) {
-      dragCounterRef.current += 1;
-      setIsDragActive(true);
-    }
-  };
-
-  const handleDragOver = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
-  };
-
-  const handleDragLeave = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    dragCounterRef.current -= 1;
-    if (dragCounterRef.current <= 0) {
-      dragCounterRef.current = 0;
-      setIsDragActive(false);
-    }
-  };
-
-  const handleDrop = async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    dragCounterRef.current = 0;
-    setIsDragActive(false);
-    const files = Array.from(event.dataTransfer?.files || []);
-    await appendFiles(files);
-  };
-
-  const removeAttachment = (attachmentId) => {
-    setAttachments(current => {
-      const toRemove = current.find(a => a.id === attachmentId);
-      if (toRemove?.previewUrl) URL.revokeObjectURL(toRemove.previewUrl);
-      return current.filter(item => item.id !== attachmentId);
-    });
-  };
-
-  const handleSend = async (event) => {
-    event?.preventDefault();
-
-    const message = composer.trim();
-    if ((!message && attachments.length === 0) || !selectedSessionId || sending) return;
-
-    const userMessageId = `local-user-${Date.now()}`;
-    const assistantMessageId = `local-assistant-${Date.now()}`;
-    const selectedApp = apps.find(app => app.id === context.appId);
-    const payloadContext = Object.fromEntries(
-      Object.entries({
-        appName: selectedApp?.name || '',
-        repoPath: selectedApp?.repoPath || '',
-        directoryPath: context.directoryPath,
-        extraInstructions: context.extraInstructions
-      }).filter(([, value]) => String(value || '').trim())
-    );
-    const payloadAttachments = attachments.map(({ id, size, previewUrl, ...attachment }) => attachment);
-
-    setSending(true);
-    setActivityLabel('Connecting…');
-    setMessagesError('');
-
-    const userMessage = {
-      id: userMessageId,
-      role: 'user',
-      content: message || 'Please inspect the attached context and respond.',
-      createdAt: new Date().toISOString(),
-      status: 'completed',
-      attachments: attachments.map(({ id, data, previewUrl, ...attachment }) => ({ id, ...attachment }))
-    };
-
-    setMessages(current => [...current, userMessage, {
-      id: assistantMessageId,
-      role: 'assistant',
-      content: '',
-      createdAt: new Date().toISOString(),
-      status: 'streaming'
-    }]);
-
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-
-    const updateAssistant = (updater) =>
-      setMessages(current => current.map(item =>
-        item.id === assistantMessageId
-          ? { ...item, ...(typeof updater === 'function' ? updater(item) : updater) }
-          : item
-      ));
-
-    try {
-      await api.streamOpenClawMessage(selectedSessionId, {
-        message: message || 'Please inspect the attached context and respond.',
-        context: payloadContext,
-        attachments: payloadAttachments,
-        signal: abortController.signal,
-        onEvent: ({ event: eventName, data }) => {
-          if (eventName === 'response.created' || eventName === 'response.in_progress') {
-            setActivityLabel('Thinking…');
-            return;
-          }
-
-          if (eventName === 'response.output_item.added' || eventName === 'response.content_part.added') {
-            setActivityLabel('Working…');
-            return;
-          }
-
-          if (eventName === 'response.output_text.delta') {
-            const delta = typeof data === 'string' ? data : (data?.delta || data?.text || '');
-            setActivityLabel('Responding…');
-            updateAssistant(item => ({ content: `${item.content || ''}${delta}`, status: 'streaming' }));
-            return;
-          }
-
-          // Fallback: unnamed SSE events (no event: line) arrive as eventName "message".
-          // Map data.type to the same actions as named events so streams that omit event
-          // lines (e.g. plain data: JSON) still render correctly.
-          if (eventName === 'message') {
-            if (data?.type === 'text_delta' && data?.text) {
-              setActivityLabel('Responding…');
-              updateAssistant(item => ({ content: `${item.content || ''}${data.text}`, status: 'streaming' }));
-            }
-            return;
-          }
-
-          if (eventName === 'response.output_text.done') {
-            const finalText = normalizeContent(data?.text || data?.output_text || data);
-            if (finalText) updateAssistant({ content: finalText, status: 'streaming' });
-            return;
-          }
-
-          if (eventName === 'response.failed' || eventName === 'error') {
-            throw new Error(data?.error?.message || data?.message || data?.error || 'OpenClaw stream failed');
-          }
-
-          if (eventName === 'done' || eventName === 'response.completed') {
-            setActivityLabel('');
-            updateAssistant({ status: 'completed', createdAt: new Date().toISOString() });
-          }
-        }
-      });
-
-      setComposer('');
-      attachments.forEach(a => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl); });
-      setAttachments([]);
-      updateAssistant(item => ({ status: 'completed', content: item.content || '[No text response]' }));
-      const now = new Date().toISOString();
-      setSessions(prev => prev.map(s =>
-        s.id === selectedSessionId ? { ...s, lastMessageAt: now } : s
-      ));
-    } catch (err) {
-      if (err?.name === 'AbortError') {
-        updateAssistant(item => ({ status: 'completed', content: item.content || '[Stopped]' }));
-      } else {
-        setMessages(current => current.filter(item => item.id !== assistantMessageId));
-        setMessagesError(err.message || 'Failed to send message');
-      }
-    } finally {
-      abortControllerRef.current = null;
-      setSending(false);
-      setActivityLabel('');
-    }
-  };
-
-  const handleStop = () => {
-    abortControllerRef.current?.abort();
-  };
 
   const handleComposerKeyDown = (event) => {
     if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
