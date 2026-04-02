@@ -256,6 +256,8 @@ export default function OpenClaw() {
 
   const MAX_ATTACHMENTS = 8;
   const MAX_ATTACHMENT_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
+  // Matches server-side ATTACHMENTS_TOTAL_BASE64_MAX_CHARS (50,000,000 chars ≈ 37.5MB raw)
+  const MAX_ATTACHMENTS_TOTAL_BASE64_CHARS = 50_000_000;
 
   const appendFiles = useCallback(async (files) => {
     if (!files || files.length === 0) return;
@@ -282,6 +284,15 @@ export default function OpenClaw() {
 
     try {
       const next = await filesToAttachments(limitedFiles);
+
+      const existingBase64Chars = attachments.reduce((sum, a) => sum + (typeof a.data === 'string' ? a.data.length : 0), 0);
+      const newBase64Chars = next.reduce((sum, a) => sum + (typeof a.data === 'string' ? a.data.length : 0), 0);
+      if (existingBase64Chars + newBase64Chars > MAX_ATTACHMENTS_TOTAL_BASE64_CHARS) {
+        const totalMB = Math.round((existingBase64Chars + newBase64Chars) * 0.75 / (1024 * 1024));
+        setMessagesError(`Combined attachments (~${totalMB}MB) exceed the 50MB total limit.`);
+        return;
+      }
+
       setAttachments(current => {
         const currentCount = Array.isArray(current) ? current.length : 0;
         const remaining = MAX_ATTACHMENTS - currentCount;
