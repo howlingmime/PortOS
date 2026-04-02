@@ -89,6 +89,10 @@ export async function streamOpenClawMessage(sessionId, { message, context, attac
     buffer += decoder.decode();
     if (buffer.trim()) flushEventBlock(buffer);
   } finally {
-    await reader.cancel();
+    try {
+      await reader.cancel();
+    } catch {
+      // ignore cancel errors to avoid masking the original error
+    }
   }
 }

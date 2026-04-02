@@ -65,7 +65,7 @@ const contextSchema = z.object({
   extraInstructions: z.string().trim().min(1).optional()
 }).optional();
 
-const sendMessageSchema = z.object({
+export const sendMessageSchema = z.object({
   message: z.string().trim().min(1),
   context: contextSchema,
   attachments: z.array(attachmentSchema).max(8).optional()

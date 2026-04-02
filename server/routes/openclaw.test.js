@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import { request } from '../lib/testHelper.js';
-import openclawRoutes from './openclaw.js';
+import openclawRoutes, { sendMessageSchema } from './openclaw.js';
 
 vi.mock('../integrations/openclaw/api.js', () => ({
   isConfigured: vi.fn(),
@@ -330,17 +330,10 @@ describe('OpenClaw Routes', () => {
       expect(openclawApi.sendSessionMessage).not.toHaveBeenCalled();
     });
 
-    it('should return 400 when combined attachments exceed the 50 MB total limit', async () => {
-      openclawApi.isConfigured.mockResolvedValue({ configured: true, enabled: true });
-
+    it('should reject combined attachments exceeding the 50 MB total limit (schema-level)', () => {
       // Use 6 attachments each at 9,000,000 chars (each individually under the ~13.3M per-attachment cap)
       // Combined = 54,000,000 chars > ATTACHMENTS_TOTAL_BASE64_MAX_CHARS (50,000,000).
-      // A dedicated app instance with a higher body-parser limit is required here so Express
-      // parses the request and hands it to Zod, rather than rejecting it with 413 itself.
-      const bigApp = express();
-      bigApp.use(express.json({ limit: '100mb' }));
-      bigApp.use('/api/openclaw', openclawRoutes);
-
+      // Validated directly against the schema to avoid sending a ~54MB HTTP body in CI.
       const data = 'A'.repeat(9_000_000);
       const attachments = Array.from({ length: 6 }, () => ({
         sourceType: 'base64',
@@ -349,13 +342,10 @@ describe('OpenClaw Routes', () => {
         kind: 'image'
       }));
 
-      const response = await request(bigApp)
-        .post('/api/openclaw/sessions/main/messages')
-        .send({ message: 'Combined too large', attachments });
+      const result = sendMessageSchema.safeParse({ message: 'Combined too large', attachments });
 
-      expect(response.status).toBe(400);
-      expect(response.body.code).toBe('VALIDATION_ERROR');
-      expect(openclawApi.sendSessionMessage).not.toHaveBeenCalled();
+      expect(result.success).toBe(false);
+      expect(result.error.issues.some(i => i.path.includes('attachments'))).toBe(true);
     });
 
     it('should accept a valid base64 attachment within size limits', async () => {
