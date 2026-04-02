@@ -23,13 +23,15 @@ function lcs(a, b) {
 const InlineDiff = memo(function InlineDiff({ oldText, newText }) {
   const oldWords = (oldText || '').split(/(\s+)/);
   const newWords = (newText || '').split(/(\s+)/);
-  const common = new Set(lcs(oldWords, newWords));
+  const commonSeq = lcs(oldWords, newWords);
 
   const render = (words, added) => {
     const spans = [];
     let run = [];
+    let ci = 0;
     words.forEach((w, i) => {
-      if (common.has(w)) {
+      if (ci < commonSeq.length && w === commonSeq[ci]) {
+        ci++;
         if (run.length) { spans.push(<span key={i + 'r'} className={added ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'}>{run.join('')}</span>); run = []; }
         spans.push(w);
       } else { run.push(w); }

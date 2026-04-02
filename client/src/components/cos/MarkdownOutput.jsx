@@ -18,7 +18,13 @@ function parseInline(text) {
       parts.push(<em key={m.index} className="text-gray-300 italic">{s.slice(1, -1)}</em>);
     } else {
       const lm = s.match(/\[([^\]]+)\]\(([^)]+)\)/);
-      if (lm) parts.push(<a key={m.index} href={lm[2]} className="text-port-accent hover:underline" target="_blank" rel="noopener noreferrer">{lm[1]}</a>);
+      if (lm) {
+        const href = lm[2];
+        const safeHref = /^(https?:\/\/|\/[^/])/.test(href) ? href : null;
+        parts.push(safeHref
+          ? <a key={m.index} href={safeHref} className="text-port-accent hover:underline" target="_blank" rel="noopener noreferrer">{lm[1]}</a>
+          : <span key={m.index} className="text-port-accent">{lm[1]}</span>);
+      }
     }
     last = m.index + s.length;
   }

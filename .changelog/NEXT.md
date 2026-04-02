@@ -54,3 +54,9 @@
 ## Fixed
 - JIRA report provider discovery now tries all available API providers instead of failing on first unreachable one
 - `agentCliSpawning.js` imported `completeExecution`/`errorExecution` from `executionLanes.js` (wrong module); corrected to import from `toolStateMachine.js`, fixing server crash on startup
+- XSS: `MarkdownOutput.jsx` links now validate `href` protocol (allow `http://`, `https://`, `/` only); unsafe URIs render as plain text
+- Toast notifications missing background color — added `bg-port-card` with border
+- `InlineDiff` word diff used `Set` which collapsed duplicate common words; replaced with sequential LCS pointer matching
+- `httpClient.js` now auto-sets `Content-Type: application/json` when sending JSON body
+- `zipStream.js` sanitizes ZIP entry paths (normalizes separators, strips `..` and `.` components)
+- `multipart.js` sanitizes file extension to alphanumeric characters only

@@ -79,7 +79,9 @@ export function parseZip() {
 
         if (buf.length < headerSize) return;
 
-        const name = buf.slice(30, 30 + nameLen).toString('utf-8');
+        const rawName = buf.slice(30, 30 + nameLen).toString('utf-8');
+        // Sanitize: normalize path separators and reject directory traversal
+        const name = rawName.replace(/\\/g, '/').split('/').filter(s => s !== '..' && s !== '.').join('/');
         const dataDescriptor = (flags & 0x0008) !== 0; // bit 3: sizes in data descriptor
 
         buf = buf.slice(headerSize);

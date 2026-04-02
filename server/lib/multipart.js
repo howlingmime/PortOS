@@ -99,7 +99,8 @@ function parseStream(stream, boundary, fieldName, maxSize, fileFilter, next) {
     const originalname = dispMatch[2];
     const mimeMatch = headerStr.match(/Content-Type:\s*([^\r\n]+)/i);
     const mimetype = mimeMatch ? mimeMatch[1].trim() : 'application/octet-stream';
-    const ext = originalname.match(/\.[^.]+$/)?.[0] || '';
+    const rawExt = originalname.match(/\.[^.]+$/)?.[0] || '';
+    const ext = rawExt.replace(/[^a-zA-Z0-9.]/g, '');
     fileMeta = { originalname, mimetype };
 
     if (fileFilter) {

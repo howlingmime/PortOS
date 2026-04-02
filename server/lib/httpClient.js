@@ -63,7 +63,12 @@ export function createHttpClient({ baseURL = '', headers: defaultHeaders = {}, t
       signal: AbortSignal.timeout(timeout)
     };
 
-    if (data !== undefined) options.body = JSON.stringify(data);
+    if (data !== undefined) {
+      options.body = JSON.stringify(data);
+      if (!options.headers['Content-Type'] && !options.headers['content-type']) {
+        options.headers['Content-Type'] = 'application/json';
+      }
+    }
 
     const res = await fetchFn(url, options);
     const ct = res.headers.get('content-type') || '';
