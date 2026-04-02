@@ -391,7 +391,7 @@ export async function getSessionMessages(sessionId, { limit = 50 } = {}) {
     sessionKey: sessionId,
     limit,
     includeTools: false
-  });
+  }, sessionId);
   const messages = (payload?.messages || [])
     .map((message, index) => normalizeMessage(message, index))
     .filter(message => message.content || message.role || message.createdAt);

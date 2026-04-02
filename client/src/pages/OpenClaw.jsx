@@ -281,8 +281,10 @@ export default function OpenClaw() {
   useEffect(() => () => abortControllerRef.current?.abort(), []);
 
   const MAX_ATTACHMENTS = 8;
-  // Matches server-side ATTACHMENT_BASE64_MAX_CHARS (13,333,333 chars ≈ 10,000,000 raw bytes)
-  const MAX_ATTACHMENT_FILE_SIZE = 10_000_000; // 10MB per file (metric, not binary)
+  // Matches server-side ATTACHMENT_BASE64_MAX_CHARS (13,333,333 chars). Base64 expands raw bytes
+  // by 4/3, so 13,333,333 chars ≈ 9,999,999 raw bytes after block-rounding. Use that as the limit
+  // so a file that passes client validation is guaranteed to pass server validation too.
+  const MAX_ATTACHMENT_FILE_SIZE = 9_999_999; // effective per-file server limit in raw bytes
   // Matches server-side ATTACHMENTS_TOTAL_BASE64_MAX_CHARS (50,000,000 chars ≈ 37.5MB raw)
   const MAX_ATTACHMENTS_TOTAL_BASE64_CHARS = 50_000_000;
 
