@@ -343,22 +343,16 @@ export default function OpenClaw() {
 
     try {
       const next = await filesToAttachments(limitedFiles);
-
-      const existingBase64Chars = attachments.reduce((sum, a) => sum + (typeof a.data === 'string' ? a.data.length : 0), 0);
       const newBase64Chars = next.reduce((sum, a) => sum + (typeof a.data === 'string' ? a.data.length : 0), 0);
-      if (existingBase64Chars + newBase64Chars > MAX_ATTACHMENTS_TOTAL_BASE64_CHARS) {
-        next.forEach(a => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl); });
-        const totalMB = Math.round((existingBase64Chars + newBase64Chars) * 0.75 / (1024 * 1024));
-        setMessagesError(`Combined attachments exceed the 50MB encoded total limit (~${totalMB}MB decoded).`);
-        return;
-      }
 
       setAttachments(current => {
-        // Re-check limits against actual current state to prevent race conditions if
-        // appendFiles is called concurrently before the previous async read resolves.
+        // All limit checks use `current` (live state) to avoid stale-closure races
+        // when appendFiles is called concurrently before the previous async read resolves.
         const currentBase64Chars = current.reduce((sum, a) => sum + (typeof a.data === 'string' ? a.data.length : 0), 0);
         if (currentBase64Chars + newBase64Chars > MAX_ATTACHMENTS_TOTAL_BASE64_CHARS) {
           next.forEach(a => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl); });
+          const totalMB = Math.round((currentBase64Chars + newBase64Chars) * 0.75 / (1024 * 1024));
+          setMessagesError(`Combined attachments exceed the 50MB encoded total limit (~${totalMB}MB decoded).`);
           return current;
         }
         const currentCount = Array.isArray(current) ? current.length : 0;
@@ -369,9 +363,9 @@ export default function OpenClaw() {
         }
         const accepted = next.slice(0, remaining);
         next.slice(remaining).forEach(a => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl); });
+        setMessagesError('');
         return [...current, ...accepted];
       });
-      setMessagesError('');
     } catch (err) {
       setMessagesError(err.message || 'Failed to prepare attachment');
     }

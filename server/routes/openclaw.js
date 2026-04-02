@@ -41,6 +41,13 @@ const attachmentSchema = z.object({
     });
   }
 
+  if (hasData && hasUrl) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Attachment must include either base64 data or url, not both.'
+    });
+  }
+
   if (value.sourceType === 'base64' && !hasData) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
