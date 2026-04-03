@@ -17,7 +17,7 @@ echo ""
 # Step output helper (parsed by updateExecutor for UI progress)
 step() {
   local name="$1" status="$2" message="$3"
-  echo "STEP:$name:$status:$message"
+  echo "STEP:$name:$status:$message" || true
 }
 
 # Resilient npm install — retries once after cleaning node_modules on failure
