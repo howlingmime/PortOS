@@ -118,7 +118,8 @@ Write-Host ""
 $Tag = (Get-Content package.json | ConvertFrom-Json).version
 $completedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 $marker = "{`"version`":`"$Tag`",`"completedAt`":`"$completedAt`"}"
-$marker | Out-File -Encoding utf8 -FilePath "$RootDir\data\update-complete.json.tmp"
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText("$RootDir\data\update-complete.json.tmp", $marker, $utf8NoBom)
 Move-Item -Force "$RootDir\data\update-complete.json.tmp" "$RootDir\data\update-complete.json"
 
 # Restart PM2 apps

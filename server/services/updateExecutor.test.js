@@ -73,17 +73,16 @@ describe('executeUpdate', () => {
     expect(emits.some(e => e[0] === 'git-pull' && e[1] === 'done')).toBe(true);
   });
 
-  it('records update result on close', async () => {
+  it('does not record update result on success (marker file handles it)', async () => {
     const child = createMockChild();
     spawn.mockReturnValue(child);
 
     const promise = executeUpdate('v1.0.0', () => {});
     child.emit('close', 0);
-    await promise;
+    const result = await promise;
 
-    expect(recordUpdateResult).toHaveBeenCalledWith(
-      expect.objectContaining({ version: '1.0.0', success: true })
-    );
+    expect(result.success).toBe(true);
+    expect(recordUpdateResult).not.toHaveBeenCalled();
   });
 
   it('records failure on non-zero exit code', async () => {

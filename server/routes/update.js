@@ -68,8 +68,10 @@ router.post('/execute', asyncHandler(async (req, res) => {
   };
 
   // Don't await — respond immediately, progress streams via socket.
-  // The update script emits STEP:restart:running when it reaches the PM2
-  // restart phase, which triggers the client's health polling.
+  // The update script runs `git pull --rebase` to get the latest code,
+  // so the actual post-update version may differ from `tag` if new commits
+  // landed after the release. The script writes the true version to
+  // data/update-complete.json, which the server reads on boot.
   executeUpdate(tag, emit).then(result => {
     // Note: this .then() may never fire if the update script's PM2 restart
     // kills this server process first. The client handles this by polling

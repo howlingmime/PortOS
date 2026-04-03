@@ -7,11 +7,16 @@ const UPDATE_SH = join(PATHS.root, 'update.sh');
 const UPDATE_PS1 = join(PATHS.root, 'update.ps1');
 
 /**
- * Execute the PortOS update script for a given release tag.
+ * Execute the PortOS update script (git pull to latest).
  * Spawns update.sh (or update.ps1 on Windows) detached so it survives
  * the Node process dying during the PM2 restart phase.
  *
- * @param {string} tag - The git tag to update to (e.g. "v1.27.0")
+ * The scripts pull the latest code via `git pull --rebase --autostash` and
+ * write the actual resulting version to `data/update-complete.json`.
+ * The `tag` parameter is used only for logging and the initial API response;
+ * the true post-update version is determined by the script from package.json.
+ *
+ * @param {string} tag - The release tag that triggered the update (for logging)
  * @param {function} emit - Callback (step, status, message) for progress
  * @returns {Promise<{success: boolean, failedStep?: string, errorMessage?: string}>}
  */
@@ -20,7 +25,7 @@ export async function executeUpdate(tag, emit) {
   const cmd = isWindows ? 'powershell' : 'bash';
   const args = isWindows ? ['-ExecutionPolicy', 'Bypass', '-File', UPDATE_PS1] : [UPDATE_SH];
 
-  emit('starting', 'running', `Starting update to ${tag}...`);
+  emit('starting', 'running', `Starting update (target: ${tag})...`);
 
   return new Promise((resolve) => {
     const child = spawn(cmd, args, {
@@ -64,14 +69,19 @@ export async function executeUpdate(tag, emit) {
     child.on('close', async (code, signal) => {
       const success = code === 0;
       const exitDetail = signal ? `killed by ${signal}` : `exit code ${code}`;
-      await recordUpdateResult({
-        version: tag.replace(/^v/, ''),
-        success,
-        completedAt: new Date().toISOString(),
-        log: success ? '' : `Process ${exitDetail}`
-      }).catch(e => console.error(`❌ Failed to record update result: ${e.message}`));
+      // On success the update script writes data/update-complete.json with
+      // the actual post-pull version; the server reads it on boot to record
+      // the result. We only record here on failure (when the marker won't exist).
+      if (!success) {
+        await recordUpdateResult({
+          version: tag.replace(/^v/, ''),
+          success: false,
+          completedAt: new Date().toISOString(),
+          log: `Process ${exitDetail}`
+        }).catch(e => console.error(`❌ Failed to record update result: ${e.message}`));
+      }
       if (success) {
-        emit('complete', 'done', `Update to ${tag} complete`);
+        emit('complete', 'done', 'Update complete — restarting');
       } else {
         emit(lastStep, 'error', `Update failed at step "${lastStep}" (${exitDetail})`);
       }
