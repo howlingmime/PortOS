@@ -102,6 +102,12 @@ Step "npm-install" "running" "Installing all dependencies..."
 Safe-Install -Dir "." -Label "root"
 Safe-Install -Dir "client" -Label "client"
 Safe-Install -Dir "server" -Label "server"
+
+# Run trusted install scripts skipped by ignore-scripts=true in .npmrc
+Write-SafeHost "🔧 Rebuilding esbuild & node-pty..." -ForegroundColor Yellow
+Invoke-Logged node client/node_modules/esbuild/install.js
+Invoke-Logged node server/node_modules/esbuild/install.js
+Invoke-Logged npm rebuild node-pty --prefix server
 Write-SafeHost ""
 
 # Verify critical dependencies exist

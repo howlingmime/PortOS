@@ -81,6 +81,12 @@ step "npm-install" "running" "Installing all dependencies..."
 safe_install .
 safe_install client
 safe_install server
+
+# Run trusted install scripts skipped by ignore-scripts=true in .npmrc
+log "🔧 Rebuilding esbuild & node-pty..."
+run node client/node_modules/esbuild/install.js
+run node server/node_modules/esbuild/install.js
+run npm rebuild node-pty --prefix server
 log ""
 
 # Verify critical dependencies exist
