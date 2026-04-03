@@ -35,6 +35,7 @@ export default function UpdateTab() {
   const [polling, setPolling] = useState(false);
   const pollRef = useRef(null);
   const targetVersionRef = useRef(null);
+  const preUpdateVersionRef = useRef(null);
 
   const fetchStatus = useCallback(async () => {
     const data = await api.getUpdateStatus().catch(() => null);
@@ -114,7 +115,7 @@ export default function UpdateTab() {
       // Accept either an exact target match or any version different from
       // the pre-update version (git pull may land on a newer version than
       // the release tag that triggered the update)
-      const preUpdateVersion = status?.currentVersion;
+      const preUpdateVersion = preUpdateVersionRef.current;
       if (ok?.version && (ok.version === targetVersionRef.current || (preUpdateVersion && ok.version !== preUpdateVersion))) {
         clearInterval(pollRef.current);
         setPolling(false);
@@ -148,6 +149,7 @@ export default function UpdateTab() {
     if (status?.latestRelease?.version) {
       targetVersionRef.current = status.latestRelease.version;
     }
+    preUpdateVersionRef.current = status?.currentVersion || null;
     setUpdating(true);
     setSteps([]);
     setUpdateError(null);

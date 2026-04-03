@@ -33,10 +33,27 @@ function Write-SafeHost {
     }
 }
 
+# Safe stdout helper for machine-readable output consumed by the parent process.
+# Uses [Console]::Out.WriteLine so STEP markers reach stdout even when Write-Host
+# is redirected to the information stream.
+function Write-SafeStdout {
+    param([string]$Text)
+    try {
+        [Console]::Out.WriteLine($Text)
+    } catch {
+        if ($_.Exception -is [System.IO.IOException] -or
+            $_.Exception.InnerException -is [System.IO.IOException] -or
+            $_.Exception.ToString() -like "*The pipe has been ended*") {
+            return
+        }
+        throw
+    }
+}
+
 # Step output helper (parsed by updateExecutor for UI progress)
 function Step {
     param([string]$Name, [string]$Status, [string]$Message)
-    Write-SafeHost "STEP:${Name}:${Status}:${Message}"
+    Write-SafeStdout "STEP:${Name}:${Status}:${Message}"
 }
 
 # Run an external command, routing stdout/stderr to the log file so
