@@ -113,7 +113,7 @@ export function initSocket(io) {
       // Step 3: Apply changes
       emit('apply', 'running', { message: 'Writing ecosystem.config.cjs...' });
 
-      const result = await pm2Standardizer.applyStandardization(repoPath, analysis)
+      const result = await pm2Standardizer.applyStandardization(repoPath, analysis, { skipBackup: true })
         .catch(err => ({ success: false, errors: [err.message] }));
 
       if (result.errors?.length > 0) {

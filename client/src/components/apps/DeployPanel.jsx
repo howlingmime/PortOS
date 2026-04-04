@@ -117,15 +117,15 @@ export default function DeployPanel({ appId, appName }) {
                 <div
                   key={i}
                   className={
-                    line.stream === 'stderr' ? 'text-port-error' :
-                    line.stream === 'status' ? 'text-purple-400 font-bold' :
-                    'text-gray-300'
+                    line.stream === 'stderr' ? 'text-port-error whitespace-pre-wrap break-words' :
+                    line.stream === 'status' ? 'text-purple-400 font-bold whitespace-pre-wrap break-words' :
+                    'text-gray-300 whitespace-pre-wrap break-words'
                   }
                 >
                   {line.text}
                 </div>
               ))}
-              {error && <div className="text-port-error mt-2">Error: {error}</div>}
+              {error && <div className="text-port-error mt-2 whitespace-pre-wrap break-words">Error: {error}</div>}
             </div>
 
             {result && (

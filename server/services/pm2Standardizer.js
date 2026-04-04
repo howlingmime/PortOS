@@ -406,7 +406,7 @@ export async function analyzeApp(repoPath, providerId = null) {
 /**
  * Apply standardization changes to the repository
  */
-export async function applyStandardization(repoPath, plan) {
+export async function applyStandardization(repoPath, plan, { skipBackup = false } = {}) {
   const results = {
     success: true,
     backupBranch: null,
@@ -414,8 +414,8 @@ export async function applyStandardization(repoPath, plan) {
     errors: []
   };
 
-  // Create git backup first — abort if working tree is dirty
-  if (plan.currentState.hasGit) {
+  // Create git backup first — abort if working tree is dirty (skip when caller already did it)
+  if (plan.currentState.hasGit && !skipBackup) {
     const backup = await createGitBackup(repoPath);
     if (backup.success) {
       results.backupBranch = backup.branch;
