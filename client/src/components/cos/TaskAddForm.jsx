@@ -206,10 +206,12 @@ export default function TaskAddForm({ providers, apps, onTaskAdded, compact = fa
     setIsSubmitting(false);
     setIsEnhancing(false);
 
+    // Always clear description — trivial to retype; preserves screenshots/attachments on error
+    setNewTask(t => ({ ...t, description: '' }));
+
     if (!result) return;
 
     toast.success('Task added');
-    setNewTask(t => ({ ...t, description: '' }));
     setScreenshots([]);
     setAttachments([]);
     onTaskAdded?.();
