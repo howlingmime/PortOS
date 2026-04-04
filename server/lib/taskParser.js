@@ -56,7 +56,7 @@ function parseTaskLine(line) {
     const statusKey = `[${statusChar}]`;
 
     return {
-      id: id.startsWith('task-') || id.startsWith('sys-') ? id : `task-${id}`,
+      id: id.startsWith('task-') || id.startsWith('sys-') || id.startsWith('app-improve-') ? id : `task-${id}`,
       status: STATUS_MAP[statusKey] || 'pending',
       priority: priority.toUpperCase(),
       priorityValue: PRIORITY_VALUES[priority.toUpperCase()] || 2,
@@ -76,7 +76,7 @@ function parseTaskLine(line) {
   const statusKey = `[${statusChar}]`;
 
   return {
-    id: id.startsWith('task-') || id.startsWith('sys-') ? id : `task-${id}`,
+    id: id.startsWith('task-') || id.startsWith('sys-') || id.startsWith('app-improve-') ? id : `task-${id}`,
     status: STATUS_MAP[statusKey] || 'pending',
     priority: priority.toUpperCase(),
     priorityValue: PRIORITY_VALUES[priority.toUpperCase()] || 2,

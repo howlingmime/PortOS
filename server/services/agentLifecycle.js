@@ -87,8 +87,8 @@ export async function syncRunnerAgents() {
     if (!runnerAgents.has(agent.id)) {
       const task = taskMap.get(agent.taskId);
 
-      // Infer taskType for fallback: sys- prefix tasks are internal (CoS-generated)
-      const inferredType = agent.taskId?.startsWith('sys-') ? 'internal' : 'user';
+      // Infer taskType for fallback: sys- and app-improve- prefix tasks are internal (CoS-generated)
+      const inferredType = (agent.taskId?.startsWith('sys-') || agent.taskId?.startsWith('app-improve-')) ? 'internal' : 'user';
       runnerAgents.set(agent.id, {
         taskId: agent.taskId,
         task: task || { id: agent.taskId, taskType: inferredType, description: 'Recovered from runner' },
