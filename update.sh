@@ -72,7 +72,7 @@ log ""
 
 # Update submodules (slash-do and any others)
 step "submodules" "running" "Updating submodules..."
-run git submodule update --init --recursive --remote
+run git submodule update --init --recursive
 step "submodules" "done" "Submodules updated"
 log ""
 

@@ -309,12 +309,19 @@ module.exports = ${configStr};
 }
 
 /**
- * Create git backup before modifications
+ * Create git backup before modifications.
+ * Refuses to proceed if the working tree has uncommitted changes to avoid data loss.
  */
 export async function createGitBackup(repoPath) {
   // Check if git repo
   if (!existsSync(join(repoPath, '.git'))) {
     return { success: false, reason: 'Not a git repository' };
+  }
+
+  // Refuse to overwrite uncommitted changes
+  const { stdout: statusOut } = await execAsync('git status --porcelain', { cwd: repoPath, windowsHide: true });
+  if (statusOut.trim()) {
+    return { success: false, reason: 'Working tree has uncommitted changes — commit or discard them before standardizing' };
   }
 
   const timestamp = Date.now();
@@ -407,7 +414,7 @@ export async function applyStandardization(repoPath, plan) {
     errors: []
   };
 
-  // Create git backup first
+  // Create git backup first — abort if working tree is dirty
   if (plan.currentState.hasGit) {
     const backup = await createGitBackup(repoPath);
     if (backup.success) {
@@ -415,6 +422,9 @@ export async function applyStandardization(repoPath, plan) {
       console.log(`📦 Created backup branch: ${backup.branch}`);
     } else {
       console.log(`⚠️ Could not create backup: ${backup.reason}`);
+      if (backup.reason?.includes('uncommitted changes')) {
+        return { success: false, error: backup.reason, filesModified: [], errors: [backup.reason] };
+      }
     }
   }
 
