@@ -108,6 +108,12 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Step "git-pull" "done" "Latest changes pulled"
 Write-SafeHost ""
 
+# Update submodules (slash-do and any others)
+Step "submodules" "running" "Updating submodules..."
+Invoke-Logged git submodule update --init --recursive --remote
+Step "submodules" "done" "Submodules updated"
+Write-SafeHost ""
+
 # Stop PM2 apps to release file locks before updating
 Step "pm2-stop" "running" "Stopping PortOS apps..."
 Invoke-Logged npm run pm2:stop

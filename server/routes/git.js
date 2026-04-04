@@ -20,6 +20,22 @@ async function getActiveAgentBranches() {
 
 const router = Router();
 
+// GET /api/git/submodules/status - Get all submodule statuses
+router.get('/submodules/status', asyncHandler(async (req, res) => {
+  const submodules = await git.getSubmodules();
+  res.json(submodules);
+}));
+
+// POST /api/git/submodules/update - Update a specific submodule
+router.post('/submodules/update', asyncHandler(async (req, res) => {
+  const { path } = req.body;
+  if (!path) {
+    throw new ServerError('path is required', { status: 400, code: 'VALIDATION_ERROR' });
+  }
+  const newCommit = await git.updateSubmodule(path);
+  res.json({ success: true, newCommit });
+}));
+
 // GET /api/git/:appId - Get git info for an app
 router.get('/:appId', asyncHandler(async (req, res) => {
   const { appId } = req.params;

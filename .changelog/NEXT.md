@@ -2,6 +2,8 @@
 
 ## Added
 
+- Submodules management page under Dev Tools — view status, check for updates, and update individual or all git submodules from the dashboard
+- Update scripts (`update.sh`, `update.ps1`) now auto-update submodules (including slash-do) during PortOS updates
 - Slash-do agent operations panel on app detail Overview tab — buttons for `/do:push`, `/do:review`, `/do:release`, `/do:better`, and `/do:better-swift` that queue CoS agent tasks with the full command instructions
 - Multi-line task context now renders as a dedicated `### Task Context` section in agent prompts instead of inline
 - Enter key submits the task add form (Shift+Enter for newline)
