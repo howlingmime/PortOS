@@ -40,7 +40,7 @@ export default function QuickBrainCapture() {
         } else {
           toast.error(err.message || 'Failed to save link');
         }
-        setInput(text);
+        setInput(prev => prev || text);
         return null;
       });
       if (result) {
@@ -49,7 +49,7 @@ export default function QuickBrainCapture() {
     } else {
       const result = await api.captureBrainThought(text).catch(err => {
         toast.error(err.message || 'Failed to capture thought');
-        setInput(text);
+        setInput(prev => prev || text);
         return null;
       });
       if (result) {

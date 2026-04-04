@@ -56,7 +56,7 @@ export default function Submodules() {
     return <div className="text-center py-8"><BrailleSpinner text="Loading submodules" /></div>;
   }
 
-  const hasUpdates = submodules.some(s => s.behind > 0);
+  const hasUpdates = submodules.some(s => s.behind > 0 || s.outOfSync || !s.initialized);
 
   return (
     <div className="space-y-6">

@@ -36,9 +36,9 @@ router.post('/submodules/update', asyncHandler(async (req, res) => {
   if (!path) {
     throw new ServerError('path must be a non-empty string', { status: 400, code: 'VALIDATION_ERROR' });
   }
-  // Validate that this is a known submodule path
-  const submodules = await git.getSubmodules();
-  if (!submodules.some(s => s.path === path)) {
+  // Validate that this is a known submodule path (cheap check, no remote fetches)
+  const knownPaths = await git.getSubmodulePaths();
+  if (!knownPaths.includes(path)) {
     throw new ServerError(`Unknown submodule path: ${path}`, { status: 400, code: 'VALIDATION_ERROR' });
   }
   const newCommit = await git.updateSubmodule(path);
