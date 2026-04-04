@@ -476,7 +476,7 @@ function GlobalConfigControls({ taskType, config, onUpdate, onTrigger, onReset, 
                 </div>
                 <ToggleSwitch
                   enabled={enabled}
-                  onChange={(e) => e.stopPropagation()}
+                  onChange={undefined}
                   disabled={updating}
                   tabIndex={-1}
                   ariaLabel={undefined}
