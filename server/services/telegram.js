@@ -381,7 +381,7 @@ async function forwardNotification(notification) {
   const isMemoryApproval = notification.type === NOTIFICATION_TYPES.MEMORY_APPROVAL && notification.metadata?.memoryId;
 
   if (isMemoryApproval) {
-    const memory = await peekMemory(notification.metadata.memoryId);
+    const memory = await peekMemory(notification.metadata.memoryId).catch(() => null);
     const fullContent = memory?.summary || memory?.content || notification.description || '';
     if (fullContent) lines.push(escapeHtml(fullContent));
     opts.reply_markup = JSON.stringify({

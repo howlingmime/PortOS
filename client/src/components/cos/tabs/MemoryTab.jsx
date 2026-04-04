@@ -84,11 +84,15 @@ export default function MemoryTab({ apps = [] }) {
     if (!result) return;
     toast.success(`Memory ${label}`);
     setPendingMemories(prev => prev.filter(m => m.id !== id));
-    setStats(prev => prev ? { ...prev, pendingApproval: Math.max(0, (prev.pendingApproval || 0) - 1), ...updateStats } : prev);
+    setStats(prev => prev ? {
+      ...prev,
+      pendingApproval: Math.max(0, (prev.pendingApproval || 0) - 1),
+      ...(updateStats ? updateStats(prev) : {})
+    } : prev);
   };
 
-  const handleApprove = (id) => handleMemoryAction(id, api.approveMemory, 'approved', { active: (stats?.active || 0) + 1 });
-  const handleReject = (id) => handleMemoryAction(id, api.rejectMemory, 'rejected', {});
+  const handleApprove = (id) => handleMemoryAction(id, api.approveMemory, 'approved', (prev) => ({ active: (prev.active || 0) + 1 }));
+  const handleReject = (id) => handleMemoryAction(id, api.rejectMemory, 'rejected', () => ({}));
 
   useEffect(() => {
     fetchData();

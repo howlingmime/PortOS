@@ -909,7 +909,7 @@ export async function getGitInfo(dir) {
   };
 }
 
-const SUBMODULE_STATUS_RE = /^([+ -])([0-9a-f]+)\s+(\S+)/;
+const SUBMODULE_STATUS_RE = /^([+ \-U])([0-9a-f]+)\s+(\S+)/;
 
 function parseSubmoduleStatusLine(line) {
   const match = line.match(SUBMODULE_STATUS_RE);

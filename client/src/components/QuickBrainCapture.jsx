@@ -9,6 +9,7 @@ const DOMAIN_PATTERN = /^\S+\.\S+$/;
 
 export default function QuickBrainCapture() {
   const [input, setInput] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const isUrl = useMemo(() => {
     const trimmed = input.trim();
@@ -19,8 +20,10 @@ export default function QuickBrainCapture() {
   const handleSubmit = async (e) => {
     e?.preventDefault();
     const text = input.trim();
-    if (!text) return;
+    if (!text || submitting) return;
 
+    // Guard against rapid double-submit
+    setSubmitting(true);
     // Clear input immediately so user can keep typing
     setInput('');
 
@@ -49,6 +52,7 @@ export default function QuickBrainCapture() {
         toast.success(result.message || 'Thought captured');
       }
     }
+    setSubmitting(false);
   };
 
   return (
