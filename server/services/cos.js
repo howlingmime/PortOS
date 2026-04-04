@@ -19,7 +19,7 @@ import { execPm2 } from './pm2.js';
 import { promisify } from 'util';
 import { v4 as uuidv4 } from '../lib/uuid.js';
 import { getActiveProvider } from './providers.js';
-import { parseTasksMarkdown, groupTasksByStatus, getNextTask, getAutoApprovedTasks, getAwaitingApprovalTasks, updateTaskStatus, generateTasksMarkdown } from '../lib/taskParser.js';
+import { parseTasksMarkdown, groupTasksByStatus, getNextTask, getAutoApprovedTasks, getAwaitingApprovalTasks, updateTaskStatus, generateTasksMarkdown, hasKnownPrefix, isInternalTaskId } from '../lib/taskParser.js';
 import { isAppOnCooldown, getNextAppForReview, markAppReviewStarted, markIdleReviewStarted } from './appActivity.js';
 import { getActiveApps, getAppTaskTypeOverrides } from './apps.js';
 import { getAdaptiveCooldownMultiplier, getSkippedTaskTypes, getPerformanceSummary, checkAndRehabilitateSkippedTasks, getLearningInsights, getTaskTypeConfidence } from './taskLearning.js';
@@ -513,7 +513,7 @@ async function resetOrphanedTasks() {
       const successAgentId = successfullyCompletedTaskIds.get(task.id);
       if (successAgentId) {
         emitLog('warn', `🔧 Task ${task.id} still in_progress but agent ${successAgentId} completed successfully — completing task now (missed update)`, { taskId: task.id, agentId: successAgentId });
-        await updateTask(task.id, { status: 'completed' }, task.taskType || (task.id.startsWith('sys-') ? 'internal' : 'user'));
+        await updateTask(task.id, { status: 'completed' }, task.taskType || (isInternalTaskId(task.id) ? 'internal' : 'user'));
         continue;
       }
       emitLog('info', `Found orphaned in_progress task ${task.id}, routing through retry handler`, { taskId: task.id });
@@ -2158,7 +2158,7 @@ export async function addTask(taskData, taskType = 'user', { raw = false } = {})
 
     // Create the new task
     newTask = {
-      id: id.startsWith('task-') || id.startsWith('sys-') ? id : `${taskType === 'user' ? 'task' : 'sys'}-${id}`,
+      id: hasKnownPrefix(id) ? id : `${taskType === 'user' ? 'task' : 'sys'}-${id}`,
       status: 'pending',
       priority: (taskData.priority || 'MEDIUM').toUpperCase(),
       priorityValue: PRIORITY_VALUES[taskData.priority?.toUpperCase()] || 2,
