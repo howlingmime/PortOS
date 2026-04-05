@@ -923,7 +923,8 @@ function parseSubmoduleStatusLine(line) {
 export async function getSubmodules() {
   const root = PATHS.root;
   const result = await execGit(['submodule', 'status'], root);
-  const lines = result.stdout.trim().split('\n').filter(Boolean);
+  // Split before trimming — the leading space is a status character (means "up to date")
+  const lines = result.stdout.split('\n').filter(l => l.trimEnd());
 
   const parsed = lines.map(parseSubmoduleStatusLine).filter(Boolean);
 
@@ -1007,7 +1008,7 @@ async function fetchRemoteInfo(fullPath, currentCommit) {
 export async function getSubmodulePaths() {
   const root = PATHS.root;
   const result = await execGit(['submodule', 'status'], root);
-  return result.stdout.trim().split('\n').filter(Boolean)
+  return result.stdout.split('\n').filter(l => l.trimEnd())
     .map(parseSubmoduleStatusLine).filter(Boolean).map(s => s.path);
 }
 
