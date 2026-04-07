@@ -231,12 +231,20 @@ EOF
     fi
 
     echo "🚀 Uploading iOS to TestFlight..."
+    IOS_UPLOAD_LOG="$BUILD_DIR/ios_upload.log"
+    set +e
     xcrun altool --upload-app \\
         --file "$IPA_PATH" \\
         --type ios \\
         --apiKey "$APPSTORE_API_KEY_ID" \\
         --apiIssuer "$APPSTORE_ISSUER_ID" \\
-        --transport DAV
+        --transport DAV 2>&1 | tee "$IOS_UPLOAD_LOG"
+    IOS_UPLOAD_STATUS=\${PIPESTATUS[0]}
+    set -e
+    if [ "$IOS_UPLOAD_STATUS" -ne 0 ] || grep -qE "UPLOAD FAILED|ERROR: |Validation failed" "$IOS_UPLOAD_LOG"; then
+        echo "❌ iOS upload failed — see errors above"
+        exit 1
+    fi
     echo "✅ iOS upload complete!"
     PLATFORMS_BUILT=$((PLATFORMS_BUILT + 1))
 
@@ -298,11 +306,19 @@ EOF
     fi
 
     echo "🚀 Uploading macOS to TestFlight..."
+    MACOS_UPLOAD_LOG="$BUILD_DIR/macos_upload.log"
+    set +e
     xcrun altool --upload-app \\
         --file "$PKG_PATH" \\
         --type macos \\
         --apiKey "$APPSTORE_API_KEY_ID" \\
-        --apiIssuer "$APPSTORE_ISSUER_ID"
+        --apiIssuer "$APPSTORE_ISSUER_ID" 2>&1 | tee "$MACOS_UPLOAD_LOG"
+    MACOS_UPLOAD_STATUS=\${PIPESTATUS[0]}
+    set -e
+    if [ "$MACOS_UPLOAD_STATUS" -ne 0 ] || grep -qE "UPLOAD FAILED|ERROR: |Validation failed" "$MACOS_UPLOAD_LOG"; then
+        echo "❌ macOS upload failed — see errors above"
+        exit 1
+    fi
     echo "✅ macOS upload complete!"
     PLATFORMS_BUILT=$((PLATFORMS_BUILT + 1))
 
@@ -360,12 +376,20 @@ EOF
     WCK_PATH=$(find "$EXPORT_WATCH" -name "*.ipa" | head -1)
     if [ -n "$WCK_PATH" ]; then
         echo "🚀 Uploading watchOS to TestFlight..."
+        WATCH_UPLOAD_LOG="$BUILD_DIR/watchos_upload.log"
+        set +e
         xcrun altool --upload-app \\
             --file "$WCK_PATH" \\
             --type ios \\
             --apiKey "$APPSTORE_API_KEY_ID" \\
             --apiIssuer "$APPSTORE_ISSUER_ID" \\
-            --transport DAV
+            --transport DAV 2>&1 | tee "$WATCH_UPLOAD_LOG"
+        WATCH_UPLOAD_STATUS=\${PIPESTATUS[0]}
+        set -e
+        if [ "$WATCH_UPLOAD_STATUS" -ne 0 ] || grep -qE "UPLOAD FAILED|ERROR: |Validation failed" "$WATCH_UPLOAD_LOG"; then
+            echo "❌ watchOS upload failed — see errors above"
+            exit 1
+        fi
         echo "✅ watchOS upload complete!"
     else
         echo "ℹ️  No standalone watchOS IPA (bundled with iOS app)"
