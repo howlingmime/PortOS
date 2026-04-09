@@ -231,6 +231,32 @@ describe('Auto-generated Lockfile Detection', () => {
   });
 });
 
+describe('Broken Worktree Detection', () => {
+  // Mirrors the rev-parse validation logic in removeWorktree that prevents
+  // git status from resolving to a parent repo (e.g., PortOS) when the
+  // worktree's .git file is missing
+  function isBrokenWorktree(detectedToplevel, expectedWorktreePath) {
+    return detectedToplevel && detectedToplevel !== expectedWorktreePath;
+  }
+
+  it('should detect worktree resolving to parent repo as broken', () => {
+    const worktreePath = '/data/cos/worktrees/agent-abc';
+    const detectedToplevel = '/Users/user/PortOS'; // parent repo
+    expect(isBrokenWorktree(detectedToplevel, worktreePath)).toBe(true);
+  });
+
+  it('should not flag valid worktree as broken', () => {
+    const worktreePath = '/data/cos/worktrees/agent-abc';
+    const detectedToplevel = '/data/cos/worktrees/agent-abc';
+    expect(isBrokenWorktree(detectedToplevel, worktreePath)).toBe(false);
+  });
+
+  it('should not flag as broken when rev-parse fails (null)', () => {
+    const worktreePath = '/data/cos/worktrees/agent-abc';
+    expect(isBrokenWorktree(null, worktreePath)).toBeFalsy();
+  });
+});
+
 describe('Orphaned Worktree Detection', () => {
   function findOrphanedWorktrees(worktrees, worktreesDir, activeAgentIds) {
     return worktrees.filter(wt => {

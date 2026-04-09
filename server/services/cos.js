@@ -1289,6 +1289,7 @@ async function generateSelfImprovementTaskForType(taskType, state, taskDescripti
 
   // Use configured model/provider if specified, otherwise use default
   if (interval.providerId) {
+    metadata.provider = interval.providerId;
     metadata.providerId = interval.providerId;
   }
   if (interval.model) {

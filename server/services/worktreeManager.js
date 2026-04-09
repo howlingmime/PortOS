@@ -116,6 +116,23 @@ export async function removeWorktree(agentId, sourceWorkspace, branchName, optio
     return { merged: false, removed: true, uncommittedSaved: false, warnings };
   }
 
+  // Verify the worktree still points to the correct repo before trusting git status.
+  // If the .git file is missing (e.g., worktree was partially cleaned up), git walks up
+  // the directory tree and may find a parent repo (e.g., PortOS) instead of the app repo.
+  // In that case, git status would report the parent repo's dirty files, causing us to
+  // incorrectly preserve the worktree.
+  const detectedToplevel = await execGit(['rev-parse', '--show-toplevel'], worktreePath)
+    .then(s => s.trim())
+    .catch(() => null);
+  if (detectedToplevel && detectedToplevel !== worktreePath) {
+    console.log(`🌳 Worktree ${agentId} resolves to ${detectedToplevel} instead of ${worktreePath} — broken worktree, removing`);
+    await rm(worktreePath, { recursive: true, force: true }).catch(rmErr => {
+      console.log(`⚠️ Failed to remove broken worktree ${agentId}: ${rmErr.message}`);
+    });
+    await execGit(['branch', '-D', branchName], sourceWorkspace).catch(() => {});
+    return { merged: false, removed: true, uncommittedSaved: false, warnings };
+  }
+
   // Safety check: abort removal when uncommitted changes are detected.
   // Also fail closed if git status itself fails — treat unknown state as dirty.
   let dirtyFiles;
