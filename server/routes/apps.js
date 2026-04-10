@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
 import { existsSync } from 'fs';
-import { readFile, writeFile, stat } from 'fs/promises';
+import { readFile, writeFile, stat, access } from 'fs/promises';
 import { join, resolve } from 'path';
 import * as appsService from '../services/apps.js';
 import { notifyAppsChanged, PORTOS_APP_ID } from '../services/apps.js';
@@ -21,6 +21,9 @@ import { hasDeployScript } from '../services/appDeployer.js';
 import { checkScripts, installScripts, XCODE_SCRIPT_NAMES } from '../services/xcodeScripts.js';
 
 const router = Router();
+
+/** Async equivalent of existsSync — returns true if the path is accessible */
+const pathExists = (p) => access(p).then(() => true).catch(() => false);
 
 /**
  * Derive uiPort from apiPort when app has dev UI but no dedicated prod UI port
@@ -97,7 +100,7 @@ router.get('/', asyncHandler(async (req, res) => {
 
     // Auto-populate processes from ecosystem config if not already set
     let processes = app.processes;
-    if ((!processes || processes.length === 0) && existsSync(app.repoPath)) {
+    if ((!processes || processes.length === 0) && await pathExists(app.repoPath)) {
       const parsed = await parseEcosystemFromPath(app.repoPath).catch(() => ({ processes: [] }));
       processes = parsed.processes;
     }
@@ -914,25 +917,25 @@ const documentUpdateSchema = z.object({
 router.get('/:id/documents', loadApp, asyncHandler(async (req, res) => {
   const app = req.loadedApp;
 
-  if (!app.repoPath || !existsSync(app.repoPath)) {
+  if (!app.repoPath || !await pathExists(app.repoPath)) {
     return res.json({ documents: [], hasPlanning: false });
   }
 
-  const documents = ALLOWED_DOCUMENTS.map(filename => ({
+  const documents = await Promise.all(ALLOWED_DOCUMENTS.map(async filename => ({
     filename,
-    exists: existsSync(join(app.repoPath, filename))
-  }));
+    exists: await pathExists(join(app.repoPath, filename))
+  })));
 
-  const hasPlanning = existsSync(join(app.repoPath, '.planning'));
+  const planningDir = join(app.repoPath, '.planning');
+  const hasPlanning = await pathExists(planningDir);
 
   // GSD status: detect which GSD artifacts exist
-  const planningDir = join(app.repoPath, '.planning');
   const gsd = {
-    hasCodebaseMap: existsSync(join(planningDir, 'codebase')),
-    hasProject: existsSync(join(planningDir, 'PROJECT.md')),
-    hasRoadmap: existsSync(join(planningDir, 'ROADMAP.md')),
-    hasState: existsSync(join(planningDir, 'STATE.md')),
-    hasConcerns: existsSync(join(planningDir, 'CONCERNS.md')),
+    hasCodebaseMap: await pathExists(join(planningDir, 'codebase')),
+    hasProject: await pathExists(join(planningDir, 'PROJECT.md')),
+    hasRoadmap: await pathExists(join(planningDir, 'ROADMAP.md')),
+    hasState: await pathExists(join(planningDir, 'STATE.md')),
+    hasConcerns: await pathExists(join(planningDir, 'CONCERNS.md')),
   };
 
   res.json({ documents, hasPlanning, gsd });
