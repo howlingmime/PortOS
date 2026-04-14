@@ -21,25 +21,10 @@ export default function LogTab({ vaultId, allNotes }) {
     setLoading(false);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-6 h-6 text-port-accent animate-spin" />
-      </div>
-    );
-  }
-
-  if (!log) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-        <Clock size={32} className="mb-2 opacity-30" />
-        <p className="text-sm">No activity log found</p>
-        <p className="text-xs mt-1">The log is created automatically during wiki operations</p>
-      </div>
-    );
-  }
-
+  // Hooks must run unconditionally — compute entries first (defaulting to []
+  // when log is not yet loaded) and branch into loading/empty states afterwards.
   const entries = useMemo(() => {
+    if (!log) return [];
     const result = [];
     const lines = (log.body || log.content || '').split('\n');
     let currentEntry = null;
@@ -62,6 +47,24 @@ export default function LogTab({ vaultId, allNotes }) {
     result.reverse();
     return result;
   }, [log]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="w-6 h-6 text-port-accent animate-spin" />
+      </div>
+    );
+  }
+
+  if (!log) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+        <Clock size={32} className="mb-2 opacity-30" />
+        <p className="text-sm">No activity log found</p>
+        <p className="text-xs mt-1">The log is created automatically during wiki operations</p>
+      </div>
+    );
+  }
 
   const typeColors = {
     init: 'text-port-accent',

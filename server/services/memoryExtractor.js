@@ -175,11 +175,17 @@ async function findExistingDuplicate(embedding, content, pendingMemories) {
     }
   }
 
-  // Also check pending_approval memories (searchMemories only returns active)
+  // Also check pending_approval memories (searchMemories only returns active).
+  // Note: getMemories() returns index/summary rows without `content`, so we
+  // compare against `summary` (which we also normalize on the incoming memory
+  // for a reasonable cross-match). This keeps the dedup cheap without an
+  // extra round-trip to load full bodies.
   if (pendingMemories.length > 0) {
-    const normalizedContent = normalizeText(content).substring(0, 80);
+    const normalizedIncoming = normalizeText(content).substring(0, 80);
     for (const mem of pendingMemories) {
-      if (normalizeText(mem.content).substring(0, 80) === normalizedContent) {
+      const memText = mem.content || mem.summary || '';
+      if (!memText) continue;
+      if (normalizeText(memText).substring(0, 80) === normalizedIncoming) {
         return mem;
       }
     }
