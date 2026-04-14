@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as api from '../services/api';
-import toast from '../components/ui/Toast';
 import { BookOpen, Search, Network, FileText, BarChart3, RefreshCw, Activity } from 'lucide-react';
 
 import WikiOverviewTab from '../components/wiki/tabs/OverviewTab';
@@ -27,7 +26,6 @@ export default function Wiki() {
   const [selectedVaultId, setSelectedVaultId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState([]);
-  const [totalNotes, setTotalNotes] = useState(0);
 
   const loadVaults = useCallback(async () => {
     const data = await api.getNotesVaults().catch(() => []);
@@ -43,7 +41,6 @@ export default function Wiki() {
     const data = await api.scanNotesVault(selectedVaultId, { limit: 1000 }).catch(() => null);
     if (data) {
       setNotes(data.notes);
-      setTotalNotes(data.total);
     }
   }, [selectedVaultId]);
 

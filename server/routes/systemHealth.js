@@ -52,13 +52,16 @@ router.get('/health/details', async (req, res) => {
   const cpuCount = os.cpus().length;
   const cpuUsagePercent = Math.round((cpuLoad / cpuCount) * 100);
 
-  // Disk usage (root filesystem)
+  // Disk usage (root filesystem).
+  // bavail = blocks available to unprivileged users (what the user can actually fill).
+  // Derive used/usagePercent from the same figure so `used + free === total` and
+  // the UI's percent corresponds to the displayed `free`.
   let disk = null;
   if (diskStats) {
     const totalDisk = diskStats.blocks * diskStats.bsize;
     if (totalDisk > 0) {
       const freeDisk = diskStats.bavail * diskStats.bsize;
-      const usedDisk = totalDisk - (diskStats.bfree * diskStats.bsize);
+      const usedDisk = totalDisk - freeDisk;
       const diskUsagePercent = Math.round((usedDisk / totalDisk) * 100);
       disk = {
         total: totalDisk,

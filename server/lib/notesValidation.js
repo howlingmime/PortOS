@@ -1,9 +1,23 @@
 import { z } from 'zod';
+import { isAbsolute } from 'path';
 
-// Shared: safe relative path (no traversal)
+// Shared: safe relative path (no traversal, no absolute/drive/UNC forms).
+// Rejects:
+//   - `..` anywhere (traversal)
+//   - leading `/` (posix absolute)
+//   - Windows drive letters (e.g. `C:\foo`) and UNC paths (e.g. `\\host\share`)
+//   - backslashes anywhere (only forward slashes are valid separators)
+//   - anything path.isAbsolute recognises on the current platform
 const safeRelativePath = z.string().min(1).max(1000).refine(
-  p => !p.includes('..') && !p.startsWith('/'),
-  { message: 'Path must be relative and cannot contain ..' }
+  p => {
+    if (p.includes('..')) return false;
+    if (p.startsWith('/')) return false;
+    if (p.includes('\\')) return false; // blocks UNC and Windows separators
+    if (/^[A-Za-z]:/.test(p)) return false; // blocks drive-letter prefixes
+    if (isAbsolute(p)) return false;
+    return true;
+  },
+  { message: 'Path must be relative, forward-slash separated, and cannot contain ..' }
 );
 
 export const vaultInputSchema = z.object({
