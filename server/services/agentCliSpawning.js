@@ -450,6 +450,12 @@ export async function spawnDirectly(agentId, task, prompt, workspacePath, model,
       completeExecution(executionId, { success: false });
     }
 
+    const agentDataErr = activeAgents.get(agentId);
+    if (agentDataErr?.killTimer) {
+      clearTimeout(agentDataErr.killTimer);
+      agentDataErr.killTimer = null;
+    }
+
     cosEvents.emit('agent:error', { agentId, error: err.message });
     await completeAgent(agentId, { success: false, error: err.message });
     await completeAgentRun(runId, outputBuffer, 1, 0, { message: err.message, category: 'spawn-error' });
@@ -462,6 +468,13 @@ export async function spawnDirectly(agentId, task, prompt, workspacePath, model,
     const success = code === 0;
     const agentData = activeAgents.get(agentId);
     const duration = Date.now() - (agentData?.startedAt || Date.now());
+
+    // If terminateAgent scheduled a SIGKILL fallback, the process exited
+    // before it fired — clear it so we don't leak the timer.
+    if (agentData?.killTimer) {
+      clearTimeout(agentData.killTimer);
+      agentData.killTimer = null;
+    }
 
     // Flush remaining stream parser data
     if (streamParser) {

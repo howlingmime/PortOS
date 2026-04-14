@@ -2,8 +2,10 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { safeJSONParse, PATHS } from '../lib/fileUtils.js';
 import { listWorktrees } from './worktreeManager.js';
-export { execGit } from '../lib/execGit.js';
 import { execGit } from '../lib/execGit.js';
+
+// Re-export so callers that used to import from services/git.js keep working.
+export { execGit };
 
 const PROTECTED_BRANCHES = ['main', 'master', 'dev', 'develop', 'release'];
 
