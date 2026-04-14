@@ -234,9 +234,16 @@ describe('Auto-generated Lockfile Detection', () => {
 describe('Broken Worktree Detection', () => {
   // Mirrors the rev-parse validation logic in removeWorktree that prevents
   // git status from resolving to a parent repo (e.g., PortOS) when the
-  // worktree's .git file is missing
-  function isBrokenWorktree(detectedToplevel, expectedWorktreePath) {
-    return detectedToplevel && detectedToplevel !== expectedWorktreePath;
+  // worktree's .git file is missing. Mirrors the realpath-normalization too
+  // so symlink-equivalent paths (/var <-> /private/var) don't false-positive.
+  function isBrokenWorktree(detectedToplevel, expectedWorktreePath, realpathFn = p => p) {
+    if (!detectedToplevel) return false;
+    if (detectedToplevel === expectedWorktreePath) return false;
+    try {
+      return realpathFn(detectedToplevel) !== realpathFn(expectedWorktreePath);
+    } catch {
+      return detectedToplevel !== expectedWorktreePath;
+    }
   }
 
   it('should detect worktree resolving to parent repo as broken', () => {
@@ -254,6 +261,14 @@ describe('Broken Worktree Detection', () => {
   it('should not flag as broken when rev-parse fails (null)', () => {
     const worktreePath = '/data/cos/worktrees/agent-abc';
     expect(isBrokenWorktree(null, worktreePath)).toBeFalsy();
+  });
+
+  it('should treat symlink-equivalent paths as the same worktree', () => {
+    // e.g. /var/folders/... resolves to /private/var/folders/... on macOS
+    const worktreePath = '/var/data/cos/worktrees/agent-abc';
+    const detectedToplevel = '/private/var/data/cos/worktrees/agent-abc';
+    const realpathFn = p => p.replace(/^\/var\//, '/private/var/');
+    expect(isBrokenWorktree(detectedToplevel, worktreePath, realpathFn)).toBe(false);
   });
 });
 

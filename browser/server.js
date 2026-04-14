@@ -87,7 +87,13 @@ async function configureDownloadBehavior(downloadDir) {
   });
 
   ws.addEventListener('message', (event) => {
-    const msg = JSON.parse(event.data);
+    // Chrome should only send JSON on this WS, but guard against truncated
+    // frames / non-JSON noise so a single bad message can't crash the service.
+    let msg;
+    try { msg = JSON.parse(event.data); } catch (err) {
+      console.error(`⚠️ Ignoring non-JSON WS frame: ${err.message}`);
+      return;
+    }
     if (msg.id === 1) {
       if (msg.error) {
         console.error(`❌ Browser.setDownloadBehavior failed: ${msg.error.message || JSON.stringify(msg.error)}`);
@@ -114,9 +120,16 @@ function scheduleDownloadReconnect() {
   downloadWsReconnectTimer = setTimeout(async () => {
     downloadWsReconnectTimer = null;
     if (shuttingDown || !downloadDirCurrent) return;
-    if (await checkCdp()) {
-      await configureDownloadBehavior(downloadDirCurrent);
-    } else {
+    // Contain any rejection from checkCdp/configureDownloadBehavior so an
+    // async setTimeout callback can't escape as an unhandledRejection.
+    try {
+      if (await checkCdp()) {
+        await configureDownloadBehavior(downloadDirCurrent);
+      } else {
+        scheduleDownloadReconnect();
+      }
+    } catch (err) {
+      console.error(`⚠️ Download keep-alive reconnect failed: ${err.message}`);
       scheduleDownloadReconnect();
     }
   }, 2000);
