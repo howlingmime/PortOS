@@ -44,10 +44,12 @@ export async function getRelevantMemories(task, options = {}) {
       });
     }
 
-    const fetchedMems = await Promise.all(searchResults.memories.map(r => getMemory(r.id)));
+    // allSettled: a single failed getMemory() shouldn't abort the whole retrieval.
+    const fetchedMems = await Promise.allSettled(searchResults.memories.map(r => getMemory(r.id)));
     for (let i = 0; i < searchResults.memories.length; i++) {
       const result = searchResults.memories[i];
-      const mem = fetchedMems[i];
+      const settled = fetchedMems[i];
+      const mem = settled.status === 'fulfilled' ? settled.value : null;
       if (mem) {
         const tokens = estimateTokens(mem.content);
         if (tokenCount + tokens <= maxTokens) {

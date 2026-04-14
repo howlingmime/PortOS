@@ -29,7 +29,19 @@ export function initCosRunnerConnection() {
 
   const dispatch = (event, data) => {
     const handlers = eventHandlers.get(event);
-    if (handlers) handlers.forEach(h => h(data));
+    if (!handlers) return;
+    for (const h of handlers) {
+      // Guard against sync throws and async rejections so a single bad handler
+      // can't crash the process via unhandledRejection.
+      try {
+        const ret = h(data);
+        if (ret && typeof ret.then === 'function') {
+          ret.catch(err => console.error(`🔌 CoS runner handler for ${event} rejected: ${err.message}`));
+        }
+      } catch (err) {
+        console.error(`🔌 CoS runner handler for ${event} threw: ${err.message}`);
+      }
+    }
   };
 
   socket.on('connect', () => {

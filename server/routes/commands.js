@@ -55,10 +55,18 @@ router.post('/execute', asyncHandler(async (req, res) => {
     if (!existsSync(resolvedPath)) {
       throw new ServerError('workspacePath does not exist', { status: 400, code: 'INVALID_PATH' });
     }
-    if (!statSync(resolvedPath).isDirectory()) {
-      throw new ServerError('workspacePath is not a directory', { status: 400, code: 'INVALID_PATH' });
+    // statSync/realpathSync can throw on permission/symlink edge cases — convert
+    // those into clean 400s rather than leaking as 500 via centralized middleware.
+    let realPath;
+    try {
+      if (!statSync(resolvedPath).isDirectory()) {
+        throw new ServerError('workspacePath is not a directory', { status: 400, code: 'INVALID_PATH' });
+      }
+      realPath = realpathSync(resolvedPath);
+    } catch (err) {
+      if (err instanceof ServerError) throw err;
+      throw new ServerError('workspacePath is not accessible', { status: 400, code: 'INVALID_PATH' });
     }
-    const realPath = realpathSync(resolvedPath);
     const isAllowed = ALLOWED_WORKSPACE_ROOTS.some(root => isWithinRoot(realPath, root));
     if (!isAllowed) {
       throw new ServerError('workspacePath is outside allowed directories', { status: 400, code: 'INVALID_PATH' });

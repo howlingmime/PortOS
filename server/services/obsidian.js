@@ -7,8 +7,8 @@
  */
 
 import { readFile, writeFile, readdir, stat, unlink } from 'fs/promises';
-import { existsSync } from 'fs';
-import { join, relative, basename, dirname, extname } from 'path';
+import { existsSync, realpathSync } from 'fs';
+import { join, relative, resolve, basename, dirname, extname, isAbsolute } from 'path';
 import { v4 as uuidv4 } from '../lib/uuid.js';
 import { ensureDir, readJSONFile, PATHS } from '../lib/fileUtils.js';
 
@@ -86,6 +86,35 @@ export async function updateVault(id, updates) {
 
   await saveVaults(vaults);
   return vault;
+}
+
+// Resolve `notePath` against `vault.path` and confirm the result is still
+// contained within the vault after symlinks are followed. Returns the
+// containable full path or null if the path escapes (including via symlinks,
+// prefix-match tricks like `/vault-evil`, or absolute/UNC inputs). When the
+// target doesn't exist yet (createNote), realpath the parent directory so a
+// new file path can still be validated.
+function resolveVaultPath(vault, notePath) {
+  const rootResolved = resolve(vault.path);
+  const rootReal = (() => {
+    try { return realpathSync(rootResolved); } catch { return rootResolved; }
+  })();
+  const fullPath = resolve(join(vault.path, notePath));
+  const real = (() => {
+    try { return realpathSync(fullPath); } catch {
+      // Non-existent target: realpath the parent (which MUST already exist
+      // for the path to be meaningful) and re-append the basename.
+      try {
+        const parentReal = realpathSync(dirname(fullPath));
+        return join(parentReal, basename(fullPath));
+      } catch {
+        return fullPath;
+      }
+    }
+  })();
+  const rel = relative(rootReal, real);
+  if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))) return real;
+  return null;
 }
 
 export async function getVaultById(id) {
@@ -176,8 +205,8 @@ export async function getNote(vaultId, notePath, { includeBacklinks = true } = {
   const vault = await getVaultById(vaultId);
   if (!vault) return { error: 'VAULT_NOT_FOUND' };
 
-  const fullPath = join(vault.path, notePath);
-  if (!fullPath.startsWith(vault.path)) {
+  const fullPath = resolveVaultPath(vault, notePath);
+  if (!fullPath) {
     return { error: 'INVALID_PATH', message: 'Path traversal not allowed' };
   }
   if (!existsSync(fullPath)) return { error: 'NOTE_NOT_FOUND' };
@@ -208,8 +237,8 @@ export async function updateNote(vaultId, notePath, content) {
   const vault = await getVaultById(vaultId);
   if (!vault) return { error: 'VAULT_NOT_FOUND' };
 
-  const fullPath = join(vault.path, notePath);
-  if (!fullPath.startsWith(vault.path)) return { error: 'INVALID_PATH' };
+  const fullPath = resolveVaultPath(vault, notePath);
+  if (!fullPath) return { error: 'INVALID_PATH' };
   if (!existsSync(fullPath)) return { error: 'NOTE_NOT_FOUND' };
 
   await writeFile(fullPath, content, 'utf-8');
@@ -223,13 +252,15 @@ export async function createNote(vaultId, notePath, content = '') {
 
   if (!notePath.endsWith('.md')) notePath += '.md';
 
-  const fullPath = join(vault.path, notePath);
-  if (!fullPath.startsWith(vault.path)) return { error: 'INVALID_PATH' };
+  // For a new file the target doesn't exist yet — resolveVaultPath realpaths
+  // the parent directory (which must exist) to still catch symlink escapes.
+  await ensureDir(dirname(join(vault.path, notePath)));
+  const fullPath = resolveVaultPath(vault, notePath);
+  if (!fullPath) return { error: 'INVALID_PATH' };
   if (existsSync(fullPath)) {
     return { error: 'NOTE_EXISTS', message: 'A note with this name already exists' };
   }
 
-  await ensureDir(dirname(fullPath));
   await writeFile(fullPath, content, 'utf-8');
   console.log(`📓 Created note: ${notePath} in vault ${vault.name}`);
   return await getNote(vaultId, notePath, { includeBacklinks: false });
@@ -239,8 +270,8 @@ export async function deleteNote(vaultId, notePath) {
   const vault = await getVaultById(vaultId);
   if (!vault) return { error: 'VAULT_NOT_FOUND' };
 
-  const fullPath = join(vault.path, notePath);
-  if (!fullPath.startsWith(vault.path)) return { error: 'INVALID_PATH' };
+  const fullPath = resolveVaultPath(vault, notePath);
+  if (!fullPath) return { error: 'INVALID_PATH' };
   if (!existsSync(fullPath)) return { error: 'NOTE_NOT_FOUND' };
 
   await unlink(fullPath);
