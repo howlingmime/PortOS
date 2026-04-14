@@ -56,15 +56,17 @@ router.get('/health/details', async (req, res) => {
   let disk = null;
   if (diskStats) {
     const totalDisk = diskStats.blocks * diskStats.bsize;
-    const freeDisk = diskStats.bavail * diskStats.bsize;
-    const usedDisk = totalDisk - (diskStats.bfree * diskStats.bsize);
-    const diskUsagePercent = Math.round((usedDisk / totalDisk) * 100);
-    disk = {
-      total: totalDisk,
-      used: usedDisk,
-      free: freeDisk,
-      usagePercent: diskUsagePercent
-    };
+    if (totalDisk > 0) {
+      const freeDisk = diskStats.bavail * diskStats.bsize;
+      const usedDisk = totalDisk - (diskStats.bfree * diskStats.bsize);
+      const diskUsagePercent = Math.round((usedDisk / totalDisk) * 100);
+      disk = {
+        total: totalDisk,
+        used: usedDisk,
+        free: freeDisk,
+        usagePercent: diskUsagePercent
+      };
+    }
   }
 
   // Process status summary from PM2
