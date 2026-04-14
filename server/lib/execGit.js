@@ -19,9 +19,12 @@ export function execGit(args, cwd, options = {}) {
   return new Promise((resolve, reject) => {
     const maxBuffer = options.maxBuffer || 10 * 1024 * 1024;
     const timeout = options.timeout || 30000;
+    // Always disable the shell to keep this helper a hard boundary against
+    // shell-injection. `spawn` resolves `git` via PATH on all supported
+    // platforms (including Windows) without a shell wrapper.
     const child = spawn('git', args, {
       cwd,
-      shell: process.platform === 'win32',
+      shell: false,
       windowsHide: true
     });
 

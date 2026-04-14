@@ -52,7 +52,10 @@ function SafeHtmlBody({ html }) {
   return (
     <iframe
       ref={iframeRef}
-      sandbox=""
+      // allow-same-origin is required to write/resize via contentDocument;
+      // scripts remain blocked (no allow-scripts), and we sanitize HTML upstream
+      // before injecting so the email body cannot execute JS.
+      sandbox="allow-same-origin"
       className="w-full border-0 min-h-[100px]"
       style={{ background: 'transparent' }}
       title="Email content"
