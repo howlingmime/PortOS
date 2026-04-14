@@ -568,9 +568,14 @@ async function executeMoltworldInteract(client, account, params) {
  * Initialize the action executor
  * Listens to scheduler events and executes actions
  */
+let executeListenerRegistered = false;
+
 export function init() {
-  // Prevent duplicate listeners; safe to re-register after listeners are removed
-  if (scheduleEvents.listenerCount('execute') > 0) return;
+  // Prevent duplicate listeners from THIS module specifically; a plain
+  // listenerCount check would false-positive if another module also subscribes
+  // to the `execute` event.
+  if (executeListenerRegistered) return;
+  executeListenerRegistered = true;
 
   scheduleEvents.on('execute', ({ scheduleId, schedule, timestamp }) => {
     (async () => {
