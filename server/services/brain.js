@@ -48,7 +48,12 @@ async function callAI(promptStageName, variables, providerOverride, modelOverrid
   }
 
   const prompt = await buildPrompt(promptStageName, variables);
-  const model = modelOverride || provider.defaultModel;
+  let model = modelOverride || provider.defaultModel;
+
+  // gemini-cli default is a thinking model (2.5-pro); fall back to flash-lite for speed
+  if (provider.id === 'gemini-cli' && !model) {
+    model = 'gemini-2.5-flash-lite';
+  }
 
   console.log(`🧠 Calling AI: ${provider.id} / ${model} / ${promptStageName}`);
 
@@ -59,10 +64,19 @@ async function callAI(promptStageName, variables, providerOverride, modelOverrid
       if (provider.headlessArgs?.length) {
         args.push(...provider.headlessArgs);
       }
+      // gemini-cli goes interactive unless --prompt is set, hanging on /dev/null stdin
+      const isGeminiCli = provider.id === 'gemini-cli';
+      if (isGeminiCli && !args.includes('--output-format') && !args.includes('-o')) {
+        args.push('--output-format', 'text');
+      }
       if (model) {
         args.push('--model', model);
       }
-      args.push(prompt);
+      if (isGeminiCli) {
+        args.push('--prompt', prompt);
+      } else {
+        args.push(prompt);
+      }
       let output = '';
 
       const child = spawn(provider.command, args, {
