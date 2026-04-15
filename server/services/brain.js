@@ -64,7 +64,11 @@ async function callAI(promptStageName, variables, providerOverride, modelOverrid
       if (provider.headlessArgs?.length) {
         args.push(...provider.headlessArgs);
       }
-      // gemini-cli goes interactive unless --prompt is set, hanging on /dev/null stdin
+      // gemini-cli prompt delivery differs here from runner.js and agentCliSpawning.js:
+      // those pipe the prompt via stdin for streaming runs, while this path uses
+      // stdio: ['ignore', ...] for one-shot headless classification. With stdin ignored,
+      // gemini-cli flips to interactive mode and hangs — so the prompt must go via
+      // --prompt, and --output-format text skips interactive-mode detection overhead.
       const isGeminiCli = provider.id === 'gemini-cli';
       if (isGeminiCli && !args.includes('--output-format') && !args.includes('-o')) {
         args.push('--output-format', 'text');
