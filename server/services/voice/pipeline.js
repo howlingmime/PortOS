@@ -11,6 +11,7 @@ import { synthesize } from './tts.js';
 import { streamChat } from './llm.js';
 import { getVoiceConfig } from './config.js';
 import { getToolSpecs, dispatchTool } from './tools.js';
+import { appendJournal, getToday } from '../brainJournal.js';
 
 const buildSystemPrompt = (cfg) => {
   if (!cfg.llm.usePersonality) return cfg.llm.systemPrompt;
@@ -68,7 +69,11 @@ export const splitSentences = (buffer) => {
 // [LAUGHTER], [INAUDIBLE]. Treat those as empty so we don't waste an LLM turn.
 export const isNonSpeechMarker = (text) => /^\s*\[[A-Z_ ]+\]\s*$/i.test(text);
 
-export const runTurn = async ({ audio, text, mimeType, history = [], emit, signal }) => {
+// Recognize spoken phrases that should end dictation without going through the
+// LLM. Intentionally narrow — "I'm done writing" shouldn't match.
+const STOP_DICTATION_RE = /^(stop|end|exit|cancel|pause)\s+(dictation|dictating|logging|recording)[\.\!\s]*$/i;
+
+export const runTurn = async ({ audio, text, mimeType, source, history = [], emit, signal, state }) => {
   const cfg = await getVoiceConfig();
   if (signal?.aborted) return { transcript: '', reply: '' };
 
@@ -82,7 +87,18 @@ export const runTurn = async ({ audio, text, mimeType, history = [], emit, signa
     userText = isNonSpeechMarker(stt.text) ? '' : stt.text;
     emit('voice:transcript', { text: userText, latencyMs: stt.latencyMs });
   } else {
-    emit('voice:transcript', { text: userText, latencyMs: 0, source: 'text' });
+    // VoiceWidget treats transcripts with source !== 'text' as server-STT
+    // output and appends them to the chat log. Web Speech already appended
+    // the user's words locally on onFinal, so reclassifying this echo as
+    // 'voice' would duplicate the message. Keep `source` stable and expose
+    // the caller's routing hint separately so dictation/Origin-aware code
+    // can still distinguish typed vs spoken without breaking chat history.
+    emit('voice:transcript', {
+      text: userText,
+      latencyMs: 0,
+      source: 'text',
+      inputSource: source || 'text',
+    });
   }
 
   if (!userText) {
@@ -91,6 +107,68 @@ export const runTurn = async ({ audio, text, mimeType, history = [], emit, signa
     return { transcript: '', reply: '' };
   }
   if (signal?.aborted) return { transcript: userText, reply: '' };
+
+  // Dictation mode short-circuits the LLM: the user's speech goes straight
+  // into the daily-log entry unless they say the stop phrase, which ends
+  // dictation and falls through to a normal confirmation turn.
+  //
+  // Only applies to spoken input. Typed input (the "Read back" button,
+  // assistant-issued sendText, manual typing) bypasses dictation so the
+  // user can still drive the app while dictation is live. Web Speech mode
+  // hands transcripts over as voice:text with source='voice', so we honor
+  // that hint in addition to the no-text case.
+  const isSpokenInput = !text || source === 'voice';
+  if (isSpokenInput && state?.dictation?.enabled) {
+    const trimmed = userText.trim();
+    // STT can return whitespace-only transcripts (Whisper on silent audio,
+    // trailing partials). Don't fire a bogus append event with { entry: null };
+    // just go idle and wait for the next utterance.
+    if (!trimmed) {
+      emit('voice:idle', { reason: 'empty-transcript' });
+      return { transcript: userText, reply: '' };
+    }
+    if (STOP_DICTATION_RE.test(trimmed)) {
+      state.dictation = { enabled: false, date: null };
+      emit('voice:dictation', { enabled: false });
+      const reply = 'Dictation off.';
+      const { wav, latencyMs } = await synthesize(reply, { signal });
+      // Report the real synth latency so the client's TTS timing stats
+      // reflect actual work, not a hardcoded zero.
+      if (!signal?.aborted) emit('voice:tts:audio', { sentence: reply, wav, latencyMs });
+      emit('voice:llm:delta', { delta: reply });
+      emit('voice:llm:done', { text: reply });
+      emit('voice:idle', { reason: 'turn-complete' });
+      return { transcript: userText, reply };
+    }
+    // Defensive: dictation can be enabled without a date (e.g. UI toggle
+    // without a date, or tool side-effect missing one). Default to today so
+    // we never throw here and kill the user's dictation turn.
+    let date = state.dictation.date;
+    if (!date) {
+      date = await getToday();
+      state.dictation.date = date;
+      console.warn(`🎙️  dictation missing date; defaulting to ${date}`);
+      emit('voice:dictation', { enabled: true, date });
+    }
+    const entry = await appendJournal(date, trimmed, { source: 'voice' });
+    // Ship only the delta (new segment + metadata) rather than the full
+    // entry. `entry.content` and `entry.segments` grow over the day, so
+    // emitting the whole record per utterance would push socket payload
+    // size and serialization cost toward O(n²) during long dictation
+    // sessions. The client patches local state from these fields.
+    const segments = Array.isArray(entry?.segments) ? entry.segments : [];
+    const segment = segments.length ? segments[segments.length - 1] : null;
+    emit('voice:dailyLog:appended', {
+      date,
+      text: trimmed,
+      segment,
+      segmentCount: segments.length,
+      updatedAt: entry?.updatedAt,
+    });
+    console.log(`🎙️  dictation → journal[${date}] +${trimmed.length} chars`);
+    emit('voice:idle', { reason: 'dictation-appended' });
+    return { transcript: userText, reply: '' };
+  }
 
   const messages = [
     { role: 'system', content: buildSystemPrompt(cfg) },
@@ -183,13 +261,31 @@ export const runTurn = async ({ audio, text, mimeType, history = [], emit, signa
       const t0 = Date.now();
       let result;
       let args = {};
+      const ctx = { sideEffects: [] };
       try {
         args = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
-        result = await dispatchTool(tc.function.name, args);
+        result = await dispatchTool(tc.function.name, args, ctx);
         toolRuns.push({ name: tc.function.name, ok: true, ms: Date.now() - t0 });
       } catch (err) {
         result = { ok: false, error: err.message };
         toolRuns.push({ name: tc.function.name, ok: false, ms: Date.now() - t0, error: err.message });
+      }
+      // Apply server-side side-effects (dictation state) and forward
+      // client-facing side-effects (navigation) over the socket.
+      for (const fx of ctx.sideEffects) {
+        if (fx.type === 'dictation' && state) {
+          // When disabling dictation, clear the date so it can't leak to the
+          // UI or be picked up by the next enable. A stale date is worse than
+          // null — it can cause surprising "jumped back to April 17" behavior.
+          const enabled = !!fx.enabled;
+          state.dictation = {
+            enabled,
+            date: enabled ? (fx.date || state.dictation?.date || null) : null,
+          };
+          emit('voice:dictation', { enabled: state.dictation.enabled, date: state.dictation.date });
+        } else if (fx.type === 'navigate') {
+          emit('voice:navigate', { path: fx.path });
+        }
       }
       emit('voice:tool', { name: tc.function.name, args, result });
       messages.push({
@@ -205,12 +301,12 @@ export const runTurn = async ({ audio, text, mimeType, history = [], emit, signa
 
   const totalMs = Date.now() - turnStart;
   const ttsTotal = ttsTimings.reduce((a, b) => a + b, 0);
-  const source = text ? 'text' : 'voice';
+  const inputKind = text ? 'text' : 'voice';
   const toolSummary = toolRuns.length
     ? ` · tools=${toolRuns.map((r) => `${r.name}(${r.ok ? `${r.ms}ms` : 'err'})`).join(',')}`
     : '';
   console.log(
-    `🎙️  ${source} turn ${totalMs}ms — ` +
+    `🎙️  ${inputKind} turn ${totalMs}ms — ` +
     `stt=${sttLatencyMs}ms · ` +
     `llm[${lastLlm?.model}] ttft=${firstLlm?.ttfbMs ?? '—'}ms total=${lastLlm?.totalMs}ms · ` +
     `tts=${ttsTotal}ms (${ttsTimings.length} sentences)` +

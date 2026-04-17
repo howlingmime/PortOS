@@ -1,10 +1,13 @@
 // Per-socket voice handlers.
 // Inbound:  voice:turn | voice:text | voice:interrupt | voice:reset
+//           | voice:dictation:set
 // Outbound: voice:transcript | voice:llm:delta | voice:llm:done | voice:tts:audio
-//           | voice:tool | voice:error | voice:idle
+//           | voice:tool | voice:dictation | voice:navigate
+//           | voice:dailyLog:appended | voice:error | voice:idle
 
 import { runTurn } from '../services/voice/pipeline.js';
 import { getVoiceConfig } from '../services/voice/config.js';
+import { isIsoDate } from '../services/brainJournal.js';
 
 // Cap by messages (each user utterance + assistant reply is ~2). 24 → ~12 turns.
 const HISTORY_MESSAGES = 24;
@@ -25,6 +28,7 @@ export const registerVoiceHandlers = (socket) => {
   const state = {
     history: [],
     ctrl: null,
+    dictation: { enabled: false, date: null },
   };
 
   const pushHistory = (role, content) => {
@@ -35,7 +39,7 @@ export const registerVoiceHandlers = (socket) => {
     }
   };
 
-  const runTurnWithState = async ({ audio, mimeType, text, errorStage }) => {
+  const runTurnWithState = async ({ audio, mimeType, text, source, errorStage }) => {
     state.ctrl?.abort();
     state.ctrl = new AbortController();
     const { signal } = state.ctrl;
@@ -47,14 +51,19 @@ export const registerVoiceHandlers = (socket) => {
 
     try {
       const { transcript, reply } = await runTurn({
-        audio, mimeType, text, history: state.history, emit, signal,
+        audio, mimeType, text, source, history: state.history, emit, signal, state,
       });
       // Don't persist transcript/reply when the turn was aborted or superseded
       // by a newer turn — the user interrupted, and that output shouldn't
       // re-enter context on the next turn.
       if (signal.aborted || state.ctrl?.signal !== signal) return;
-      pushHistory('user', transcript);
-      pushHistory('assistant', reply);
+      // Skip history push while dictating — the transcripts aren't part of
+      // the conversation with the CoS, just raw journal content. An exception:
+      // the stop-dictation reply IS a normal assistant turn, push both sides.
+      if (!state.dictation.enabled || reply) {
+        pushHistory('user', transcript);
+        pushHistory('assistant', reply);
+      }
     } catch (err) {
       if (signal.aborted) return;
       console.error(`🎙️  ${errorStage} failed: ${err.message}`);
@@ -106,7 +115,7 @@ export const registerVoiceHandlers = (socket) => {
 
   socket.on('voice:text', async (payload = {}) => {
     if (!(await ensureEnabled('text'))) return;
-    const raw = payload.text;
+    const raw = payload?.text;
     if (typeof raw !== 'string' && typeof raw !== 'number') {
       socket.emit('voice:error', { stage: 'text', message: 'text is required' });
       return;
@@ -120,7 +129,7 @@ export const registerVoiceHandlers = (socket) => {
       socket.emit('voice:error', { stage: 'text', message: `text too long (${text.length} > ${MAX_TEXT_LEN} chars)` });
       return;
     }
-    await runTurnWithState({ text, errorStage: 'text' });
+    await runTurnWithState({ text, source: payload?.source, errorStage: 'text' });
   });
 
   socket.on('voice:interrupt', () => {
@@ -131,7 +140,36 @@ export const registerVoiceHandlers = (socket) => {
   socket.on('voice:reset', () => {
     state.ctrl?.abort();
     state.history = [];
+    state.dictation = { enabled: false, date: null };
+    socket.emit('voice:dictation', { enabled: false });
     socket.emit('voice:idle', { reason: 'reset' });
+  });
+
+  // Explicit UI control — user toggled dictation from the Daily Log page.
+  // Validate the date to prevent malformed values from flowing into
+  // appendJournal(), which would throw and break the dictation turn. Fall
+  // back to the existing state date (or null to let the pipeline default to
+  // today) rather than storing garbage. Read the payload defensively — a
+  // client emitting `null` or a primitive would otherwise crash the
+  // destructure before our validation runs.
+  //
+  // Gated on the same voice.enabled toggle as voice:turn / voice:text: if
+  // voice is disabled, turning dictation *on* would leave the UI in a
+  // dictating state while subsequent voice turns would be rejected. Force
+  // dictation off and surface the error instead. Disabling is always
+  // allowed — it's a clean-up path that can run regardless of config.
+  socket.on('voice:dictation:set', async (payload) => {
+    const { enabled, date } = payload && typeof payload === 'object' ? payload : {};
+    if (enabled && !(await ensureEnabled('dictation'))) {
+      // Ensure UI and server agree that dictation is off after a blocked
+      // enable, otherwise the UI can silently drift into "dictating" state.
+      state.dictation = { enabled: false, date: null };
+      socket.emit('voice:dictation', { enabled: false });
+      return;
+    }
+    const normalizedDate = isIsoDate(date) ? date : (state.dictation.date || null);
+    state.dictation = { enabled: !!enabled, date: enabled ? normalizedDate : null };
+    socket.emit('voice:dictation', { enabled: state.dictation.enabled, date: state.dictation.date });
   });
 
   socket.on('disconnect', () => {
