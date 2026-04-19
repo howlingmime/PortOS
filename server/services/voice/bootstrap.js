@@ -9,6 +9,7 @@ import { createServer } from 'net';
 import { PATHS } from '../../lib/fileUtils.js';
 import { execPm2, getAppStatus } from '../pm2.js';
 import { expandPath, piperVoiceTildePath } from './config.js';
+import { isToolCapable } from './llm.js';
 
 export const pexec = promisify(execFile);
 
@@ -195,12 +196,76 @@ export const stopWhisper = async () => {
   return { stopped: true };
 };
 
+// Default tool-capable model to auto-install via `lms get` when the user has
+// voice.enabled + tools.enabled + model='auto' but LM Studio has no model that
+// speaks OpenAI structured tool_calls. Qwen2.5-7B-Instruct is the smallest
+// widely-supported option with good tool-use training (~4.5 GB Q4). Can be
+// overridden via PORTOS_VOICE_DEFAULT_TOOL_MODEL.
+const DEFAULT_TOOL_MODEL = () =>
+  process.env.PORTOS_VOICE_DEFAULT_TOOL_MODEL || 'lmstudio-community/Qwen2.5-7B-Instruct-GGUF';
+
+const LMS_BASE = () => (process.env.LM_STUDIO_URL || 'http://localhost:1234')
+  .replace(/\/+$/, '').replace(/\/v1$/, '');
+
+const listLmStudioModels = async () => {
+  const res = await fetch(`${LMS_BASE()}/v1/models`).catch(() => null);
+  if (!res?.ok) return [];
+  const body = await res.json().catch(() => ({}));
+  return (body?.data || []).map((m) => m.id);
+};
+
+export const ensureToolCapableModel = async (cfg) => {
+  // Only intervene when the user opted in: tools on AND model is 'auto'.
+  // An explicit model id means they know what they want — respect it even
+  // if incompatible.
+  if (!cfg?.llm?.tools?.enabled) return { skipped: 'tools-disabled' };
+  if (cfg?.llm?.model && cfg.llm.model !== 'auto') return { skipped: 'explicit-model' };
+
+  const installed = await listLmStudioModels();
+  if (installed.length && installed.some(isToolCapable)) {
+    return { skipped: 'already-capable', model: installed.find(isToolCapable) };
+  }
+
+  const lms = await which('lms');
+  if (!lms) {
+    console.warn(`🎙️  voice: no tool-capable model installed and 'lms' CLI not on PATH — install LM Studio CLI or set voice.llm.model explicitly.`);
+    return { skipped: 'no-lms-cli' };
+  }
+
+  const target = DEFAULT_TOOL_MODEL();
+  console.log(`🎙️  voice: no tool-capable model found — installing ${target} via lms get (multi-GB download, this may take a while)`);
+  const { stdout, stderr } = await pexec(lms, ['get', '-y', target], {
+    maxBuffer: 64 * 1024 * 1024,
+    // 30 min cap — a 4-5 GB GGUF on a slow link can legitimately take this long.
+    timeout: 30 * 60 * 1000,
+  }).catch((err) => ({ stdout: '', stderr: err?.message || String(err) }));
+  if (stderr && /error|failed|not found/i.test(stderr)) {
+    console.warn(`🎙️  voice: lms get ${target} stderr — ${stderr.slice(0, 400)}`);
+  }
+  const after = await listLmStudioModels();
+  const got = after.find(isToolCapable);
+  if (got) {
+    console.log(`🎙️  voice: tool-capable model ready — ${got}`);
+    return { installed: got };
+  }
+  console.warn(`🎙️  voice: lms get completed but no tool-capable model detected — stdout=${(stdout || '').slice(0, 200)}`);
+  return { failed: target };
+};
+
 /**
  * Reconcile PM2 state with desired voice.enabled. Called from
  * PUT /api/voice/config and at server boot.
  */
 export const reconcile = async (cfg) => {
   if (!cfg.enabled) return stopWhisper();
+
+  // Don't block reconcile on this — it can take minutes on first install.
+  // The user will see a clear log line and their first turn may fail with the
+  // new `voice:error` hint until the model finishes downloading, but voice
+  // STT + TTS + whisper are ready immediately.
+  ensureToolCapableModel(cfg).catch((err) => {
+    console.warn(`🎙️  voice: ensureToolCapableModel failed: ${err.message}`);
+  });
 
   const bins = await verifyBinaries(cfg);
   const models = verifyModels(cfg);

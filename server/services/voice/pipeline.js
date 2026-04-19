@@ -73,18 +73,30 @@ export const isNonSpeechMarker = (text) => /^\s*\[[A-Z_ ]+\]\s*$/i.test(text);
 // LLM. Intentionally narrow — "I'm done writing" shouldn't match.
 const STOP_DICTATION_RE = /^(stop|end|exit|cancel|pause)\s+(dictation|dictating|logging|recording)[\.\!\s]*$/i;
 
+// Short correlation id so overlapping turns in the logs can be told apart
+// (user interrupts, late-arriving retries). 5 chars of base36 randomness is
+// plenty for single-user PortOS.
+const shortId = () => Math.random().toString(36).slice(2, 7);
+
 export const runTurn = async ({ audio, text, mimeType, source, history = [], emit, signal, state }) => {
   const cfg = await getVoiceConfig();
   if (signal?.aborted) return { transcript: '', reply: '' };
 
   const turnStart = Date.now();
+  const turnId = shortId();
+  const elapsed = () => Date.now() - turnStart;
+  const tlog = (msg) => console.log(`🎙️ [${turnId}] ${msg} +${elapsed()}ms`);
+
+  tlog(`turn.start source=${text ? 'text' : 'audio'} ${text ? `chars=${String(text).length}` : `bytes=${audio?.byteLength || audio?.length || 0} mime=${mimeType || '—'}`}`);
 
   let userText = text;
   let sttLatencyMs = 0;
   if (!userText) {
+    tlog(`stt.start`);
     const stt = await transcribe(audio, { mimeType, signal });
     sttLatencyMs = stt.latencyMs;
     userText = isNonSpeechMarker(stt.text) ? '' : stt.text;
+    tlog(`stt.done ${sttLatencyMs}ms chars=${userText.length} text="${userText.slice(0, 80)}${userText.length > 80 ? '…' : ''}"`);
     emit('voice:transcript', { text: userText, latencyMs: stt.latencyMs });
   } else {
     // VoiceWidget treats transcripts with source !== 'text' as server-STT
@@ -93,6 +105,7 @@ export const runTurn = async ({ audio, text, mimeType, source, history = [], emi
     // 'voice' would duplicate the message. Keep `source` stable and expose
     // the caller's routing hint separately so dictation/Origin-aware code
     // can still distinguish typed vs spoken without breaking chat history.
+    tlog(`input.text chars=${userText.length} source=${source || 'text'} text="${userText.slice(0, 80)}${userText.length > 80 ? '…' : ''}"`);
     emit('voice:transcript', {
       text: userText,
       latencyMs: 0,
@@ -102,7 +115,7 @@ export const runTurn = async ({ audio, text, mimeType, source, history = [], emi
   }
 
   if (!userText) {
-    console.log(`🎙️  voice: empty input (stt=${sttLatencyMs}ms)`);
+    tlog(`done empty-input stt=${sttLatencyMs}ms`);
     emit('voice:idle', { reason: 'empty-transcript' });
     return { transcript: '', reply: '' };
   }
@@ -182,11 +195,16 @@ export const runTurn = async ({ audio, text, mimeType, source, history = [], emi
 
   let pending = '';
   const ttsTimings = [];
+  let ttsIdx = 0;
   const speak = async (sentence) => {
     if (signal?.aborted || !sentence) return;
+    const i = ++ttsIdx;
+    const t0 = Date.now();
+    tlog(`tts.start #${i} chars=${sentence.length}`);
     const { wav, latencyMs } = await synthesize(sentence, { signal });
     if (signal?.aborted) return;
     ttsTimings.push(latencyMs);
+    tlog(`tts.done  #${i} ${latencyMs}ms synth+queue=${Date.now() - t0}ms`);
     emit('voice:tts:audio', { sentence, wav, latencyMs });
   };
 
@@ -214,17 +232,28 @@ export const runTurn = async ({ audio, text, mimeType, source, history = [], emi
   for (let iter = 0; iter < maxIterations; iter++) {
     if (signal?.aborted) break;
 
+    const iterStart = Date.now();
+    let firstDeltaAt = null;
+    let deltaChars = 0;
+    tlog(`llm.start iter=${iter + 1}/${maxIterations} model=${cfg.llm.model} tools=${toolSpecs?.length || 0} msgs=${messages.length}`);
     const llm = await streamChat(messages, {
       model: cfg.llm.model,
       signal,
       tools: toolSpecs,
+      tag: turnId,
       onDelta: (delta) => {
+        if (firstDeltaAt === null) {
+          firstDeltaAt = Date.now();
+          tlog(`llm.ttft  iter=${iter + 1} ${firstDeltaAt - iterStart}ms model=${lastLlm?.model || cfg.llm.model}`);
+        }
+        deltaChars += delta.length;
         emit('voice:llm:delta', { delta });
         flushSentence(delta);
       },
     });
     if (!firstLlm) firstLlm = llm;
     lastLlm = llm;
+    tlog(`llm.done  iter=${iter + 1} ${Date.now() - iterStart}ms model=${llm.model} text=${(llm.text || '').length}c spoken=${deltaChars}c tool_calls=${llm.toolCalls?.length || 0} finish=${llm.finishReason ?? '—'}`);
     // Accumulate spoken text across tool-calling iterations. The old single-
     // assignment version dropped every earlier segment, so the persisted
     // `reply` (and next turn's history) diverged from what the user actually
@@ -264,11 +293,17 @@ export const runTurn = async ({ audio, text, mimeType, source, history = [], emi
       const ctx = { sideEffects: [] };
       try {
         args = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
+        const argSummary = Object.keys(args).length ? Object.entries(args).map(([k, v]) => `${k}=${JSON.stringify(v).slice(0, 40)}`).join(' ') : '—';
+        tlog(`tool.start ${tc.function.name} ${argSummary}`);
         result = await dispatchTool(tc.function.name, args, ctx);
-        toolRuns.push({ name: tc.function.name, ok: true, ms: Date.now() - t0 });
+        const ms = Date.now() - t0;
+        toolRuns.push({ name: tc.function.name, ok: true, ms });
+        tlog(`tool.done  ${tc.function.name} ok ${ms}ms`);
       } catch (err) {
+        const ms = Date.now() - t0;
         result = { ok: false, error: err.message };
-        toolRuns.push({ name: tc.function.name, ok: false, ms: Date.now() - t0, error: err.message });
+        toolRuns.push({ name: tc.function.name, ok: false, ms, error: err.message });
+        tlog(`tool.fail  ${tc.function.name} ${ms}ms err="${err.message}"`);
       }
       // Apply server-side side-effects (dictation state) and forward
       // client-facing side-effects (navigation) over the socket.
@@ -306,12 +341,25 @@ export const runTurn = async ({ audio, text, mimeType, source, history = [], emi
     ? ` · tools=${toolRuns.map((r) => `${r.name}(${r.ok ? `${r.ms}ms` : 'err'})`).join(',')}`
     : '';
   console.log(
-    `🎙️  ${inputKind} turn ${totalMs}ms — ` +
+    `🎙️ [${turnId}] turn.summary ${inputKind} ${totalMs}ms — ` +
     `stt=${sttLatencyMs}ms · ` +
-    `llm[${lastLlm?.model}] ttft=${firstLlm?.ttfbMs ?? '—'}ms total=${lastLlm?.totalMs}ms · ` +
+    `llm[${lastLlm?.model}] ttft=${firstLlm?.ttfbMs ?? '—'}ms total=${lastLlm?.totalMs}ms finish=${lastLlm?.finishReason ?? '—'} · ` +
     `tts=${ttsTotal}ms (${ttsTimings.length} sentences)` +
     toolSummary
   );
+
+  // Surface the silent-empty-reply case — most commonly caused by picking a
+  // model that doesn't speak the OpenAI tool-calling API (e.g., IBM Granite,
+  // which emits `<tool_call>[...]</tool_call>` inline in content), especially
+  // when many tools are attached and the model bails with a zero-length
+  // stream. Without this the user sees their transcript, then silence.
+  if (!signal?.aborted && !finalText.trim() && toolRuns.length === 0) {
+    const hint = toolsEnabled
+      ? `Model ${lastLlm?.model || cfg.llm.model} returned no response. It may not support OpenAI tool-calling with ${toolSpecs?.length || 0} tools — try a tool-use model (Qwen2.5-Instruct, Hermes-3, Mistral) or disable voice tools in Settings.`
+      : `Model ${lastLlm?.model || cfg.llm.model} returned no response.`;
+    console.warn(`🎙️  empty LLM output — ${hint}`);
+    emit('voice:error', { stage: 'llm', message: hint });
+  }
 
   emit('voice:llm:done', { text: finalText, model: lastLlm?.model, ttfbMs: firstLlm?.ttfbMs });
   emit('voice:idle', { reason: 'turn-complete' });
