@@ -385,7 +385,11 @@ const TOOLS = [
   {
     name: 'goal_log_note',
     description:
-      'Attach a free-form progress note to an active goal (without changing the percent). Use when the user says "log on my X goal that I talked to Y", "add a note to my jacket goal — found the pattern". Matches the goal by fuzzy title match.',
+      'Attach a free-form progress note to an EXISTING NAMED GOAL (without changing the percent). ' +
+      'ONLY use when the user explicitly references a specific goal by its title or short name — phrasings like "log on my <goal> goal that I talked to Y", "add a note to my jacket goal — found the pattern", "update my estate goal: signed the papers". ' +
+      'DO NOT use for generic life events like "set up the cat litter box", "I went for a walk", "the dishwasher broke" — those have no goal context and belong in daily_log_append. ' +
+      'If the user did not say the word "goal" or name a specific known goal, this is the wrong tool. ' +
+      'Matches the goal by fuzzy title match — but if the matched score is weak the call returns ok:false; do not invent a query that doesn\'t come from the user\'s words.',
     parameters: {
       type: 'object',
       properties: {
