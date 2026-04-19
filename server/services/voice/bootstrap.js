@@ -300,11 +300,29 @@ export const ensureToolCapableModel = async (cfg) => {
   return { failed: chain };
 };
 
+// Returns the set of model keys currently loaded in LM Studio (per `lms ps`).
+// `lms load` is NOT idempotent in practice — re-loading an already-loaded
+// model spawns a SECOND instance of it, doubling VRAM. Worse, when VRAM is
+// full the second load fails with "Model loading was stopped due to
+// insufficient system resources" and our preload reports as failed even
+// though the original instance is fine. Always check `lms ps` first.
+const listLoadedModelKeys = async () => {
+  const lms = await which('lms');
+  if (!lms) return new Set();
+  const { stdout } = await pexec(lms, ['ps', '--json'], { timeout: 10_000 })
+    .catch(() => ({ stdout: '' }));
+  try {
+    const arr = JSON.parse(stdout || '[]');
+    return new Set(arr.map((m) => m.modelKey).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+};
+
 // Pre-warm the model that 'auto' will pick on the first turn so the user
-// doesn't pay a 5–30 s cold-load on their first question. `lms load` is
-// idempotent — if the model is already loaded LM Studio returns success
-// immediately. We mirror the resolveModel preference order: tool-capable,
-// non-reasoning, smallest first.
+// doesn't pay a 5–30 s cold-load on their first question. Skip when the
+// chosen model is already loaded — see `listLoadedModelKeys` for why "skip
+// if loaded" matters more than just being efficient.
 export const preloadModel = async (cfg) => {
   if (!cfg?.enabled) return { skipped: 'voice-disabled' };
   if (cfg?.llm?.model && cfg.llm.model !== 'auto') return { skipped: 'explicit-model' };
@@ -324,6 +342,17 @@ export const preloadModel = async (cfg) => {
   const candidates = wantsTools ? installed.filter(isToolCapable) : installed;
   const target = sortPreferred(candidates)[0] || sortPreferred(installed)[0];
   if (!target) return { skipped: 'no-candidate' };
+
+  // CRITICAL: skip the load if the model is already in `lms ps`. Otherwise
+  // every server restart spawns another instance of the same model in
+  // LM Studio (3 copies of qwen3-4b reported in the wild), eating multiples
+  // of its VRAM and causing OOM-style "Model loading was stopped due to
+  // insufficient system resources" errors when nothing is actually wrong.
+  const loaded = await listLoadedModelKeys();
+  if (loaded.has(target)) {
+    console.log(`🎙️  voice: ${target} already loaded — skipping preload`);
+    return { skipped: 'already-loaded', model: target };
+  }
 
   // `lms load` blocks until ready (5-30s cold). Run as fire-and-forget so
   // reconcile returns immediately; whisper/TTS can come up in parallel.
