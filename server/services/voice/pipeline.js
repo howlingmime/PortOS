@@ -26,8 +26,28 @@ const buildSystemPrompt = (cfg) => {
   if (Array.isArray(p.traits) && p.traits.length) lines.push(`Personality: ${p.traits.join(', ')}.`);
   if (cfg.llm.tools?.enabled) {
     // Critical: with tools on, the model must ACTUALLY call them, not just
-    // speak as if it did. Confirm only *after* a tool call succeeds.
-    lines.push('You have tools for acting on the user\'s behalf (for example, saving to the brain inbox). When the user asks you to save, capture, add, remember, note, or file something, you MUST call the matching tool — do not just reply in words. After the tool runs, confirm briefly in one short sentence using the exact words the user said. If you reference the brain inbox, call it "brain inbox" (not "green inbox" or any other near-homophone).');
+    // speak as if it did. Small models (Qwen3-4B etc.) frequently *narrate*
+    // the action — they say "Opening your daily log" without ever issuing
+    // the tool_call. Be explicit about navigation/dictation verbs in
+    // addition to the original capture/save verbs, and tell the model not
+    // to echo or paraphrase the user's request as its own reply.
+    lines.push(
+      'You have tools for acting on the user\'s behalf. ' +
+      'You MUST call the matching tool whenever the user requests an action — ' +
+      'never describe the action in words instead of calling the tool. ' +
+      'Trigger phrases that REQUIRE a tool call: ' +
+      '"open"/"go to"/"take me to"/"show me"/"navigate to" → matching navigation tool (e.g., daily_log_open). ' +
+      'Anything mentioning "daily log" without a clear intent of just discussing it (e.g., "let\'s make a daily log", "I want to make a log entry", "let me log something today", "new daily log") → daily_log_open (set startDictation=true if they said "dictate" / "talk into" / "record"). ' +
+      '"save"/"capture"/"add"/"remember"/"note"/"file"/"log it" → matching capture tool (e.g., brain_capture, meatspace_log_*, daily_log_append, goal_log_note). ' +
+      '"start dictation"/"dictate"/"record my log" → daily_log_start_dictation. ' +
+      '"what time"/"what day"/"what date" → time_now. ' +
+      '"what are my goals"/"my goals" → goal_list. ' +
+      '"is anything crashed"/"pm2 status"/"are services up" → pm2_status. ' +
+      'NEVER reply with just the user\'s request echoed back (e.g., user says "open my daily log" — do NOT reply "open my daily log"; CALL daily_log_open). ' +
+      'NEVER paraphrase the action as your reply ("Sure, opening your daily log now") without first calling the actual tool. ' +
+      'After the tool runs, confirm briefly in one short sentence. ' +
+      'If you reference the brain inbox, call it "brain inbox" (not "green inbox").'
+    );
   } else {
     // Prevent hallucinated actions when tools are disabled.
     lines.push('You cannot take actions right now — no tools are enabled. If the user asks you to save, add, or remember something, acknowledge the request and honestly say you can\'t file it yourself yet. Do not claim to have done anything.');

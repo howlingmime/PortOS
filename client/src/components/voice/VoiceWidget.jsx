@@ -50,6 +50,11 @@ export default function VoiceWidget() {
   const [interimTranscript, setInterimTranscript] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [dictationActive, setDictationActive] = useState(false);
+  // Refs held by the voice:dictation listener so it can call the latest
+  // handleStart/handleStop closures without re-binding socket listeners on
+  // every prop change. Populated in the effect that defines the handlers.
+  const handleStartRef = useRef(null);
+  const handleStopRef = useRef(null);
   const [handsFree, setHandsFree] = useState(() => {
     if (typeof window === 'undefined') return true;
     const stored = window.localStorage.getItem(HANDS_FREE_KEY);
@@ -149,7 +154,21 @@ export default function VoiceWidget() {
         if (d?.path && typeof d.path === 'string') navigate(d.path);
       }),
       onVoiceEvent('voice:dictation', (d) => {
-        setDictationActive((prev) => (prev === !!d?.enabled ? prev : !!d?.enabled));
+        const next = !!d?.enabled;
+        setDictationActive((prev) => (prev === next ? prev : next));
+        // Auto-start the mic when dictation begins — without this, clicking
+        // "Dictate" on the Daily Log enabled server-side dictation but the
+        // user's mic stayed off, so nothing was ever transcribed. Mirror the
+        // stop on the way out so leaving dictation cleans up the recorder.
+        // Read handleStart/handleStop through refs so we always pick up the
+        // latest closure (engine settings can change at runtime).
+        if (next) {
+          // Defer to next tick so the local stage / dictation state has
+          // settled before handleStart reads it.
+          setTimeout(() => { handleStartRef.current?.(); }, 0);
+        } else if (isWebSpeechCapturing() || isCapturing() || isContinuous()) {
+          handleStopRef.current?.();
+        }
       }),
       onVoiceEvent('voice:dailyLog:appended', (d) => {
         if (d?.text) {
@@ -242,6 +261,12 @@ export default function VoiceWidget() {
     }
     warnIfQuiet(r.peak);
   }, [handsFree, useWebSpeech]);
+
+  // Keep the refs the dictation listener uses pointed at the latest closures.
+  // Rebinding the listener itself would tear down/rebuild the socket
+  // subscription on every prop change, which is wasteful.
+  useEffect(() => { handleStartRef.current = handleStart; }, [handleStart]);
+  useEffect(() => { handleStopRef.current = handleStop; }, [handleStop]);
 
   const handleClear = () => {
     resetConversation();
