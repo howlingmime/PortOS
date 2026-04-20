@@ -27,6 +27,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'fs
 import { networkInterfaces } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { findTailscale } from '../server/lib/tailscale.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -37,27 +38,6 @@ const META_PATH = join(CERT_DIR, 'meta.json');
 
 const FORCE = process.argv.includes('--force');
 const SELF_SIGNED_ONLY = process.argv.includes('--self-signed');
-
-// ---- Tailscale CLI detection ---------------------------------------------
-
-const TAILSCALE_CANDIDATES = [
-  '/Applications/Tailscale.app/Contents/MacOS/Tailscale', // macOS GUI install
-  '/usr/local/bin/tailscale',
-  '/opt/homebrew/bin/tailscale',
-  '/usr/bin/tailscale'
-];
-
-function findTailscale() {
-  for (const p of TAILSCALE_CANDIDATES) {
-    if (existsSync(p)) return p;
-  }
-  const path = process.env.PATH || '';
-  for (const dir of path.split(':')) {
-    const p = join(dir, 'tailscale');
-    if (existsSync(p)) return p;
-  }
-  return null;
-}
 
 function tailscaleStatus(bin) {
   const out = execFileSync(bin, ['status', '--json'], { stdio: ['ignore', 'pipe', 'ignore'] });

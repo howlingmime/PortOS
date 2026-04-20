@@ -12,6 +12,7 @@ import { readJSONFile, ensureDir, PATHS, dataPath } from '../lib/fileUtils.js';
 import { createMutex } from '../lib/asyncMutex.js';
 import { instanceEvents } from './instanceEvents.js';
 import { getPeers, DEFAULT_SYNC_CATEGORIES } from './instances.js';
+import { peerBaseUrl } from '../lib/peerUrl.js';
 import * as brainSync from './brainSync.js';
 import * as brainSyncLog from './brainSyncLog.js';
 import * as memorySync from './memorySync.js';
@@ -59,7 +60,7 @@ async function withCursors(fn) {
 // --- Peer fetch helper ---
 
 async function fetchPeer(peer, path) {
-  const url = `http://${peer.address}:${peer.port}${path}`;
+  const url = `${peerBaseUrl(peer)}${path}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -88,7 +89,7 @@ async function syncImageFromPeer(peer, avatarPath) {
   const exists = await access(localPath).then(() => true).catch(() => false);
   if (exists) return;
 
-  const url = `http://${peer.address}:${peer.port}${avatarPath}`;
+  const url = `${peerBaseUrl(peer)}${avatarPath}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {

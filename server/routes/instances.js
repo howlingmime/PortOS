@@ -6,10 +6,15 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import * as instances from '../services/instances.js';
 import { getSyncStatus } from '../services/syncOrchestrator.js';
 import { asyncHandler, ServerError } from '../lib/errorHandler.js';
 import { DEFAULT_PEER_PORT } from '../lib/ports.js';
+import { findTailscale } from '../lib/tailscale.js';
+
+const execFileAsync = promisify(execFile);
 
 const router = Router();
 
@@ -19,7 +24,8 @@ const addPeerSchema = z.object({
     .regex(/^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/, 'Must be a valid IP address')
     .refine(ip => !ip.startsWith('127.') && !ip.startsWith('169.254.'), 'Loopback and link-local addresses are not allowed'),
   port: z.number().int().min(1).max(65535).default(DEFAULT_PEER_PORT),
-  name: z.string().optional()
+  name: z.string().optional(),
+  host: z.string().optional()
 });
 
 const syncCategoriesSchema = z.object({
@@ -35,7 +41,9 @@ const updatePeerSchema = z.object({
   name: z.string().optional(),
   enabled: z.boolean().optional(),
   syncEnabled: z.boolean().optional(),
-  syncCategories: syncCategoriesSchema
+  syncCategories: syncCategoriesSchema,
+  // Accept empty string to clear; any other string is validated/normalized in the service
+  host: z.string().optional().nullable()
 });
 
 const announceSchema = z.object({
@@ -66,6 +74,26 @@ router.get('/sync-status', asyncHandler(async (req, res) => {
     memorySeq: status.local.memorySeq,
     checksums: status.local.checksums
   });
+}));
+
+// GET /api/instances/tailnet-suffix — detect local Tailscale MagicDNS suffix
+// so the UI can auto-suggest DNS names (e.g., `iphone181` + `.taile8179.ts.net`)
+// for peers that currently use bare IP addresses.
+router.get('/tailnet-suffix', asyncHandler(async (req, res) => {
+  const bin = findTailscale();
+  if (!bin) return res.json({ suffix: null, reason: 'tailscale-not-installed' });
+  const { stdout } = await execFileAsync(bin, ['status', '--json']).catch(() => ({ stdout: null }));
+  if (!stdout) return res.json({ suffix: null, reason: 'tailscale-not-running' });
+  const status = JSON.parse(stdout);
+  const suffix = status?.CurrentTailnet?.MagicDNSSuffix ?? status?.MagicDNSSuffix ?? null;
+  // Also include the peer map so the UI can auto-match a peer's instanceId/hostname
+  // to its tailnet DNS name without asking the peer.
+  const peers = Object.values(status?.Peer ?? {}).map(p => ({
+    dnsName: (p.DNSName ?? '').replace(/\.$/, ''),
+    hostName: p.HostName ?? null,
+    ips: p.TailscaleIPs ?? []
+  }));
+  res.json({ suffix, self: (status?.Self?.DNSName ?? '').replace(/\.$/, '') || null, peers });
 }));
 
 // GET /api/instances/self — get this instance's identity
@@ -118,6 +146,12 @@ router.post('/peers', asyncHandler(async (req, res) => {
 // PUT /api/instances/peers/:id — update peer
 router.put('/peers/:id', asyncHandler(async (req, res) => {
   const data = updatePeerSchema.parse(req.body);
+  // Reject invalid DNS names up front so the UI gets a clear error instead of a silent no-op.
+  if (data.host !== undefined && data.host !== null && data.host !== '') {
+    if (instances.validHost(data.host) === undefined) {
+      throw new ServerError('Invalid DNS host — use a hostname like "machine.tailnet.ts.net"', { status: 400 });
+    }
+  }
   const peer = await instances.updatePeer(req.params.id, data);
   if (!peer) throw new ServerError('Peer not found', { status: 404 });
   res.json(peer);
