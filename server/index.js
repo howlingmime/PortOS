@@ -417,6 +417,21 @@ ensureSelf()
         console.log(`⚠️  HTTP only — getUserMedia (mic) will not work over Tailscale IP. Run "npm run setup:cert" to enable HTTPS.`);
       } else {
         initCertRenewer(httpServer);
+        // Tailscale's Let's Encrypt cert only covers <machine>.<tailnet>.ts.net,
+        // so https://localhost:PORT fails the cert check. Spin up a loopback-
+        // only HTTP listener on a sibling port for local dev/debugging —
+        // Chrome treats http://localhost as a secure context so getUserMedia
+        // still works. Same Express app + same Socket.IO instance (via
+        // io.attach), so routes and websocket events are identical.
+        const localHttpPort = Number(process.env.PORTOS_HTTP_PORT) || Number(PORT) - 2;
+        const localServer = createHttpServer(app);
+        io.attach(localServer);
+        localServer.listen(localHttpPort, '127.0.0.1', () => {
+          console.log(`🔓 Local HTTP also at http://localhost:${localHttpPort} (loopback only, no cert warnings)`);
+        });
+        localServer.on('error', (err) => {
+          console.warn(`⚠️  Local HTTP fallback on :${localHttpPort} failed: ${err.message} — Tailscale HTTPS still active`);
+        });
       }
 
       // Set up process error handlers with io instance
