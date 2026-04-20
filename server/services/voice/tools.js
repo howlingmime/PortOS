@@ -14,6 +14,131 @@ import * as journal from '../brainJournal.js';
 
 const DAILY_LOG_PATH = '/brain/daily-log';
 
+// Named pages the voice agent can navigate to. Keys are spoken-friendly aliases
+// (what the user is likely to say); values are app routes. Keep in sync with
+// Layout.jsx — when you add a nav item the user might ask for by voice, add
+// its alias(es) here.
+const NAV_PAGES = {
+  dashboard: '/',
+  home: '/',
+  apps: '/apps',
+  'review-hub': '/review',
+  review: '/review',
+  cybercity: '/city',
+  city: '/city',
+  character: '/character',
+  data: '/data',
+  shell: '/shell',
+  browser: '/browser',
+  instances: '/instances',
+  loops: '/loops',
+  openclaw: '/openclaw',
+  'social-agents': '/agents',
+  // Chief of Staff
+  'chief-of-staff': '/cos/tasks',
+  cos: '/cos/tasks',
+  tasks: '/cos/tasks',
+  'cos-tasks': '/cos/tasks',
+  'cos-agents': '/cos/agents',
+  agents: '/cos/agents',
+  'cos-briefing': '/cos/briefing',
+  briefing: '/cos/briefing',
+  'cos-gsd': '/cos/gsd',
+  gsd: '/cos/gsd',
+  'cos-health': '/cos/health',
+  'cos-jobs': '/cos/jobs',
+  'system-tasks': '/cos/jobs',
+  'cos-schedule': '/cos/schedule',
+  schedule: '/cos/schedule',
+  'cos-scripts': '/cos/scripts',
+  'cos-memory': '/cos/memory',
+  'cos-learning': '/cos/learning',
+  'cos-productivity': '/cos/productivity',
+  streaks: '/cos/productivity',
+  'cos-digest': '/cos/digest',
+  'cos-config': '/cos/config',
+  // Brain
+  brain: '/brain/inbox',
+  'brain-inbox': '/brain/inbox',
+  inbox: '/brain/inbox',
+  'daily-log': '/brain/daily-log',
+  'brain-digest': '/brain/digest',
+  'brain-graph': '/brain/graph',
+  'brain-links': '/brain/links',
+  'brain-memory': '/brain/memory',
+  'brain-notes': '/brain/notes',
+  notes: '/brain/notes',
+  'brain-trust': '/brain/trust',
+  // Calendar
+  calendar: '/calendar/agenda',
+  agenda: '/calendar/agenda',
+  'calendar-day': '/calendar/day',
+  'calendar-week': '/calendar/week',
+  'calendar-month': '/calendar/month',
+  'calendar-lifetime': '/calendar/lifetime',
+  'calendar-review': '/calendar/review',
+  'calendar-sync': '/calendar/sync',
+  // Digital Twin
+  'digital-twin': '/digital-twin/overview',
+  twin: '/digital-twin/overview',
+  'twin-autobiography': '/digital-twin/autobiography',
+  'twin-documents': '/digital-twin/documents',
+  'twin-identity': '/digital-twin/identity',
+  'twin-interview': '/digital-twin/interview',
+  // Goals & Insights
+  goals: '/goals/list',
+  insights: '/insights/overview',
+  // MeatSpace
+  meatspace: '/meatspace/overview',
+  'meatspace-health': '/meatspace/health',
+  'meatspace-body': '/meatspace/body',
+  'meatspace-alcohol': '/meatspace/alcohol',
+  'meatspace-nicotine': '/meatspace/nicotine',
+  'meatspace-age': '/meatspace/age',
+  'meatspace-blood': '/meatspace/blood',
+  'meatspace-genome': '/meatspace/genome',
+  'meatspace-lifestyle': '/meatspace/lifestyle',
+  // Messages
+  messages: '/messages/inbox',
+  drafts: '/messages/drafts',
+  // POST
+  post: '/post/launcher',
+  'post-launcher': '/post/launcher',
+  'post-history': '/post/history',
+  'post-wordplay': '/post/wordplay',
+  // Wiki
+  wiki: '/wiki/overview',
+  'wiki-browse': '/wiki/browse',
+  'wiki-graph': '/wiki/graph',
+  'wiki-search': '/wiki/search',
+  // Dev tools
+  devtools: '/devtools/runs',
+  'ai-runs': '/devtools/runs',
+  'ai-agents': '/devtools/agents',
+  'feature-agents': '/feature-agents',
+  'devtools-github': '/devtools/github',
+  github: '/devtools/github',
+  'devtools-jira': '/devtools/jira',
+  jira: '/devtools/jira',
+  'devtools-datadog': '/devtools/datadog',
+  datadog: '/devtools/datadog',
+  'devtools-history': '/devtools/history',
+  'devtools-processes': '/devtools/processes',
+  'devtools-usage': '/devtools/usage',
+  'devtools-runner': '/devtools/runner',
+  'devtools-submodules': '/devtools/submodules',
+  // Settings
+  settings: '/settings/backup',
+  'settings-voice': '/settings/voice',
+  'settings-telegram': '/settings/telegram',
+  'settings-database': '/settings/database',
+  prompts: '/prompts',
+  providers: '/ai',
+  'ai-providers': '/ai',
+  security: '/security',
+  uploads: '/uploads',
+};
+
 // Shorthand presets for voice logging. A user saying "I had a beer" should
 // not need to recite oz + ABV — these defaults match typical US servings.
 const DRINK_PRESETS = {
@@ -28,6 +153,113 @@ const NICOTINE_PRESETS = {
   cigarette: { mgPerUnit: 1 },
   vape:      { mgPerUnit: 1 },
   pouch:     { mgPerUnit: 6 },
+};
+
+// Shared with pipeline.js (summarizeUi) and the client's domIndex.classify.
+// Mirror of the client-side kinds; keep in sync.
+export const UI_KINDS = ['tab', 'button', 'link', 'input', 'textarea', 'select', 'checkbox', 'radio'];
+
+// Per-turn tool filtering. Small models (qwen3-4b, granite, etc.) choke when
+// given 25 tools — the schema alone is 10+ KB and routing accuracy tanks.
+// Group each tool by domain; expose only the groups whose intent regex
+// matches the user's utterance, plus the always-on set. "open the tasks
+// page" sees ~8 tools instead of 25; "I had a beer" sees ~8 instead of 25.
+const TOOL_GROUPS = {
+  brain_search: 'brain',
+  brain_list_recent: 'brain',
+  meatspace_log_drink: 'meatspace',
+  meatspace_log_nicotine: 'meatspace',
+  meatspace_summary_today: 'meatspace',
+  meatspace_log_weight: 'meatspace',
+  goal_list: 'goals',
+  goal_update_progress: 'goals',
+  goal_log_note: 'goals',
+  pm2_status: 'system',
+  pm2_restart: 'system',
+  feeds_digest: 'feeds',
+  daily_log_open: 'dailylog',
+  daily_log_start_dictation: 'dailylog',
+  daily_log_stop_dictation: 'dailylog',
+  daily_log_read: 'dailylog',
+  ui_list_interactables: 'ui',
+  ui_click: 'ui',
+  ui_fill: 'ui',
+  ui_select: 'ui',
+  ui_check: 'ui',
+  // UNGROUPED = always-on: time_now, brain_capture, daily_log_append,
+  // ui_navigate. These cover the highest-frequency intents.
+};
+
+// Loose on purpose — false positives are cheap (one extra tool), false
+// negatives are expensive (LLM guesses wrong or can't act).
+export const UI_INTENT_RE = /\b(click|press|tap|hit|open|go to|take me|show me|navigate|select|pick|switch|choose|tab|button|dropdown|field|input|fill|enter|type|write|check|uncheck|toggle|link|option|on (?:this|the) page|what(?:'s)? (?:on|here))\b/i;
+const GROUP_INTENT = {
+  brain: /\b(search|find|look ?up|recall|what did I (?:say|write|note)|brain|inbox|capture)\b/i,
+  meatspace: /\b(drink|drank|beer|wine|whiskey|shot|cocktail|cigarette|vape|pouch|nicotine|weigh|pound|kilo|kg|smoke|smoking|how am I|summary today|log (?:a|my) (?:drink|weight|nicotine))\b/i,
+  goals: /\b(goals?|progress|objective)\b/i,
+  system: /\b(restart|crash(?:ed)?|pm2|process|service|is.*(?:running|down|up)|status)\b/i,
+  feeds: /\b(feeds?|news|unread|article|rss|digest)\b/i,
+  dailylog: /\b(daily ?log|journal|dictat|log entry|log something|to my log|read (?:back )?my log)\b/i,
+  ui: UI_INTENT_RE,
+};
+
+// Fail-fast at import time: any group referenced in TOOL_GROUPS that has no
+// matching GROUP_INTENT entry means a tool silently never reaches the LLM.
+// A typo (`'daily_log'` vs `'dailylog'`) is otherwise invisible until the
+// user tries that group and the LLM has no tool to call.
+for (const [name, group] of Object.entries(TOOL_GROUPS)) {
+  if (!(group in GROUP_INTENT)) {
+    throw new Error(`voice tools: TOOL_GROUPS[${name}] = "${group}" but no GROUP_INTENT.${group} regex defined`);
+  }
+}
+
+const normalizeLabel = (s) => (s || '')
+  .toLowerCase()
+  .replace(/\s+/g, ' ')
+  .trim()
+  .replace(/[.!?:;,"']+$/, '');
+
+// Accepts one kind OR an array of kinds for multi-kind tools like ui_fill
+// (input|textarea) and ui_check (checkbox|radio). The error pool and label
+// come from the union so the LLM sees the correct "available" list.
+const findUiElement = (ctx, label, kindHint) => {
+  const ui = ctx?.state?.ui;
+  if (!ui || !Array.isArray(ui.elements) || !ui.elements.length) {
+    return {
+      entry: null,
+      err: {
+        ok: false,
+        error: 'No UI index available',
+        summary: 'I don\'t see the page contents yet — reload the voice widget and try again.',
+      },
+    };
+  }
+  const kinds = Array.isArray(kindHint) ? kindHint : (kindHint ? [kindHint] : null);
+  const target = normalizeLabel(label);
+  const withKind = kinds ? ui.elements.filter((e) => kinds.includes(e.kind)) : ui.elements;
+  const pools = kinds ? [withKind, ui.elements] : [ui.elements];
+  const matchers = [
+    (lab) => lab === target,
+    (lab) => lab.startsWith(target),
+    (lab) => lab.includes(target),
+  ];
+  for (const matcher of matchers) {
+    for (const pool of pools) {
+      const hit = pool.find((e) => matcher(normalizeLabel(e.label)));
+      if (hit) return { entry: hit, err: null };
+    }
+  }
+  const available = (kinds ? withKind : ui.elements).slice(0, 12).map((e) => e.label);
+  const kindLabel = kinds ? kinds.join('/') : 'element';
+  return {
+    entry: null,
+    err: {
+      ok: false,
+      error: `No ${kindLabel} matching "${label}" on this page`,
+      available,
+      summary: `I don't see "${label}" on this page. Available: ${available.join(', ') || 'none'}.`,
+    },
+  };
 };
 
 const resolveDrinkPreset = (name) => {
@@ -508,7 +740,7 @@ const TOOLS = [
   {
     name: 'daily_log_open',
     description:
-      'Open the Daily Log page in the UI and optionally start voice dictation mode. ' +
+      'Open the Daily Log page AND (typically) start dictation. ONLY use when the user explicitly mentions "daily log", "log entry", "journal", or dictation — NEVER use this as a generic "take me to a page" tool; for any other destination call ui_navigate instead. ' +
       'Use when the user says "open my daily log", "take me to my daily log", "go to daily log", "let\'s make a daily log", "let\'s make a new daily log", "I want to make a log entry", "start my daily log", "new daily log", "let me add to my log". ' +
       'Set startDictation=true (DEFAULT for create-intent phrasings) when the user wants to write content right now — i.e., they said any of: "make"/"start"/"new"/"create"/"dictate"/"record"/"talk into"/"log something". ' +
       'Set startDictation=false ONLY when the user explicitly just wants to LOOK at the page without writing — i.e., they said "show me", "open"/"go to" without any create/write verb. ' +
@@ -625,6 +857,165 @@ const TOOLS = [
   },
 
   {
+    name: 'ui_navigate',
+    description:
+      'Navigate the UI to a page. Use for "take me to X" / "open X" / "go to X" EXCEPT Daily Log (use daily_log_open). ' +
+      'Pass `page` as a short name the user would say: tasks, agents, gsd, briefing, calendar, goals, brain, meatspace, memory, messages, settings, shell, instances, wiki, character, health, body, alcohol, etc. ' +
+      'Server resolves fuzzy — "chief of staff tasks", "cos tasks", "task page" all map to tasks. If no match, the error lists valid names.',
+    parameters: {
+      type: 'object',
+      properties: {
+        page: {
+          type: 'string',
+          description: 'Short page name the user said (e.g. "tasks", "calendar"). Server fuzzy-matches.',
+        },
+        path: {
+          type: 'string',
+          description: 'Explicit route path starting with / (e.g. "/cos/tasks"). Only when page doesn\'t fit.',
+        },
+      },
+    },
+    execute: async ({ page, path } = {}, ctx = {}) => {
+      let target = null;
+      let resolvedKey = null;
+      if (page && typeof page === 'string') {
+        const norm = normalizeLabel(page).replace(/\s+/g, '-');
+        const keys = Object.keys(NAV_PAGES);
+        // Tiered match: exact → key prefixes norm → norm prefixes key → key
+        // contained in norm (so "chief-of-staff-tasks" finds "tasks") → key
+        // contains norm substring. Last word tried as a standalone key at
+        // the end since voice phrasings often end with the target page.
+        const tail = norm.split('-').filter(Boolean).pop();
+        const picks = [
+          keys.find((k) => k === norm),
+          keys.find((k) => norm.startsWith(k) && k.length >= 3),
+          keys.find((k) => k.startsWith(norm)),
+          keys.find((k) => norm.endsWith(`-${k}`) && k.length >= 3),
+          keys.find((k) => norm.includes(k) && k.length >= 4),
+          keys.find((k) => k.includes(norm)),
+          tail && tail !== norm ? keys.find((k) => k === tail) : null,
+        ];
+        const hit = picks.find(Boolean);
+        if (hit) { target = NAV_PAGES[hit]; resolvedKey = hit; }
+      }
+      if (!target && path && typeof path === 'string' && path.startsWith('/')) target = path;
+      if (!target) {
+        const suggestions = ['tasks', 'agents', 'gsd', 'briefing', 'calendar', 'goals', 'brain', 'meatspace', 'messages', 'settings', 'shell', 'instances'];
+        return {
+          ok: false,
+          error: `Unknown page "${page || path || ''}"`,
+          suggestions,
+          summary: `I don't know that page. Try: ${suggestions.slice(0, 6).join(', ')}.`,
+        };
+      }
+      ctx.sideEffects?.push({ type: 'navigate', path: target });
+      return { ok: true, path: target, summary: `Opened ${resolvedKey || target}.` };
+    },
+  },
+
+  {
+    name: 'ui_list_interactables',
+    description: 'List interactive elements on the current page. Fallback when the per-turn UI summary isn\'t enough.',
+    parameters: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: UI_KINDS, description: 'Optional kind filter.' },
+      },
+    },
+    execute: async ({ kind } = {}, ctx = {}) => {
+      const ui = ctx.state?.ui;
+      if (!ui || !Array.isArray(ui.elements)) {
+        return { ok: false, error: 'No UI index available. The user may not have the voice widget loaded.' };
+      }
+      const items = kind ? ui.elements.filter((e) => e.kind === kind) : ui.elements;
+      return {
+        ok: true,
+        path: ui.path,
+        title: ui.title,
+        count: items.length,
+        items: items.slice(0, 100),
+        summary: `${items.length} interactive element${items.length === 1 ? '' : 's'} on ${ui.title || ui.path || 'this page'}.`,
+      };
+    },
+  },
+
+  {
+    name: 'ui_click',
+    description: 'Click a tab, button, or link on the current page by visible label. "Select Memory tab" → label="Memory", kind="tab".',
+    parameters: {
+      type: 'object',
+      properties: {
+        label: { type: 'string', description: 'Visible label.' },
+        kind: { type: 'string', enum: ['tab', 'button', 'link'], description: 'Optional kind hint.' },
+      },
+      required: ['label'],
+    },
+    execute: async ({ label, kind } = {}, ctx = {}) => {
+      const hit = findUiElement(ctx, label, kind);
+      if (!hit.entry) return hit.err;
+      ctx.sideEffects?.push({ type: 'ui:click', target: { ref: hit.entry.ref, label: hit.entry.label } });
+      return { ok: true, label: hit.entry.label, kind: hit.entry.kind, summary: `Clicked ${hit.entry.label}.` };
+    },
+  },
+
+  {
+    name: 'ui_fill',
+    description: 'Type text into an input or textarea by its label. Use ui_select for dropdowns, ui_check for checkboxes.',
+    parameters: {
+      type: 'object',
+      properties: {
+        label: { type: 'string', description: 'Visible label of the input.' },
+        value: { type: 'string', description: 'Text to fill in.' },
+      },
+      required: ['label', 'value'],
+    },
+    execute: async ({ label, value } = {}, ctx = {}) => {
+      const hit = findUiElement(ctx, label, ['input', 'textarea']);
+      if (!hit.entry) return hit.err;
+      ctx.sideEffects?.push({ type: 'ui:fill', target: { ref: hit.entry.ref, label: hit.entry.label }, value: String(value ?? '') });
+      return { ok: true, label: hit.entry.label, summary: `Filled ${hit.entry.label}.` };
+    },
+  },
+
+  {
+    name: 'ui_select',
+    description: 'Pick an option from a <select> dropdown by label. "Set status to Active" → label="Status", option="Active".',
+    parameters: {
+      type: 'object',
+      properties: {
+        label: { type: 'string', description: 'Visible label of the select.' },
+        option: { type: 'string', description: 'Option text or value.' },
+      },
+      required: ['label', 'option'],
+    },
+    execute: async ({ label, option } = {}, ctx = {}) => {
+      const hit = findUiElement(ctx, label, 'select');
+      if (!hit.entry) return hit.err;
+      ctx.sideEffects?.push({ type: 'ui:select', target: { ref: hit.entry.ref, label: hit.entry.label }, option: String(option) });
+      return { ok: true, label: hit.entry.label, option, summary: `Selected ${option} on ${hit.entry.label}.` };
+    },
+  },
+
+  {
+    name: 'ui_check',
+    description: 'Toggle a checkbox or radio by label. checked=true to check, false to uncheck.',
+    parameters: {
+      type: 'object',
+      properties: {
+        label: { type: 'string', description: 'Visible label.' },
+        checked: { type: 'boolean', description: 'Desired state.' },
+      },
+      required: ['label', 'checked'],
+    },
+    execute: async ({ label, checked } = {}, ctx = {}) => {
+      const hit = findUiElement(ctx, label, ['checkbox', 'radio']);
+      if (!hit.entry) return hit.err;
+      ctx.sideEffects?.push({ type: 'ui:check', target: { ref: hit.entry.ref, label: hit.entry.label }, checked: !!checked });
+      return { ok: true, label: hit.entry.label, checked: !!checked, summary: `${checked ? 'Checked' : 'Unchecked'} ${hit.entry.label}.` };
+    },
+  },
+
+  {
     name: 'time_now',
     description:
       'Report the current local date, time, and day of week. Use when the user asks "what time is it?", "what day is today?", "what\'s the date?". LLMs don\'t know the current time on their own — always call this tool rather than guessing.',
@@ -648,10 +1039,38 @@ const TOOLS = [
   },
 ];
 
-export const getToolSpecs = () => TOOLS.map((t) => ({
+const toSpec = (t) => ({
   type: 'function',
   function: { name: t.name, description: t.description, parameters: t.parameters },
-}));
+});
+
+export const getToolSpecs = () => TOOLS.map(toSpec);
+
+// Intent-filtered spec list. Pass the user's current utterance; returns the
+// filtered spec array PLUS the set of active groups so downstream consumers
+// (pipeline.js → shouldIncludeUi) don't have to re-run the same regexes.
+// Cuts ~25 tools to ~8–12 per turn so small tool-use models (qwen3-4b etc.)
+// don't choke.
+export const classifyIntent = (userText) => {
+  const active = new Set();
+  if (!userText) return active;
+  for (const [group, re] of Object.entries(GROUP_INTENT)) {
+    if (re.test(userText)) active.add(group);
+  }
+  return active;
+};
+
+export const getToolSpecsForIntent = (userText) => {
+  if (!userText) return { specs: getToolSpecs(), activeGroups: new Set() };
+  const activeGroups = classifyIntent(userText);
+  const specs = TOOLS
+    .filter((t) => {
+      const group = TOOL_GROUPS[t.name];
+      return !group || activeGroups.has(group);
+    })
+    .map(toSpec);
+  return { specs, activeGroups };
+};
 
 export const dispatchTool = async (name, args, ctx) => {
   const tool = TOOLS.find((t) => t.name === name);

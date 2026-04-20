@@ -10,8 +10,89 @@ import { transcribe } from './stt.js';
 import { synthesize } from './tts.js';
 import { streamChat } from './llm.js';
 import { getVoiceConfig } from './config.js';
-import { getToolSpecs, dispatchTool } from './tools.js';
+import { getToolSpecsForIntent, classifyIntent, dispatchTool, UI_KINDS } from './tools.js';
 import { appendJournal, getToday } from '../brainJournal.js';
+
+// Compact per-page UI summary the LLM uses to drive ui_* tools. Keep it
+// short — every turn pays the token cost. Groups elements by kind and shows
+// label only; full state (values, options) is still available through
+// ui_list_interactables if the LLM needs more detail.
+const UI_SUMMARY_MAX_CHARS = 4000;
+const KIND_HEADINGS = {
+  tab: 'Tabs (* = active)',
+  button: 'Buttons',
+  link: 'Links',
+  input: 'Inputs',
+  textarea: 'Textareas',
+  select: 'Selects',
+  checkbox: 'Checkboxes',
+  radio: 'Radios',
+};
+const summarizeUi = (ui) => {
+  if (!ui || !Array.isArray(ui.elements) || !ui.elements.length) return null;
+  const groups = Object.fromEntries(UI_KINDS.map((k) => [k, []]));
+  for (const e of ui.elements) {
+    const g = groups[e.kind];
+    if (!g) continue;
+    let s = e.label;
+    if (e.kind === 'tab' && e.active) s = `${s}*`;
+    else if (e.kind === 'input' || e.kind === 'textarea') {
+      const type = e.type && e.type !== 'text' ? `:${e.type}` : '';
+      s = `${s}${type}`;
+    } else if (e.kind === 'select' && Array.isArray(e.options)) {
+      const opts = e.options.slice(0, 6).join('|');
+      s = `${s}[${opts}${e.options.length > 6 ? '…' : ''}]`;
+    } else if (e.kind === 'checkbox' || e.kind === 'radio') {
+      s = `${s}${e.checked ? '(✓)' : ''}`;
+    }
+    g.push(s);
+  }
+  const parts = [];
+  if (ui.title) parts.push(`Page: ${ui.title}${ui.path ? ` (${ui.path})` : ''}.`);
+  for (const k of UI_KINDS) {
+    if (groups[k].length) parts.push(`${KIND_HEADINGS[k]}: ${groups[k].slice(0, 40).join(', ')}.`);
+  }
+  const out = parts.join(' ');
+  // Hard cap so a page with hundreds of long labels can't blow past the
+  // LLM's practical context budget.
+  return out.length > UI_SUMMARY_MAX_CHARS ? `${out.slice(0, UI_SUMMARY_MAX_CHARS - 1)}…` : out;
+};
+
+// Only inject the per-turn UI summary when the user is plausibly trying to
+// drive the UI. Most voice turns ("what time", "how am I doing") don't need
+// the 2–4 KB page snapshot, and the LLM can still call ui_list_interactables
+// as an explicit fallback. Takes the pre-computed active group set so the
+// same regex doesn't run twice per turn.
+const shouldIncludeUi = (userText, activeGroups) => !userText || activeGroups?.has('ui');
+
+// After a ui_* side effect fires, pause briefly for the client to push a
+// fresh voice:ui:index so the next LLM iteration sees the post-action DOM
+// (e.g., a modal that just opened). Resolves with the new ui snapshot or
+// null on timeout/abort. Safe to call with no waiter infrastructure in
+// state (e.g., in tests) — just times out.
+const waitForUiRefresh = (state, timeoutMs, signal) => new Promise((resolve) => {
+  if (!state) { resolve(null); return; }
+  if (!Array.isArray(state.uiWaiters)) state.uiWaiters = [];
+  let done = false;
+  const finish = (value) => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    signal?.removeEventListener?.('abort', onAbort);
+    // Remove self from the pending list so timed-out/aborted waiters don't
+    // accumulate across turns. Next voice:ui:index would fire them as
+    // no-ops, but the array grows unbounded without this.
+    const i = state.uiWaiters.indexOf(finish);
+    if (i !== -1) state.uiWaiters.splice(i, 1);
+    resolve(value);
+  };
+  const onAbort = () => finish(null);
+  const timer = setTimeout(() => finish(null), timeoutMs);
+  signal?.addEventListener?.('abort', onAbort, { once: true });
+  state.uiWaiters.push(finish);
+});
+
+export { summarizeUi, shouldIncludeUi };
 
 const buildSystemPrompt = (cfg) => {
   if (!cfg.llm.usePersonality) return cfg.llm.systemPrompt;
@@ -36,7 +117,9 @@ const buildSystemPrompt = (cfg) => {
       'You MUST call the matching tool whenever the user requests an action — ' +
       'never describe the action in words instead of calling the tool. ' +
       'Trigger phrases that REQUIRE a tool call: ' +
-      '"open"/"go to"/"take me to"/"show me"/"navigate to" → matching navigation tool (e.g., daily_log_open with startDictation=false). ' +
+      '"open"/"go to"/"take me to"/"show me"/"navigate to" X → call ui_navigate with page=X (NOT daily_log_open — that tool is ONLY for the Daily Log / dictation). "Take me to tasks" → ui_navigate page="tasks". "Chief of staff agents" → ui_navigate page="agents". "Open calendar" → ui_navigate page="calendar". Only pick daily_log_open when the user explicitly says "daily log", "log entry", or "journal". ' +
+      '"Select X tab"/"switch to the X tab"/"click X"/"press the X button"/"pick Y from the Z dropdown"/"fill X with Y"/"check/uncheck X" — the LLM receives a compact "Current UI state" summary at the start of UI-driving turns listing Tabs, Buttons, Links, Inputs, Selects, Checkboxes. Use ui_click for tabs/buttons/links, ui_fill for text inputs, ui_select for dropdowns, ui_check for checkboxes. Pass the EXACT label shown in the UI summary. Prefer the `kind` argument when you have it (tab vs button). If the label isn\'t in the current UI summary, call ui_list_interactables OR ui_navigate first — do NOT guess. Active tab is marked with * in the summary; don\'t click it again. ' +
+      'CHAINED UI FLOWS: after a ui_click / ui_fill / ui_select / ui_check succeeds, its tool result includes a `ui` field with the FRESH page state (a modal may have opened, a tab may have switched, new fields may be visible). Always re-read this `ui` field before choosing the next action — don\'t rely on the original per-turn UI summary after an action has fired. For multi-step flows like "create a task called Foo with description Bar": ui_click New Task → read result.ui → ui_fill Name=Foo → read result.ui → ui_fill Description=Bar → ui_click Save. Do it all in ONE turn, not one action per turn. ' +
       'INTENT TO CREATE / WRITE in the daily log — phrases like "let\'s make a daily log", "let\'s make a new daily log", "start a daily log", "I want to make a log entry", "let me log something today", "new daily log", "let me add to my log" → call daily_log_open with startDictation=true. After this single tool call, STOP TALKING and let the user dictate freely — the dictation system handles every following utterance automatically without you. Do NOT say "I\'ll append it" or "what would you like to add" — the user already knows. Just confirm in one short sentence ("Daily log open, dictating now.") and stay quiet. ' +
       'When the user is asking you to write something specific into the daily log right now — phrases like "add to my daily log: X", "note in today\'s log that X", "write in my log: X", "log this in my daily log: X", "for my daily log: X" — you MUST call daily_log_append with the exact X text (everything AFTER the leading "add … to my log" / "note that" / "for my log" phrasing). NEVER reply with just a paraphrased "add to my daily log: …" line — that\'s narration; CALL daily_log_append. ' +
       'Empty-content intent — phrases that announce the user is about to dictate a note WITHOUT yet providing the note text — "add a note to my daily log" / "add another note to my daily log" / "add this other note to my daily log" / "I want to add to my log" / "let me add a note" — call daily_log_start_dictation (NOT daily_log_append, because there\'s no content to append yet). The user\'s next utterance will be captured by the dictation system. ' +
@@ -206,14 +289,23 @@ export const runTurn = async ({ audio, text, mimeType, source, history = [], emi
     return { transcript: userText, reply: '' };
   }
 
+  const toolsEnabled = !!cfg.llm.tools?.enabled;
+  const intent = toolsEnabled ? getToolSpecsForIntent(userText) : { specs: undefined, activeGroups: classifyIntent(userText) };
+  const toolSpecs = intent.specs;
+
   const messages = [
     { role: 'system', content: buildSystemPrompt(cfg) },
-    ...history,
-    { role: 'user', content: userText },
   ];
-
-  const toolsEnabled = !!cfg.llm.tools?.enabled;
-  const toolSpecs = toolsEnabled ? getToolSpecs() : undefined;
+  if (shouldIncludeUi(userText, intent.activeGroups)) {
+    const uiSummary = summarizeUi(state?.ui);
+    if (uiSummary) {
+      messages.push({
+        role: 'system',
+        content: `Current UI state — use ui_click / ui_fill / ui_select / ui_check to drive these. Names shown are the exact labels; pass them as the "label" argument. ${uiSummary}`,
+      });
+    }
+  }
+  messages.push(...history, { role: 'user', content: userText });
   const maxIterations = Math.max(1, cfg.llm.tools?.maxIterations ?? 3);
 
   let pending = '';
@@ -313,7 +405,7 @@ export const runTurn = async ({ audio, text, mimeType, source, history = [], emi
       const t0 = Date.now();
       let result;
       let args = {};
-      const ctx = { sideEffects: [] };
+      const ctx = { sideEffects: [], state };
       try {
         args = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
         const argSummary = Object.keys(args).length ? Object.entries(args).map(([k, v]) => `${k}=${JSON.stringify(v).slice(0, 40)}`).join(' ') : '—';
@@ -343,6 +435,29 @@ export const runTurn = async ({ audio, text, mimeType, source, history = [], emi
           emit('voice:dictation', { enabled: state.dictation.enabled, date: state.dictation.date });
         } else if (fx.type === 'navigate') {
           emit('voice:navigate', { path: fx.path });
+        } else if (fx.type === 'ui:click') {
+          emit('voice:ui:click', { target: fx.target });
+        } else if (fx.type === 'ui:fill') {
+          emit('voice:ui:fill', { target: fx.target, value: fx.value });
+        } else if (fx.type === 'ui:select') {
+          emit('voice:ui:select', { target: fx.target, option: fx.option });
+        } else if (fx.type === 'ui:check') {
+          emit('voice:ui:check', { target: fx.target, checked: fx.checked });
+        }
+      }
+      // If the tool mutated the UI, pause for the client's follow-up index
+      // push and attach the fresh summary to the tool result so the next LLM
+      // iteration can chain the next action against the new page state (e.g.
+      // click New Task → see the modal → fill Name → click Save, all in one
+      // turn). Short timeout so a dropped index doesn't stall voice.
+      const hasUiEffect = ctx.sideEffects.some((fx) => typeof fx.type === 'string' && fx.type.startsWith('ui:'));
+      if (hasUiEffect && !signal?.aborted) {
+        const tRefresh = Date.now();
+        const refreshed = await waitForUiRefresh(state, 800, signal);
+        tlog(`tool.refresh ${tc.function.name} ${refreshed ? 'ok' : 'timeout'} ${Date.now() - tRefresh}ms`);
+        if (refreshed) {
+          const summary = summarizeUi(refreshed);
+          if (summary) result = { ...result, ui: summary };
         }
       }
       emit('voice:tool', { name: tc.function.name, args, result });

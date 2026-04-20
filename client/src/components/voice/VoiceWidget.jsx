@@ -8,6 +8,8 @@ import {
 } from '../../services/voiceClient';
 import { getVoiceConfig } from '../../services/apiVoice';
 import toast from '../ui/Toast';
+import { useVoiceUiSync, pushUiIndexAfterAction } from '../../hooks/useVoiceUiSync';
+import { doClick, doFill, doSelect, doSetCheckbox } from '../../services/uiInteract';
 
 // Peak below this (0..1) is usually whisper's [BLANK_AUDIO] territory.
 const QUIET_MIC_THRESHOLD = 0.02;
@@ -67,6 +69,10 @@ export default function VoiceWidget() {
   const [level, setLevel] = useState(0);
   const scrollRef = useRef(null);
   const useWebSpeech = sttEngine === 'web-speech' && webSpeechSupported;
+
+  // Keep the server's UI index fresh so the LLM knows what's on the page
+  // and can drive it with ui_click / ui_fill / ui_select / ui_check.
+  useVoiceUiSync(enabled);
 
   // Disabling voice mode (via Settings or the socket broadcast) must release
   // every mic path — MediaRecorder, AudioWorklet VAD, and Web Speech — plus
@@ -175,6 +181,26 @@ export default function VoiceWidget() {
           const preview = d.text.length > 60 ? `${d.text.slice(0, 60)}…` : d.text;
           toast(`📓 +"${preview}"`);
         }
+      }),
+      onVoiceEvent('voice:ui:click', (d) => {
+        const res = doClick(d?.target);
+        if (!res.ok) toast.error(`Voice: couldn't click "${d?.target?.label || d?.target?.ref}"`);
+        else pushUiIndexAfterAction();
+      }),
+      onVoiceEvent('voice:ui:fill', (d) => {
+        const res = doFill(d?.target, d?.value);
+        if (!res.ok) toast.error(`Voice: couldn't fill "${d?.target?.label || d?.target?.ref}"`);
+        else pushUiIndexAfterAction();
+      }),
+      onVoiceEvent('voice:ui:select', (d) => {
+        const res = doSelect(d?.target, d?.option);
+        if (!res.ok) toast.error(`Voice: couldn't select "${d?.option}" on "${d?.target?.label}"`);
+        else pushUiIndexAfterAction();
+      }),
+      onVoiceEvent('voice:ui:check', (d) => {
+        const res = doSetCheckbox(d?.target, d?.checked);
+        if (!res.ok) toast.error(`Voice: couldn't toggle "${d?.target?.label}"`);
+        else pushUiIndexAfterAction();
       }),
     ];
     return () => offs.forEach((off) => off());

@@ -10,12 +10,19 @@ For project goals, see [GOALS.md](./GOALS.md). For completed work, see [DONE.md]
 
 ## Backlog
 
-- [ ] **Voice CoS tool expansion** — 14 tools registered in `server/services/voice/tools.js`: `brain_capture`, `brain_search`, `brain_list_recent`, `meatspace_log_drink`, `meatspace_log_nicotine`, `meatspace_log_weight`, `meatspace_summary_today`, `goal_list`, `goal_update_progress`, `goal_log_note`, `pm2_status`, `pm2_restart`, `feeds_digest`, `time_now`. Remaining candidates:
+- [ ] **Voice CoS tool expansion** — tools now include the original domain set plus `ui_navigate`, `ui_list_interactables`, `ui_click`, `ui_fill`, `ui_select`, `ui_check` for accessibility-style page driving. Remaining candidates:
   - `calendar_today` / `calendar_next` — surface today's Google Calendar events through the existing Google MCP integration
   - `meatspace_log_workout` — wrap `meatspaceHealth.js` workout/activity exports
   - `weather_now` — needs an external API choice (OpenWeather / Apple WeatherKit / NWS)
   - `timer_set` — set a voice-triggered reminder; likely reuses `agentActionExecutor.js` scheduled actions
   - `feeds_mark_read` — pair with `feeds_digest` for "mark that one read"
+
+- [ ] **Voice agent — next power-ups** (follow-ons to the ui_* accessibility layer):
+  - `ui_read` — extract visible page text (not just interactables) so "what does this say?" / "summarize this page" works without hand-navigation. Complements `ui_list_interactables`.
+  - **Destructive-action confirmation gate** — when a `ui_click` target label matches `/delete|remove|discard|reset|clear/i`, pause and require spoken "confirm" / "cancel" before firing. Prevents voice mishaps.
+  - **Vision fallback tool** (`ui_describe_visually`) — screenshot the current tab (or a named canvas/chart element) and send to a vision-capable model so "what's on this chart?" works on non-DOM content (CyberCity, graph views). Depends on whether `portos-ai-toolkit` wires a vision provider.
+  - **Proactive CoS speech** — push-to-talk the other direction: a server event that makes the voice widget speak unprompted ("heads up: 3 things on your briefing" / "time to stretch"). Needs a quiet-hours policy and an interrupt-gracefully contract with the existing barge-in logic.
+  - **Explicit long-term memory routing** — when the user says "remember that …", auto-route to `brain_capture` and inject top-N relevant memories into the voice turn's system prompt via `brain_search`. Some of this is ambiently possible today; make it explicit and self-improving.
 - [x] **Test coverage** — cosRunnerClient.js ✅ (37 tests), agentActionExecutor.js ✅ (27 tests), CoS routes ✅ (170 tests across 6 test files, 83-100% route coverage). Remaining gap: cos.js service (~4% coverage)
 - [ ] **CyberCity v2** — Transform from decorative scene to living systems dashboard. See [cybercity-v2.md](./docs/features/cybercity-v2.md) for full plan. Top priorities: system health atmosphere, richer billboards, brain inbox pulse, agent activity visualization, chronotype energy overlay.
 - [ ] **M50 P9**: CoS Automation & Rules — Automated email classification, rule-based pre-filtering, email-to-task pipeline

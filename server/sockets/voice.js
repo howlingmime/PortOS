@@ -1,8 +1,9 @@
 // Per-socket voice handlers.
 // Inbound:  voice:turn | voice:text | voice:interrupt | voice:reset
-//           | voice:dictation:set
+//           | voice:dictation:set | voice:ui:index
 // Outbound: voice:transcript | voice:llm:delta | voice:llm:done | voice:tts:audio
 //           | voice:tool | voice:dictation | voice:navigate
+//           | voice:ui:click | voice:ui:fill | voice:ui:select | voice:ui:check
 //           | voice:dailyLog:appended | voice:error | voice:idle
 
 import { runTurn } from '../services/voice/pipeline.js';
@@ -29,6 +30,12 @@ export const registerVoiceHandlers = (socket) => {
     history: [],
     ctrl: null,
     dictation: { enabled: false, date: null },
+    ui: null, // { path, title, elements:[{ ref, kind, label, ... }], updatedAt }
+    // Promises awaiting the NEXT voice:ui:index arrival — used by the
+    // pipeline to chain ui_* actions within one LLM turn: after firing a
+    // ui:click, wait for the client's fresh index before the next tool
+    // runs so the LLM can see the modal/new content it just opened.
+    uiWaiters: [],
   };
 
   const pushHistory = (role, content) => {
@@ -172,7 +179,37 @@ export const registerVoiceHandlers = (socket) => {
     socket.emit('voice:dictation', { enabled: state.dictation.enabled, date: state.dictation.date });
   });
 
+  // Client pushes the current page's DOM index whenever voice is enabled
+  // and the user navigates or the DOM mutates. The pipeline injects a
+  // compact summary into each LLM turn so it can drive the UI by label
+  // (ui_click, ui_fill, ui_select, ui_check).
+  socket.on('voice:ui:index', (payload) => {
+    if (!payload || typeof payload !== 'object') return;
+    const { path, title, elements } = payload;
+    if (!Array.isArray(elements)) return;
+    // Cap to avoid prompt bloat from a malicious or runaway client.
+    const MAX = 200;
+    const filtered = elements
+      .filter((e) => e && typeof e === 'object' && typeof e.ref === 'number' && typeof e.label === 'string')
+      .slice(0, MAX);
+    state.ui = {
+      path: typeof path === 'string' ? path.slice(0, 256) : null,
+      title: typeof title === 'string' ? title.slice(0, 120) : null,
+      elements: filtered,
+      updatedAt: Date.now(),
+    };
+    if (state.uiWaiters.length) {
+      const waiters = state.uiWaiters;
+      state.uiWaiters = [];
+      waiters.forEach((resolve) => resolve(state.ui));
+    }
+  });
+
   socket.on('disconnect', () => {
     state.ctrl?.abort();
+    // Abort any pending UI refresh waiters so their turns don't hang.
+    const waiters = state.uiWaiters;
+    state.uiWaiters = [];
+    waiters.forEach((resolve) => resolve(null));
   });
 };
