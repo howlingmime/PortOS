@@ -180,6 +180,21 @@ export const isNonSpeechMarker = (text) => /^\s*\[[A-Z_ ]+\]\s*$/i.test(text);
 // LLM. Intentionally narrow — "I'm done writing" shouldn't match.
 const STOP_DICTATION_RE = /^(stop|end|exit|cancel|pause)\s+(dictation|dictating|logging|recording)[\.\!\s]*$/i;
 
+// Detect the narrate-instead-of-call failure: the LLM replied with text that
+// claims it just performed an action ("I opened your daily log", "Navigating
+// to tasks now", "Added that to your inbox") but no tool actually fired.
+// Small tool-use models (Qwen3-4B / Hermes-3-8B class) still leak this
+// occasionally even with the strong system-prompt biasing in buildSystemPrompt.
+// The user hears a confident confirmation but nothing changed.
+//
+// Deliberately narrow: only fires on first-person action-claim phrasings, so
+// conversational replies that happen to mention the same verbs ("I saved a
+// file last year") don't false-positive. Exported for unit testing.
+const ACTION_CLAIM_RE = /\b(?:I(?:'ve| have| just| already)?\s+(?:open(?:ed|ing)?|navigat(?:ed|ing)|sav(?:ed|ing)|add(?:ed|ing)|not(?:ed|ing)|captur(?:ed|ing)|remember(?:ed|ing)?|fill(?:ed|ing)|click(?:ed|ing)|select(?:ed|ing)|switch(?:ed|ing)|set|filed|logg(?:ed|ing))|(?:opening|navigating|saving|adding|noting|capturing|filing|logging|filling|clicking|selecting|switching)\s+(?:to\s+|your|the|that|this|it))\b/i;
+
+export const detectNarrationWithoutCall = ({ finalText, toolRuns }) =>
+  toolRuns?.length === 0 && !!finalText?.trim() && ACTION_CLAIM_RE.test(finalText);
+
 // Short correlation id so overlapping turns in the logs can be told apart
 // (user interrupts, late-arriving retries). 5 chars of base36 randomness is
 // plenty for single-user PortOS.
@@ -503,6 +518,15 @@ export const runTurn = async ({ audio, text, mimeType, source, history = [], emi
       : `Model ${lastLlm?.model || cfg.llm.model} returned no response.`;
     console.warn(`🎙️  empty LLM output — ${hint}`);
     emit('voice:error', { stage: 'llm', message: hint });
+  } else if (!signal?.aborted && toolsEnabled && detectNarrationWithoutCall({ finalText, toolRuns })) {
+    // Narrate-instead-of-call: the model claimed to do something but never
+    // invoked a tool. User already heard the narration via TTS; surface a
+    // toast so they know the action didn't actually happen and can rephrase.
+    console.warn(`🎙️ [${turnId}] narrate-without-call user="${userText.slice(0, 80)}" reply="${finalText.slice(0, 120)}"`);
+    emit('voice:error', {
+      stage: 'llm',
+      message: "I said I'd do that but didn't actually call the tool. Try rephrasing — e.g. \"open my daily log\" or \"go to tasks\".",
+    });
   }
 
   emit('voice:llm:done', { text: finalText, model: lastLlm?.model, ttfbMs: firstLlm?.ttfbMs });
