@@ -10,6 +10,7 @@ import { readFile, unlink } from 'fs/promises';
 
 import alertsRoutes from './routes/alerts.js';
 import appleHealthRoutes from './routes/appleHealth.js';
+import avatarRoutes from './routes/avatar.js';
 import systemHealthRoutes from './routes/systemHealth.js';
 import appsRoutes from './routes/apps.js';
 import portsRoutes from './routes/ports.js';
@@ -229,6 +230,7 @@ app.set('io', io);
 
 // API Routes
 app.use('/api/alerts', alertsRoutes);
+app.use('/api/avatar', avatarRoutes);
 app.use('/api/system', systemHealthRoutes);
 app.use('/api/apps', appsRoutes);
 app.use('/api/ports', portsRoutes);
