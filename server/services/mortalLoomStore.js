@@ -97,6 +97,37 @@ export async function mlReplace(key, array) {
   await updateStore(store => { store[key] = array; });
 }
 
+// === Profile (HealthProfile mirror: biologicalSex, birthDate, lifestyle, …) ===
+
+/** Returns `store.profile` when MortalLoom sync is enabled, else null. */
+export async function mlGetProfileIfEnabled() {
+  if (!(await isMortalLoomEnabled())) return null;
+  const store = await readStore();
+  return (store && typeof store.profile === 'object') ? store.profile : null;
+}
+
+/**
+ * Deep-merge `patch` onto `store.profile` when sync is enabled; no-op otherwise.
+ * Nested objects (`lifestyle`, `locationProfile`, `socioeconomic`) are merged field-wise
+ * so callers can patch a single field without clobbering the rest.
+ */
+export async function mlPatchProfileIfEnabled(patch) {
+  if (!(await isMortalLoomEnabled())) return null;
+  return updateStore(store => {
+    const current = (store.profile && typeof store.profile === 'object') ? store.profile : {};
+    const next = { ...current };
+    for (const [k, v] of Object.entries(patch)) {
+      if (v && typeof v === 'object' && !Array.isArray(v) && current[k] && typeof current[k] === 'object') {
+        next[k] = { ...current[k], ...v };
+      } else {
+        next[k] = v;
+      }
+    }
+    store.profile = next;
+    return next;
+  });
+}
+
 /**
  * Upsert a HealthMetricEntry by date — merges non-null fields into the
  * existing entry for that date, or appends a new one. Mirrors Swift's
