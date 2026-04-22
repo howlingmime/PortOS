@@ -166,7 +166,9 @@ export async function start() {
   }
 
   // Prune agent archives older than 90 days
-  await pruneOldAgentArchives(AGENT_ARCHIVE_RETENTION_DAYS).catch(() => {});
+  await pruneOldAgentArchives(AGENT_ARCHIVE_RETENTION_DAYS).catch(err =>
+    console.warn(`⚠️ pruneOldAgentArchives failed: ${err?.message || err}`)
+  );
 
   // Health check + orphan cleanup (15 min)
   scheduleEvent({
