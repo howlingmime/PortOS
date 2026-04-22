@@ -76,7 +76,15 @@ describe('loops.js', () => {
     setupProviderMocks();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Stop all running loops to clear timers and prevent cross-test interference
+    const loops = await getLoops();
+    for (const loop of loops) {
+      if (loop.status === 'running') {
+        await stopLoop(loop.id).catch(() => {});
+      }
+    }
+    vi.clearAllTimers();
     vi.useRealTimers();
   });
 

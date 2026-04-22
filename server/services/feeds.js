@@ -224,15 +224,29 @@ export async function refreshAllFeeds() {
   const data = await store.load();
   const CONCURRENCY = 5;
   let totalNew = 0;
+  let totalFailed = 0;
   for (let i = 0; i < data.feeds.length; i += CONCURRENCY) {
     const batch = data.feeds.slice(i, i + CONCURRENCY);
     const results = await Promise.allSettled(batch.map(f => refreshFeed(f.id)));
-    for (const r of results) {
-      if (r.status === 'fulfilled' && r.value.newCount) totalNew += r.value.newCount;
+    for (let j = 0; j < results.length; j++) {
+      const feed = batch[j];
+      const r = results[j];
+      if (r.status === 'fulfilled') {
+        if (r.value?.error) {
+          totalFailed++;
+          console.warn(`⚠️ Feed refresh failed: ${feed.id} (${feed.url}) - ${r.value.error}`);
+        } else if (r.value?.newCount) {
+          totalNew += r.value.newCount;
+        }
+      } else {
+        totalFailed++;
+        const errMsg = r.reason instanceof Error ? r.reason.message : String(r.reason);
+        console.warn(`⚠️ Feed refresh rejected: ${feed.id} (${feed.url}) - ${errMsg}`);
+      }
     }
   }
-  console.log(`📡 All feeds refreshed: +${totalNew} new items`);
-  return { refreshed: data.feeds.length, newItems: totalNew };
+  console.log(`📡 All feeds refreshed: +${totalNew} new items, ${totalFailed} failures`);
+  return { refreshed: data.feeds.length, newItems: totalNew, failures: totalFailed };
 }
 
 export async function getItems({ feedId, unreadOnly, limit, offset = 0 } = {}) {
@@ -250,7 +264,7 @@ export async function getItems({ feedId, unreadOnly, limit, offset = 0 } = {}) {
   });
 
   if (limit != null) return items.slice(offset, offset + limit);
-  return items;
+  return items.slice(offset);
 }
 
 export async function markItemRead(itemId) {
