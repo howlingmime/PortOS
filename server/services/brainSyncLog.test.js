@@ -16,14 +16,16 @@ vi.mock('../lib/asyncMutex.js', () => ({
 }));
 vi.mock('../lib/fileUtils.js', () => ({
   ensureDir: vi.fn(),
+  atomicWrite: vi.fn().mockResolvedValue(undefined),
   safeJSONParse: (str, fallback) => {
     try { return JSON.parse(str); } catch { return fallback; }
   },
   PATHS: { brain: '/tmp/test/brain' }
 }));
 
-import { readFile, writeFile, appendFile, mkdir, rename } from 'fs/promises';
+import { readFile, appendFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
+import { atomicWrite } from '../lib/fileUtils.js';
 import {
   initSyncLog,
   getCurrentSeq,
@@ -253,17 +255,15 @@ describe('brainSyncLog', () => {
       readFile.mockResolvedValue(
         '{"seq":1,"op":"create"}\n{"seq":2,"op":"update"}\n{"seq":3,"op":"delete"}\n'
       );
-      writeFile.mockResolvedValue();
-      rename.mockResolvedValue();
+      atomicWrite.mockResolvedValue();
 
       const dropped = await compactLog(2);
       expect(dropped).toBe(1);
-      expect(writeFile).toHaveBeenCalledTimes(1);
-      const written = writeFile.mock.calls[0][1];
+      expect(atomicWrite).toHaveBeenCalledTimes(1);
+      const written = atomicWrite.mock.calls[0][1];
       expect(written).toContain('"seq":2');
       expect(written).toContain('"seq":3');
       expect(written).not.toContain('"seq":1,');
-      expect(rename).toHaveBeenCalledTimes(1);
     });
 
     it('returns 0 when file does not exist', async () => {
