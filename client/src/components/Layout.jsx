@@ -72,6 +72,7 @@ import {
   HardDrive,
   MessagesSquare,
   BookOpen,
+  NotebookPen,
   Search,
   Mic
 } from 'lucide-react';
@@ -100,7 +101,7 @@ const navItems = [
     icon: Brain,
     children: [
       { to: '/brain/config', label: 'Config', icon: Settings },
-      { to: '/brain/daily-log', label: 'Daily Log', icon: BookOpen },
+      { to: '/brain/daily-log', label: 'Daily Log', icon: NotebookPen },
       { to: '/brain/digest', label: 'Digest', icon: Calendar },
       { to: '/brain/graph', label: 'Graph', icon: Network },
       { to: '/brain/inbox', label: 'Inbox', icon: MessageSquare },

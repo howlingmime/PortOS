@@ -108,19 +108,33 @@ export async function atomicWrite(filePath, data) {
   const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   await writeFile(tmp, payload);
   // Node's fs.rename uses MoveFileExW with MOVEFILE_REPLACE_EXISTING on Windows (atomic
-  // overwrite), but will still fail with EPERM/EACCES if the destination is locked. Fall
-  // back to unlink + rename so writes succeed on Windows in those edge cases too.
+  // overwrite), but still fails with EPERM/EACCES if the destination is locked (AV scan,
+  // concurrent reader). Fall back to a backup-swap so the original file is never lost.
   const replace = async () => {
     const err = await rename(tmp, filePath).then(() => null, (e) => e);
     if (!err) return;
     if (process.platform === 'win32' && ['EPERM', 'EACCES', 'EEXIST'].includes(err.code)) {
-      await unlink(filePath).catch(() => {});
-      await rename(tmp, filePath);
+      const bak = `${filePath}.${process.pid}.${Date.now()}.bak`;
+      const hadExisting = await rename(filePath, bak).then(() => true, (e) => {
+        if (e.code === 'ENOENT') return false;
+        throw e;
+      });
+      const renameErr = await rename(tmp, filePath).then(() => null, (e) => e);
+      if (renameErr) {
+        if (hadExisting) await rename(bak, filePath).catch(() => {});
+        throw renameErr;
+      }
+      if (hadExisting) await unlink(bak).catch(() => {});
       return;
     }
     throw err;
   };
-  await replace();
+  try {
+    await replace();
+  } catch (err) {
+    await unlink(tmp).catch(() => {});
+    throw err;
+  }
 }
 
 /**
