@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
  * Tests for socket.js initSocket behavior.
@@ -59,6 +59,7 @@ vi.mock('./appDeployer.js', () => ({ hasDeployScript: vi.fn(), deployApp: vi.fn(
 vi.mock('../sockets/voice.js', () => ({ registerVoiceHandlers: vi.fn() }));
 
 import { initSocket } from './socket.js';
+import { cosEvents } from './cosEvents.js';
 import { detachSocketSessions } from './shell.js';
 import * as shellService from './shell.js';
 
@@ -96,6 +97,14 @@ function makeIo() {
 
 describe('socket.js — initSocket', () => {
   let io;
+  const createdSockets = [];
+
+  afterEach(() => {
+    for (const s of createdSockets) {
+      if (s.handlers['disconnect']) s.handlers['disconnect']();
+    }
+    createdSockets.length = 0;
+  });
 
   beforeEach(() => {
     vi.mocked(detachSocketSessions).mockClear();
@@ -151,6 +160,7 @@ describe('socket.js — initSocket', () => {
   it('disconnected socket no longer receives events (removed from all sets)', () => {
     const s1 = makeSocket('disc-1');
     const s2 = makeSocket('disc-2');
+    createdSockets.push(s2); // s1 is disconnected in the test; only s2 needs afterEach cleanup
     io.connect(s1);
     io.connect(s2);
 
@@ -166,13 +176,15 @@ describe('socket.js — initSocket', () => {
     // Shell cleanup was called for s1 (prevents sessionListSubscribers Set leak)
     expect(shellService.detachSocketSessions).toHaveBeenCalledWith(s1);
 
-    // Count cos:subscribed emits (registration acks) for s1
-    const s1CosSubscribedCount = s1.emitted.filter(([ev]) => ev === 'cos:subscribed').length;
-    expect(s1CosSubscribedCount).toBe(1); // was subscribed once before disconnect
+    // Verify broadcast no longer reaches s1 — emit a cos:status event via the captured listener
+    const statusListener = cosEvents.on.mock.calls.find(([ev]) => ev === 'status')?.[1];
+    const s1EmitsBefore = s1.emitted.length;
+    if (statusListener) statusListener({ running: true });
 
-    // s2 remains connected — still gets acks from its own registration
-    const s2CosSubscribedCount = s2.emitted.filter(([ev]) => ev === 'cos:subscribed').length;
-    expect(s2CosSubscribedCount).toBe(1);
+    // s1 must not receive any new event
+    expect(s1.emitted.length).toBe(s1EmitsBefore);
+    // s2 still subscribed — must receive the broadcast
+    expect(s2.emitted.some(([ev]) => ev === 'cos:status')).toBe(true);
   });
 
   // ===========================================================================

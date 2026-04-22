@@ -105,7 +105,7 @@ export async function ensureDirs(dirs) {
  */
 export async function atomicWrite(filePath, data) {
   const payload = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
-  const tmp = `${filePath}.tmp`;
+  const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   await writeFile(tmp, payload);
   await rename(tmp, filePath);
 }
