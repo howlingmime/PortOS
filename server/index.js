@@ -300,7 +300,8 @@ app.use('/api/openclaw', openclawRoutes);
 
 // Initialize agent automation scheduler and action executor
 automationScheduler.init().catch(err => console.error(`❌ Agent scheduler init failed: ${err.message}`));
-agentActionExecutor.init().catch(err => console.error(`❌ agentActionExecutor init failed: ${err.message}`));
+// agentActionExecutor.init() is synchronous — don't chain .catch on undefined
+agentActionExecutor.init();
 
 // Recover any inbox entries stuck in 'classifying' from a previous crash/restart
 recoverStuckClassifications().catch(err => console.error(`❌ Brain recovery failed: ${err.message}`));
