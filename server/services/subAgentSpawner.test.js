@@ -1,6 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { isTruthyMeta, isFalsyMeta, selectModelForTask } from './subAgentSpawner.js';
-import { applyAppWorktreeDefault } from './cos.js';
+// vi.mock() calls are hoisted by Vitest before import evaluation, but are placed
+// at the top for clarity and to match the convention in other test files.
 
 // Mock taskLearning so suggestModelTier returns null → pattern-matching path runs.
 // This matches the behavior of the old inline selectModelForTask copy.
@@ -23,6 +22,10 @@ vi.mock('./thinkingLevels.js', async (importOriginal) => {
     isLocalPreferred: vi.fn().mockReturnValue(false)
   };
 });
+
+import { describe, it, expect, vi } from 'vitest';
+import { isTruthyMeta, isFalsyMeta, selectModelForTask } from './subAgentSpawner.js';
+import { applyAppWorktreeDefault } from './cos.js';
 
 /**
  * Tests for the subAgentSpawner service

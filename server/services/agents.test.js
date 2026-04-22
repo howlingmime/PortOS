@@ -55,6 +55,13 @@ describe('agents.js', () => {
   // registerSpawnedAgent / unregisterSpawnedAgent — module-level Map
   // ===========================================================================
   describe('registerSpawnedAgent / unregisterSpawnedAgent', () => {
+    // Clean up any PIDs registered by tests in this describe so they don't
+    // leak into subsequent tests via the module-level spawnedAgentCommands Map.
+    afterEach(() => {
+      unregisterSpawnedAgent(12345);
+      unregisterSpawnedAgent(99999);
+    });
+
     it('registers metadata and surfaces it in getRunningAgents', async () => {
       // Provide ps output that matches the claude pattern
       mockExecWith('12345  1001  0.5  0.3  01:00  /usr/bin/claude --print\n');
@@ -101,8 +108,8 @@ describe('agents.js', () => {
       }
     });
 
-    it('stores registeredAt timestamp on registration', async () => {
-      const before = Date.now();
+    it('killProcess delegates to CoS killAgent for a registered PID', async () => {
+      // Register PID 99999 so killProcess detects it as a CoS-spawned agent
       registerSpawnedAgent(99999, {
         agentId: 'agent-ts',
         taskId: 'task-ts',
@@ -112,16 +119,13 @@ describe('agents.js', () => {
         prompt: 'hello'
       });
 
-      // getRunningAgents merges data; check the entry surfaced in results
-      mockExecWith('99999  1001  0.0  0.1  00:01  /usr/bin/claude\n');
-      const agents = await getRunningAgents();
-      const found = agents.find(a => a.pid === 99999);
-      expect(found).toBeDefined();
-      // Cleanup so it doesn't leak into next test
-      unregisterSpawnedAgent(99999);
-      const after = Date.now();
-      // registeredAt comes from Date.now() inside registerSpawnedAgent — just verify the call succeeded
-      expect(before).toBeLessThanOrEqual(after);
+      // killProcess for a registered PID should delegate to killAgent (mocked above)
+      await killProcess(99999);
+
+      // Verify the CoS killAgent mock was invoked with the registered agentId —
+      // this proves the registry entry is live and used by killProcess.
+      const { killAgent } = await import('./subAgentSpawner.js');
+      expect(killAgent).toHaveBeenCalledWith('agent-ts');
     });
   });
 
@@ -146,9 +150,7 @@ describe('agents.js', () => {
       mockExecWith('');
 
       const agents = await getRunningAgents();
-      expect(Array.isArray(agents)).toBe(true);
-      // May still have entries from other patterns; no assertion on exact length
-      // But with blank output for every pattern, all should be empty
+      expect(agents).toEqual([]);
     });
 
     it('sorts agents newest-first by startTime', async () => {

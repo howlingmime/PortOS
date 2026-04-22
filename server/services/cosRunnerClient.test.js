@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 
 // Capture the mock socket at creation time so clearAllMocks() doesn't lose it.
 // The socket's `on()` stores listener references so we can invoke them later.
@@ -74,6 +74,12 @@ describe('cosRunnerClient', () => {
   // onCosRunnerEvent
   // ===========================================================================
   describe('onCosRunnerEvent', () => {
+    // Ensure initCosRunnerConnection has been called so capturedSocketListeners is populated,
+    // even when this describe block runs in isolation without the initCosRunnerConnection tests.
+    beforeAll(() => {
+      initCosRunnerConnection();
+    });
+
     it('handler is invoked with payload when the socket emits agent:output', () => {
       // capturedSocketListeners stores dispatch fns registered during initCosRunnerConnection.
       // These are plain function references that survive vi.clearAllMocks().

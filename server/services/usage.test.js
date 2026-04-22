@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
  * Tests for usage.js — streak calculation logic and getUsageSummary shape.
@@ -42,9 +42,20 @@ function makeUsage(dailyActivity = {}, extras = {}) {
   };
 }
 
+// Fixed reference date: noon UTC on a Wednesday to avoid midnight edge cases.
+const FIXED_DATE = new Date('2025-06-11T12:00:00.000Z');
+
 describe('usage.js — streak calculations', () => {
   beforeEach(async () => {
+    // Freeze time so daysAgo() and usage.js internal new Date() agree,
+    // preventing flakiness when a test run crosses UTC midnight.
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_DATE);
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('currentStreak', () => {
