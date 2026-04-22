@@ -17,7 +17,9 @@ const probe = async (url) => {
   const t = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
     const res = await fetch(url, { method: 'GET', signal: controller.signal });
-    return { ok: true, status: res.status, latencyMs: Date.now() - started };
+    const latencyMs = Date.now() - started;
+    if (!res.ok) return { ok: false, state: 'bad_status', status: res.status, latencyMs };
+    return { ok: true, status: res.status, latencyMs };
   } catch (err) {
     const name = err?.name || '';
     const code = err?.cause?.code || err?.code || '';

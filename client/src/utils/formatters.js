@@ -129,7 +129,7 @@ export function formatDateTime(value) {
  * @returns {string} Formatted duration (e.g., "45s", "3m 12s", "2h 5m")
  */
 export function formatDurationMs(ms) {
-  if (!ms) return '-';
+  if (ms == null) return '-';
   const seconds = Math.floor(ms / 1000);
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
@@ -144,7 +144,7 @@ export function formatDurationMs(ms) {
  * @returns {string} Formatted duration (e.g., "30m", "1h 30m", "2h")
  */
 export function formatDurationMin(minutes) {
-  if (!minutes) return '';
+  if (minutes == null) return '';
   if (minutes >= 60) {
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
