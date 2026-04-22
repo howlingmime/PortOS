@@ -234,12 +234,12 @@ const navItems = [
       { to: '/settings/backup', label: 'Backup', icon: Download },
       { to: '/settings/database', label: 'Database', icon: Database },
       { to: '/settings/image-gen', label: 'Image Gen', icon: ImageIcon },
-      { to: '/settings/voice', label: 'Voice', icon: Mic },
       { to: '/prompts', label: 'Prompts', icon: FileText },
       { to: '/ai', label: 'Providers', icon: Bot },
       { to: '/security', label: 'Security', icon: Camera },
       { to: '/settings/telegram', label: 'Telegram', icon: MessageSquare },
-      { to: '/uploads', label: 'Uploads', icon: Upload }
+      { to: '/uploads', label: 'Uploads', icon: Upload },
+      { to: '/settings/voice', label: 'Voice', icon: Mic }
     ]
   },
   { to: '/agents', label: 'Social Agents', icon: Users, single: true },
