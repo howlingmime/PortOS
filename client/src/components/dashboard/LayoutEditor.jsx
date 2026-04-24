@@ -8,7 +8,13 @@ import toast from '../ui/Toast';
 // Keyboard-first editor. No drag-and-drop dep — reorder uses up/down buttons
 // (keyboard + touch friendly). Delete and "save as new" use inline state
 // instead of window.confirm/prompt per project convention.
-export default function LayoutEditor({ layouts, activeLayoutId, onClose, onSave, onDelete, onDuplicate }) {
+// Fallback if the server didn't return limits (shouldn't happen, but keeps
+// the editor functional in degraded states). Kept in sync with the server's
+// ID_MAX_LENGTH by convention — the server value is authoritative.
+const FALLBACK_ID_MAX = 60;
+
+export default function LayoutEditor({ layouts, activeLayoutId, limits, onClose, onSave, onDelete, onDuplicate }) {
+  const idMax = limits?.idMaxLength || FALLBACK_ID_MAX;
   const [editingId, setEditingId] = useState(activeLayoutId);
   const editing = layouts.find((l) => l.id === editingId);
   const [widgets, setWidgets] = useState(editing?.widgets ?? []);
@@ -81,16 +87,14 @@ export default function LayoutEditor({ layouts, activeLayoutId, onClose, onSave,
   const commitDuplicate = async () => {
     const trimmed = dupName.trim();
     if (!trimmed) { toast.error('Name required'); return; }
-    // Server idSchema caps ids at 60 chars. Compute the final id in a way
-    // that always fits regardless of how many collisions we walk through —
-    // the suffix grows (-2, -10, -100) so we trim the base per-iteration.
-    const ID_MAX = 60;
+    // Final id must fit the server's idMax. Suffix grows with collisions
+    // (-2, -10, -100) so the base is trimmed per iteration.
     const baseSlug = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     if (!baseSlug) { toast.error('Use letters/numbers in the name'); return; }
     const fitId = (n) => {
-      if (n <= 1) return baseSlug.slice(0, ID_MAX);
+      if (n <= 1) return baseSlug.slice(0, idMax);
       const suffix = `-${n}`;
-      return `${baseSlug.slice(0, ID_MAX - suffix.length)}${suffix}`;
+      return `${baseSlug.slice(0, idMax - suffix.length)}${suffix}`;
     };
     const existingIds = new Set(layouts.map((l) => l.id));
     let n = 1;

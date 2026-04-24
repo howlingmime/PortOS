@@ -98,6 +98,15 @@ const sanitizeLayout = (l) => {
   return { id: l.id, name, builtIn: BUILTIN_IDS.has(l.id), widgets };
 };
 
+// Bundled so clients can enforce the same limits without duplicating magic
+// numbers. Lives on every /api/dashboard/layouts response.
+export const LIMITS = Object.freeze({
+  idMaxLength: ID_MAX_LENGTH,
+  nameMaxLength: NAME_MAX_LENGTH,
+  widgetsMax: WIDGETS_MAX,
+  widgetIdMaxLength: WIDGET_ID_MAX_LENGTH,
+});
+
 export async function getState() {
   await ensureDir(PATHS.data);
   const raw = await readJSONFile(STATE_PATH, DEFAULT_STATE, { logError: false });
@@ -115,7 +124,7 @@ export async function getState() {
   const activeLayoutId = layouts.find((l) => l.id === raw.activeLayoutId)
     ? raw.activeLayoutId
     : layouts[0].id;
-  return { activeLayoutId, layouts };
+  return { activeLayoutId, layouts, limits: LIMITS };
 }
 
 export async function setActiveLayout(id) {
@@ -123,9 +132,9 @@ export async function setActiveLayout(id) {
   if (!state.layouts.find((l) => l.id === id)) {
     throw makeErr(`Unknown layout id: ${id}`, ERR_NOT_FOUND);
   }
-  const next = { ...state, activeLayoutId: id };
+  const next = { activeLayoutId: id, layouts: state.layouts };
   await atomicWrite(STATE_PATH, next);
-  return next;
+  return { ...next, limits: LIMITS };
 }
 
 export async function saveLayout(layout) {
@@ -134,9 +143,9 @@ export async function saveLayout(layout) {
   const merged = idx >= 0
     ? state.layouts.map((l, i) => i === idx ? { ...l, ...layout, builtIn: l.builtIn } : l)
     : [...state.layouts, { ...layout, builtIn: false }];
-  const next = { ...state, layouts: merged };
+  const next = { activeLayoutId: state.activeLayoutId, layouts: merged };
   await atomicWrite(STATE_PATH, next);
-  return next;
+  return { ...next, limits: LIMITS };
 }
 
 export async function deleteLayout(id) {
@@ -152,5 +161,5 @@ export async function deleteLayout(id) {
   const activeLayoutId = state.activeLayoutId === id ? nextLayouts[0].id : state.activeLayoutId;
   const next = { activeLayoutId, layouts: nextLayouts };
   await atomicWrite(STATE_PATH, next);
-  return next;
+  return { ...next, limits: LIMITS };
 }

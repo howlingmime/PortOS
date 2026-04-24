@@ -90,7 +90,7 @@ describe('PUT /api/dashboard/layouts/:id', () => {
     const res = await request(makeApp())
       .put('/api/dashboard/layouts/NotKebab')
       .send({ name: 'x', widgets: [] });
-    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBe(400);
     expect(svc.saveLayout).not.toHaveBeenCalled();
   });
 
@@ -98,7 +98,7 @@ describe('PUT /api/dashboard/layouts/:id', () => {
     const res = await request(makeApp())
       .put('/api/dashboard/layouts/my-custom')
       .send({ name: 'Custom', widgets: ['apps', 'cos', 'apps'] });
-    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBe(400);
     expect(svc.saveLayout).not.toHaveBeenCalled();
   });
 });
@@ -108,8 +108,7 @@ describe('PUT /api/dashboard/layouts/active — id validation', () => {
     const res = await request(makeApp())
       .put('/api/dashboard/layouts/active')
       .send({ id: 'Not_Kebab' });
-    expect(res.status).toBeGreaterThanOrEqual(400);
-    expect(res.status).toBeLessThan(500);
+    expect(res.status).toBe(400);
     expect(svc.setActiveLayout).not.toHaveBeenCalled();
   });
 });

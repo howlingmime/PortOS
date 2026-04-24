@@ -20,6 +20,7 @@ export default function Dashboard() {
 
   const [layouts, setLayouts] = useState([]);
   const [layoutsLoading, setLayoutsLoading] = useState(true);
+  const [layoutLimits, setLayoutLimits] = useState(null);
   const [activeLayoutId, setActiveLayoutId] = useState(null);
   const [editorOpen, setEditorOpen] = useState(false);
 
@@ -48,6 +49,7 @@ export default function Dashboard() {
       .then((data) => {
         setLayouts(data.layouts);
         setActiveLayoutId(data.activeLayoutId);
+        if (data.limits) setLayoutLimits(data.limits);
         setLayoutsError(null);
       })
       .catch((err) => setLayoutsError(err.message))
@@ -206,6 +208,7 @@ export default function Dashboard() {
         <LayoutEditor
           layouts={layouts}
           activeLayoutId={activeLayoutId}
+          limits={layoutLimits}
           onClose={() => setEditorOpen(false)}
           onSave={saveLayout}
           onDelete={deleteLayoutById}
