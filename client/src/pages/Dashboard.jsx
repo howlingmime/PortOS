@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [layoutsError, setLayoutsError] = useState(null);
 
   const [layouts, setLayouts] = useState([]);
+  const [layoutsLoading, setLayoutsLoading] = useState(true);
   const [activeLayoutId, setActiveLayoutId] = useState(null);
   const [editorOpen, setEditorOpen] = useState(false);
 
@@ -49,7 +50,8 @@ export default function Dashboard() {
         setActiveLayoutId(data.activeLayoutId);
         setLayoutsError(null);
       })
-      .catch((err) => setLayoutsError(err.message));
+      .catch((err) => setLayoutsError(err.message))
+      .finally(() => setLayoutsLoading(false));
 
     fetchLayouts();
 
@@ -178,7 +180,13 @@ export default function Dashboard() {
         </div>
       )}
 
-      {activeLayout && visibleWidgets.length === 0 && (
+      {layoutsLoading && !layoutsError && (
+        <div className="flex items-center justify-center h-24">
+          <BrailleSpinner text="Loading layout" />
+        </div>
+      )}
+
+      {!layoutsLoading && activeLayout && visibleWidgets.length === 0 && (
         <div className="bg-port-card border border-port-border rounded-xl p-8 text-center text-gray-500">
           This layout has no widgets. Click the layout picker and choose &ldquo;Edit layouts…&rdquo; to add some.
         </div>

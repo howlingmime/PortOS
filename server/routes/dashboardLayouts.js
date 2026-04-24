@@ -15,11 +15,12 @@ const router = Router();
 
 // Bounds are sourced from the service so sanitization on read and validation
 // at the API boundary agree by construction.
-const idSchema = z.string().min(1).max(svc.ID_MAX_LENGTH).regex(svc.ID_PATTERN, 'id must be lowercase kebab');
+const idSchema = z.string().trim().min(1).max(svc.ID_MAX_LENGTH).regex(svc.ID_PATTERN, 'id must be lowercase kebab');
 
 const layoutSchema = z.object({
   id: idSchema,
-  name: z.string().min(1).max(svc.NAME_MAX_LENGTH),
+  // Trim before min-length check so whitespace-only names are rejected.
+  name: z.string().trim().min(1).max(svc.NAME_MAX_LENGTH),
   widgets: z
     .array(z.string().min(1).max(svc.WIDGET_ID_MAX_LENGTH))
     .max(svc.WIDGETS_MAX)
