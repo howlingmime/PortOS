@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Brain, Cpu, Package, History, HeartPulse, Search, Loader2, Navigation, Play } from 'lucide-react';
+import { Brain, Cpu, Package, History, HeartPulse, Search, Loader2, Navigation, Play, LayoutGrid } from 'lucide-react';
 import { useCmdKSearch } from '../hooks/useCmdKSearch';
 import { useScrollLock } from '../hooks/useScrollLock';
-import { search, getPaletteManifest, runPaletteAction } from '../services/api';
+import { search, getPaletteManifest, runPaletteAction, getDashboardLayouts, setActiveDashboardLayout } from '../services/api';
 import toast from './ui/Toast';
 import { modKey } from '../utils/platform';
 
@@ -86,13 +86,29 @@ export default function CmdKSearch() {
     }
   }, [open]);
 
+  // Manifest (nav + actions) is cached for the lifetime of the component —
+  // static at module load on the server. Dashboard layouts change whenever
+  // the user creates/renames one, so they're re-fetched on every open to
+  // avoid a stale list on the same page mount.
   useEffect(() => {
-    if (!open || manifest) return;
-    getPaletteManifest().then((data) => {
-      setManifest({
-        nav: (data?.nav || []).map(precompute),
-        actions: (data?.actions || []).map(precompute),
-      });
+    if (!open) return;
+    const manifestPromise = manifest
+      ? Promise.resolve({ nav: manifest.nav, actions: manifest.actions })
+      : getPaletteManifest().then((data) => ({
+          nav: (data?.nav || []).map(precompute),
+          actions: (data?.actions || []).map(precompute),
+        }));
+    Promise.all([manifestPromise, getDashboardLayouts()]).then(([m, dashboards]) => {
+      const layouts = (dashboards?.layouts || []).map((l) => precompute({
+        id: `layout.${l.id}`,
+        layoutId: l.id,
+        layoutName: l.name,
+        label: `Dashboard: ${l.name}`,
+        section: 'Layouts',
+        aliases: ['layout', l.id, ...l.name.toLowerCase().split(/\s+/)],
+        keywords: ['dashboard', 'layout', 'view'],
+      }));
+      setManifest({ nav: m.nav, actions: m.actions, layouts });
     });
   }, [open, manifest]);
 
@@ -116,12 +132,12 @@ export default function CmdKSearch() {
   }, [searchResults, query]);
 
   const combined = useMemo(() => {
-    if (!manifest) return [];
+    if (!manifest) return { nav: [], actions: [], layouts: [], commandCount: 0 };
     const q = query.trim().toLowerCase();
     if (!q) {
       const nav = manifest.nav.filter((c) => DEFAULT_NAV_IDS.has(c.id)).map((c) => ({ ...c, kind: 'nav' }));
       const actions = manifest.actions.filter((a) => DEFAULT_ACTION_IDS.has(a.id)).map((a) => ({ ...a, kind: 'action' }));
-      return { nav, actions, commandCount: nav.length + actions.length };
+      return { nav, actions, layouts: [], commandCount: nav.length + actions.length };
     }
     const rank = (items, max) => items
       .map((c) => ({ cmd: c, score: scoreCommand(c, q) }))
@@ -131,7 +147,8 @@ export default function CmdKSearch() {
       .map((x) => x.cmd);
     const nav = rank(manifest.nav, 8).map((c) => ({ ...c, kind: 'nav' }));
     const actions = rank(manifest.actions, 5).map((a) => ({ ...a, kind: 'action' }));
-    return { nav, actions, commandCount: nav.length + actions.length };
+    const layouts = rank(manifest.layouts || [], 5).map((l) => ({ ...l, kind: 'layout' }));
+    return { nav, actions, layouts, commandCount: nav.length + actions.length + layouts.length };
   }, [manifest, query]);
 
   const flatSearchResults = useMemo(
@@ -143,7 +160,7 @@ export default function CmdKSearch() {
   );
 
   const focusable = useMemo(
-    () => [...combined.nav, ...combined.actions, ...flatSearchResults],
+    () => [...combined.nav, ...combined.actions, ...combined.layouts, ...flatSearchResults],
     [combined, flatSearchResults]
   );
 
@@ -157,6 +174,12 @@ export default function CmdKSearch() {
   const DISPATCH = useMemo(() => ({
     nav: (item) => { navigate(item.path); close(); },
     search: (item) => { navigate(item.url); close(); },
+    layout: async (item) => {
+      await setActiveDashboardLayout(item.layoutId);
+      navigate('/');
+      toast.success(`Switched to "${item.layoutName}"`);
+      close();
+    },
     action: async (item) => {
       const required = item.parameters?.required || [];
       if (required.length > 0) {
@@ -275,6 +298,14 @@ export default function CmdKSearch() {
             'Run',
             combined.actions.map((a) =>
               renderRow(a, { icon: Play, title: a.label, subtitle: (a.description || a.section || '').slice(0, 80), badge: 'RUN' })
+            )
+          )}
+
+          {renderGroup(
+            <LayoutGrid size={14} />,
+            'Dashboard layout',
+            combined.layouts.map((l) =>
+              renderRow(l, { icon: LayoutGrid, title: l.label, subtitle: 'Switch dashboard layout', badge: 'LAYOUT' })
             )
           )}
 
