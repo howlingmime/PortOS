@@ -96,16 +96,18 @@ export default function CmdKSearch() {
   const navActionsFetchedRef = useRef(false);
   useEffect(() => {
     if (!open || navActionsFetchedRef.current) return;
-    navActionsFetchedRef.current = true;
     let cancelled = false;
+    let fetchOk = true;
     // request() toasts the failure centrally; on rejection we fall back to
     // an empty shape so the palette still renders (layouts + search work).
-    // Also: if the fetch fails, allow a retry on next open by un-setting the
-    // ref so the user isn't stuck with a blank nav list forever.
+    // The ref only flips to true after a SUCCESSFUL apply — if the fetch
+    // fails or the user closes the palette before it resolves, the next
+    // open will re-fetch instead of being stuck with empty nav/actions.
     getPaletteManifest()
-      .catch(() => { navActionsFetchedRef.current = false; return { nav: [], actions: [] }; })
+      .catch(() => { fetchOk = false; return { nav: [], actions: [] }; })
       .then((data) => {
         if (cancelled) return;
+        if (fetchOk) navActionsFetchedRef.current = true;
         const nav = (data?.nav || []).map(precompute);
         const actions = (data?.actions || []).map(precompute);
         setManifest((prev) => ({
