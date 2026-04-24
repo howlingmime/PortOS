@@ -88,10 +88,13 @@ const sanitizeLayout = (l) => {
   if (Array.isArray(l.widgets)) {
     for (const w of l.widgets) {
       if (typeof w !== 'string') continue;
-      if (!w || w.length > WIDGET_ID_MAX_LENGTH) continue;
-      if (seen.has(w)) continue;
-      seen.add(w);
-      widgets.push(w);
+      // Trim first so hand-edited JSON ("apps ") normalizes to the
+      // canonical id and dedup catches whitespace-only duplicates.
+      const widgetId = w.trim();
+      if (!widgetId || widgetId.length > WIDGET_ID_MAX_LENGTH) continue;
+      if (seen.has(widgetId)) continue;
+      seen.add(widgetId);
+      widgets.push(widgetId);
       if (widgets.length >= WIDGETS_MAX) break;
     }
   }
