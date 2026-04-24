@@ -104,7 +104,12 @@ export default function Dashboard() {
     setActiveLayoutId(id);
     // Revert on failure. request() already surfaces the error via toast,
     // so swallow here to prevent an unhandled rejection from click handlers.
-    await api.setActiveDashboardLayout(id).catch(() => setActiveLayoutId(previousId));
+    // Guard the revert with a functional setState — if the user has since
+    // switched to another layout, the more recent selection wins instead
+    // of snapping back to the stale `previousId`.
+    await api.setActiveDashboardLayout(id).catch(() => {
+      setActiveLayoutId((current) => (current === id ? previousId : current));
+    });
   };
 
   const saveLayout = async ({ id, name, widgets }) => {
@@ -118,8 +123,12 @@ export default function Dashboard() {
     setLayouts(result.layouts);
     setActiveLayoutId(id);
     // Mirror selectLayout's revert-on-failure so the picker doesn't
-    // diverge from server state if the active-write fails.
-    await api.setActiveDashboardLayout(id).catch(() => setActiveLayoutId(previousId));
+    // diverge from server state if the active-write fails. Only revert
+    // if the UI still reflects the id we tried to set; a later selection
+    // must not be clobbered by an earlier failed request.
+    await api.setActiveDashboardLayout(id).catch(() => {
+      setActiveLayoutId((current) => (current === id ? previousId : current));
+    });
   };
 
   const deleteLayoutById = async (id) => {

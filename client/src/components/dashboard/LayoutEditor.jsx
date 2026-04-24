@@ -31,20 +31,23 @@ export default function LayoutEditor({ layouts, activeLayoutId, limits, onClose,
     requestAnimationFrame(() => closeRef.current?.focus());
   }, []);
 
-  // Rehydrate draft state ONLY when the user switches layouts. Keyed on
-  // `layouts` too would clobber in-flight edits every time the parent
-  // refreshes the list after save — surprised the user on save-as-new.
+  // Rehydrate draft state when the user switches layouts OR when the
+  // `layouts` prop changes (e.g. "Save as new…" calls setEditingId(newId)
+  // before the parent's setLayouts has propagated; this effect re-runs
+  // once the new entry lands so the editor shows its name/widgets).
+  // The `dirty` guard preserves in-flight edits across unrelated parent
+  // refreshes (palette-triggered layout switches, socket events, etc.).
   useEffect(() => {
     const cur = layouts.find((l) => l.id === editingId);
     if (!cur) return;
+    if (dirty) return;
     setWidgets(cur.widgets);
     setName(cur.name);
-    setDirty(false);
     setMode('idle');
     setDupName('');
     setPendingSwitchId(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingId]);
+  }, [editingId, layouts]);
 
   // Guard layout switches when there are unsaved edits: instead of silently
   // discarding the draft, surface an inline confirm in the footer.
@@ -60,7 +63,8 @@ export default function LayoutEditor({ layouts, activeLayoutId, limits, onClose,
 
   const confirmSwitch = () => {
     if (!pendingSwitchId) { setMode('idle'); return; }
-    setEditingId(pendingSwitchId); // rehydrate effect clears dirty/mode
+    setDirty(false); // user chose to discard; lets the rehydrate effect run
+    setEditingId(pendingSwitchId);
   };
 
   const cancelSwitch = () => {
@@ -112,13 +116,16 @@ export default function LayoutEditor({ layouts, activeLayoutId, limits, onClose,
     const trimmed = dupName.trim();
     if (!trimmed) { toast.error('Name required'); return; }
     // Final id must fit the server's idMax. Suffix grows with collisions
-    // (-2, -10, -100) so the base is trimmed per iteration.
+    // (-2, -10, -100) so the base is trimmed per iteration. Strip trailing
+    // dashes after slicing so a boundary mid-dash doesn't produce a
+    // trailing dash (`foo-`) or, combined with the suffix, a double-dash
+    // (`foo--2`) — both violate the server's ID_PATTERN.
     const baseSlug = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     if (!baseSlug) { toast.error('Use letters/numbers in the name'); return; }
     const fitId = (n) => {
-      if (n <= 1) return baseSlug.slice(0, idMax);
-      const suffix = `-${n}`;
-      return `${baseSlug.slice(0, idMax - suffix.length)}${suffix}`;
+      const suffix = n <= 1 ? '' : `-${n}`;
+      const body = baseSlug.slice(0, idMax - suffix.length).replace(/-+$/g, '');
+      return `${body}${suffix}`;
     };
     const existingIds = new Set(layouts.map((l) => l.id));
     let n = 1;
