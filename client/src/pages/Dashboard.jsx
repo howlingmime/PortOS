@@ -14,16 +14,17 @@ export default function Dashboard() {
   const [health, setHealth] = useState(null);
   const [usage, setUsage] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [dataError, setDataError] = useState(null);
+  const [layoutsError, setLayoutsError] = useState(null);
 
   const [layouts, setLayouts] = useState([]);
   const [activeLayoutId, setActiveLayoutId] = useState(null);
   const [editorOpen, setEditorOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
-    setError(null);
+    setDataError(null);
     const [appsData, healthData, usageData] = await Promise.all([
-      api.getApps().catch((err) => { setError(err.message); return []; }),
+      api.getApps().catch((err) => { setDataError(err.message); return []; }),
       api.checkHealth().catch(() => null),
       api.getUsage().catch(() => null),
     ]);
@@ -45,8 +46,9 @@ export default function Dashboard() {
       .then((data) => {
         setLayouts(data.layouts);
         setActiveLayoutId(data.activeLayoutId);
+        setLayoutsError(null);
       })
-      .catch((err) => setError(`Layouts: ${err.message}`));
+      .catch((err) => setLayoutsError(err.message));
 
     fetchLayouts();
 
@@ -164,9 +166,14 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {error && (
+      {dataError && (
         <div className="p-4 bg-port-error/20 border border-port-error rounded-lg text-port-error">
-          {error}
+          {dataError}
+        </div>
+      )}
+      {layoutsError && (
+        <div className="p-4 bg-port-error/20 border border-port-error rounded-lg text-port-error">
+          Layouts: {layoutsError}
         </div>
       )}
 

@@ -81,7 +81,9 @@ export default function LayoutEditor({ layouts, activeLayoutId, onClose, onSave,
   const commitDuplicate = async () => {
     const trimmed = dupName.trim();
     if (!trimmed) { toast.error('Name required'); return; }
-    const baseId = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    // Server-side idSchema caps ids at 60 chars; reserve 4 for a `-NN` suffix
+    // so collision-dedup can't push the final id past the limit.
+    const baseId = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 56);
     if (!baseId) { toast.error('Use letters/numbers in the name'); return; }
     const existingIds = new Set(layouts.map((l) => l.id));
     let id = baseId;

@@ -15,7 +15,9 @@ import ActivityStreakWidget from './builtins/ActivityStreakWidget';
 import HourlyActivityWidget from './builtins/HourlyActivityWidget';
 
 // Each entry: { id, label, Component, width, gate? }. `gate(state) => bool`
-// skips the widget when it has nothing useful to show (e.g. no apps).
+// skips the widget when it has nothing useful to show. The Apps tile is
+// intentionally un-gated — it renders its own empty-state CTA so the "add
+// your first app" path is always visible on a blank install.
 export const WIDGETS = [
   { id: 'quick-brain',       label: 'Quick Brain Capture',   Component: QuickBrainCapture,      width: 'half' },
   { id: 'quick-task',        label: 'Quick Task',            Component: QuickTaskWidget,        width: 'half' },

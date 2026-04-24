@@ -40,7 +40,7 @@ const SERVICE_ERROR_STATUS = {
 
 const mapServiceError = (err) => {
   const status = SERVICE_ERROR_STATUS[err?.code];
-  if (status) return new ServerError(err.message, { status });
+  if (status) return new ServerError(err.message, { status, code: err.code });
   return err;
 };
 
