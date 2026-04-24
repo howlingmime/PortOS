@@ -13,14 +13,19 @@ import * as svc from '../services/dashboardLayouts.js';
 
 const router = Router();
 
+const idSchema = z.string().min(1).max(60).regex(/^[a-z0-9-]+$/, 'id must be lowercase kebab');
+
 const layoutSchema = z.object({
-  id: z.string().min(1).max(60).regex(/^[a-z0-9-]+$/, 'id must be lowercase kebab'),
+  id: idSchema,
   name: z.string().min(1).max(80),
-  widgets: z.array(z.string().min(1).max(80)).max(50),
+  widgets: z
+    .array(z.string().min(1).max(80))
+    .max(50)
+    .refine((w) => new Set(w).size === w.length, { message: 'widgets must be unique' }),
 });
 
 const setActiveSchema = z.object({
-  id: z.string().min(1).max(60),
+  id: idSchema,
 });
 
 // Map service error codes to HTTP statuses. Any other error (I/O, parse,

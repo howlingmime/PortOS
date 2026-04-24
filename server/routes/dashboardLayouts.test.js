@@ -88,6 +88,25 @@ describe('PUT /api/dashboard/layouts/:id', () => {
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(svc.saveLayout).not.toHaveBeenCalled();
   });
+
+  it('rejects duplicate widget ids', async () => {
+    const res = await request(makeApp())
+      .put('/api/dashboard/layouts/my-custom')
+      .send({ name: 'Custom', widgets: ['apps', 'cos', 'apps'] });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(svc.saveLayout).not.toHaveBeenCalled();
+  });
+});
+
+describe('PUT /api/dashboard/layouts/active — id validation', () => {
+  it('rejects non-kebab ids with 400 (not 404)', async () => {
+    const res = await request(makeApp())
+      .put('/api/dashboard/layouts/active')
+      .send({ id: 'Not_Kebab' });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+    expect(svc.setActiveLayout).not.toHaveBeenCalled();
+  });
 });
 
 describe('DELETE /api/dashboard/layouts/:id', () => {

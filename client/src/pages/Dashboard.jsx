@@ -95,12 +95,9 @@ export default function Dashboard() {
   const selectLayout = async (id) => {
     const previousId = activeLayoutId;
     setActiveLayoutId(id);
-    // Revert optimistic state on failure — request() toasts the error
-    // centrally, but the picker can't stay showing the wrong selection.
-    await api.setActiveDashboardLayout(id).catch((err) => {
-      setActiveLayoutId(previousId);
-      throw err;
-    });
+    // Revert on failure. request() already surfaces the error via toast,
+    // so swallow here to prevent an unhandled rejection from click handlers.
+    await api.setActiveDashboardLayout(id).catch(() => setActiveLayoutId(previousId));
   };
 
   const saveLayout = async ({ id, name, widgets }) => {

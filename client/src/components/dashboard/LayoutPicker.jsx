@@ -39,7 +39,12 @@ export default function LayoutPicker({ layouts, activeLayoutId, onSelect, onEdit
                 key={l.id}
                 role="menuitemradio"
                 aria-checked={l.id === activeLayoutId}
-                onClick={() => { onSelect(l.id); setOpen(false); }}
+                onClick={() => {
+                  setOpen(false);
+                  // onSelect performs an API write; request() toasts any
+                  // failure, swallow here to avoid unhandled rejections.
+                  Promise.resolve(onSelect(l.id)).catch(() => {});
+                }}
                 className={`w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/5 ${
                   l.id === activeLayoutId ? 'text-white' : 'text-gray-300'
                 }`}

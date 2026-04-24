@@ -65,10 +65,15 @@ export default function LayoutEditor({ layouts, activeLayoutId, onClose, onSave,
     setDirty(true);
   };
 
+  // Each async handler awaits an API write through onSave/onDuplicate/
+  // onDelete. request() toasts failures centrally; swallow here so a
+  // rejection from a sync click handler doesn't surface as unhandled.
+  // On failure we keep dirty/mode state so the user can retry.
   const save = async () => {
     const trimmed = name.trim();
     if (!trimmed) { toast.error('Name required'); return; }
-    await onSave({ id: editingId, name: trimmed, widgets });
+    const ok = await onSave({ id: editingId, name: trimmed, widgets }).then(() => true, () => false);
+    if (!ok) return;
     setDirty(false);
     toast.success('Layout saved');
   };
@@ -82,14 +87,16 @@ export default function LayoutEditor({ layouts, activeLayoutId, onClose, onSave,
     let id = baseId;
     let n = 2;
     while (existingIds.has(id)) id = `${baseId}-${n++}`;
-    await onDuplicate({ id, name: trimmed, widgets });
+    const ok = await onDuplicate({ id, name: trimmed, widgets }).then(() => true, () => false);
+    if (!ok) return;
     setEditingId(id);
     setMode('idle');
     toast.success('New layout created');
   };
 
   const commitDelete = async () => {
-    await onDelete(editingId);
+    const ok = await onDelete(editingId).then(() => true, () => false);
+    if (!ok) return;
     const remaining = layouts.filter((l) => l.id !== editingId);
     setMode('idle');
     if (remaining.length > 0) setEditingId(remaining[0].id);

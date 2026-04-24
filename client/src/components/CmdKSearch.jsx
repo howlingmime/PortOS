@@ -86,12 +86,16 @@ export default function CmdKSearch() {
     }
   }, [open]);
 
-  // Split into two effects so setManifest never retriggers the fetch loop:
-  //   1. nav + actions are static server-side; fetched once, ever.
-  //   2. layouts change when the user creates/renames; re-fetched on open.
+  // Two effects so setManifest never retriggers a fetch loop:
+  //   1. nav + actions are static server-side; fetched once per mount (guarded
+  //      by a ref so remounting `open` doesn't re-hit the network).
+  //   2. layouts change when the user creates/renames/deletes; re-fetched on
+  //      every open-transition so the palette picks up changes immediately.
   // Each updates `manifest` functionally without depending on its value.
+  const navActionsFetchedRef = useRef(false);
   useEffect(() => {
-    if (!open) return;
+    if (!open || navActionsFetchedRef.current) return;
+    navActionsFetchedRef.current = true;
     let cancelled = false;
     getPaletteManifest().then((data) => {
       if (cancelled) return;
@@ -104,8 +108,6 @@ export default function CmdKSearch() {
       }));
     });
     return () => { cancelled = true; };
-    // Intentionally runs once per open-transition; `manifest` is not a dep.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   useEffect(() => {
@@ -196,10 +198,12 @@ export default function CmdKSearch() {
     nav: (item) => { navigate(item.path); close(); },
     search: (item) => { navigate(item.url); close(); },
     layout: async (item) => {
-      await setActiveDashboardLayout(item.layoutId);
-      // Notify any mounted Dashboard to re-fetch — navigate('/') is a
-      // no-op if the user is already on the dashboard, and we otherwise
-      // wouldn't see the new active layout until next mount.
+      // request() toasts errors centrally; swallow the rejection here so
+      // clicks from sync event handlers don't bubble as unhandled. On
+      // success, tell any mounted Dashboard to re-fetch because
+      // navigate('/') is a no-op if the user is already there.
+      const ok = await setActiveDashboardLayout(item.layoutId).then(() => true, () => false);
+      if (!ok) { close(); return; }
       window.dispatchEvent(new CustomEvent('portos:dashboard-layout-changed'));
       navigate('/');
       toast.success(`Switched to "${item.layoutName}"`);
