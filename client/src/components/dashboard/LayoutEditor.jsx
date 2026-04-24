@@ -12,10 +12,12 @@ import toast from '../ui/Toast';
 // the editor functional in degraded states). Kept in sync with the server's
 // ID_MAX_LENGTH by convention — the server value is authoritative.
 const FALLBACK_ID_MAX = 60;
+const FALLBACK_NAME_MAX = 80;
 const FALLBACK_WIDGETS_MAX = 50;
 
 export default function LayoutEditor({ layouts, activeLayoutId, limits, onClose, onSave, onDelete, onDuplicate }) {
   const idMax = limits?.idMaxLength || FALLBACK_ID_MAX;
+  const nameMax = limits?.nameMaxLength || FALLBACK_NAME_MAX;
   const widgetsMax = limits?.widgetsMax || FALLBACK_WIDGETS_MAX;
   const [editingId, setEditingId] = useState(activeLayoutId);
   const editing = layouts.find((l) => l.id === editingId);
@@ -193,6 +195,7 @@ export default function LayoutEditor({ layouts, activeLayoutId, limits, onClose,
                 type="text"
                 value={name}
                 onChange={(e) => { setName(e.target.value); setDirty(true); }}
+                maxLength={nameMax}
                 className="w-full bg-port-bg border border-port-border rounded-lg px-3 py-2 text-sm text-white focus:border-port-accent outline-hidden"
               />
             </div>
@@ -252,6 +255,7 @@ export default function LayoutEditor({ layouts, activeLayoutId, limits, onClose,
                   if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); commitDuplicate(); }
                   else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setMode('idle'); }
                 }}
+                maxLength={nameMax}
                 placeholder="Name for new layout"
                 className="flex-1 bg-port-bg border border-port-border rounded-lg px-3 py-2 text-sm text-white focus:border-port-accent outline-hidden"
               />

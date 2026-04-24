@@ -96,15 +96,16 @@ export default function Dashboard() {
     [apps, sortedApps, activeApps, appStats, health, usage, fetchData]
   );
 
-  // Falls back to a local minimal layout when the /api/dashboard/layouts
-  // endpoint is unreachable (first load + transient outages). A failed
-  // refresh preserves the prior `layouts` (the .catch() branch doesn't
-  // reset them) but a failed initial load would otherwise leave the grid
-  // blank — the fallback keeps the dashboard usable until recovery.
-  const activeLayout = useMemo(
-    () => layouts.find((l) => l.id === activeLayoutId) || layouts[0] || FALLBACK_LAYOUT,
-    [layouts, activeLayoutId]
-  );
+  // Falls back to a local minimal layout only AFTER the initial fetch has
+  // settled so the spinner isn't rendered alongside a flash of fallback
+  // widgets. A failed refresh preserves the prior `layouts` (the .catch()
+  // branch doesn't reset them); a failed/empty initial load then shows
+  // the fallback so the dashboard stays usable until recovery.
+  const activeLayout = useMemo(() => {
+    const found = layouts.find((l) => l.id === activeLayoutId) || layouts[0];
+    if (found) return found;
+    return layoutsLoading ? undefined : FALLBACK_LAYOUT;
+  }, [layouts, activeLayoutId, layoutsLoading]);
 
   const visibleWidgets = useMemo(
     () => (activeLayout?.widgets ?? [])
