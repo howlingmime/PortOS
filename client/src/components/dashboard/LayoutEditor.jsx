@@ -12,9 +12,11 @@ import toast from '../ui/Toast';
 // the editor functional in degraded states). Kept in sync with the server's
 // ID_MAX_LENGTH by convention — the server value is authoritative.
 const FALLBACK_ID_MAX = 60;
+const FALLBACK_WIDGETS_MAX = 50;
 
 export default function LayoutEditor({ layouts, activeLayoutId, limits, onClose, onSave, onDelete, onDuplicate }) {
   const idMax = limits?.idMaxLength || FALLBACK_ID_MAX;
+  const widgetsMax = limits?.widgetsMax || FALLBACK_WIDGETS_MAX;
   const [editingId, setEditingId] = useState(activeLayoutId);
   const editing = layouts.find((l) => l.id === editingId);
   const [widgets, setWidgets] = useState(editing?.widgets ?? []);
@@ -95,8 +97,19 @@ export default function LayoutEditor({ layouts, activeLayoutId, limits, onClose,
   };
 
   const add = (id) => {
-    setWidgets((prev) => (prev.includes(id) ? prev : [...prev, id]));
-    setDirty(true);
+    let added = false;
+    setWidgets((prev) => {
+      if (prev.includes(id)) return prev;
+      // Match server's Zod cap so users don't hit a 400 on Save after
+      // silently accumulating past the limit.
+      if (prev.length >= widgetsMax) {
+        toast.error(`Layouts are capped at ${widgetsMax} widgets`);
+        return prev;
+      }
+      added = true;
+      return [...prev, id];
+    });
+    if (added) setDirty(true);
   };
 
   // Each async handler awaits an API write through onSave/onDuplicate/

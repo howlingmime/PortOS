@@ -143,9 +143,14 @@ export async function setActiveLayout(id) {
 export async function saveLayout(layout) {
   const state = await getState();
   const idx = state.layouts.findIndex((l) => l.id === layout.id);
+  // Derive `builtIn` from BUILTIN_IDS at write-time (not from the persisted
+  // flag) so a hand-edited JSON that deleted the default `ops` entry can't
+  // produce a new `ops` that sanitizeLayout() later treats as built-in while
+  // the write-path echoed `builtIn: false` to the client.
+  const builtIn = BUILTIN_IDS.has(layout.id);
   const merged = idx >= 0
-    ? state.layouts.map((l, i) => i === idx ? { ...l, ...layout, builtIn: l.builtIn } : l)
-    : [...state.layouts, { ...layout, builtIn: false }];
+    ? state.layouts.map((l, i) => i === idx ? { ...l, ...layout, builtIn } : l)
+    : [...state.layouts, { ...layout, builtIn }];
   const next = { activeLayoutId: state.activeLayoutId, layouts: merged };
   await atomicWrite(STATE_PATH, next);
   return { ...next, limits: LIMITS };
