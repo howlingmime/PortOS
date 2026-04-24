@@ -179,6 +179,10 @@ export default function CmdKSearch() {
     search: (item) => { navigate(item.url); close(); },
     layout: async (item) => {
       await setActiveDashboardLayout(item.layoutId);
+      // Notify any mounted Dashboard to re-fetch — navigate('/') is a
+      // no-op if the user is already on the dashboard, and we otherwise
+      // wouldn't see the new active layout until next mount.
+      window.dispatchEvent(new CustomEvent('portos:dashboard-layout-changed'));
       navigate('/');
       toast.success(`Switched to "${item.layoutName}"`);
       close();

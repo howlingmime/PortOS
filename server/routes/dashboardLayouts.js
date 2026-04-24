@@ -23,15 +23,27 @@ const setActiveSchema = z.object({
   id: z.string().min(1).max(60),
 });
 
+// Map service error codes to HTTP statuses. Any other error (I/O, parse,
+// write failures) bubbles through asyncHandler as 500 — do NOT collapse
+// unknown errors into 404, that hides real server problems.
+const SERVICE_ERROR_STATUS = {
+  [svc.ERR_NOT_FOUND]: 404,
+  [svc.ERR_BUILTIN_PROTECTED]: 400,
+};
+
+const mapServiceError = (err) => {
+  const status = SERVICE_ERROR_STATUS[err?.code];
+  if (status) return new ServerError(err.message, { status });
+  return err;
+};
+
 router.get('/', asyncHandler(async (_req, res) => {
   res.json(await svc.getState());
 }));
 
 router.put('/active', asyncHandler(async (req, res) => {
   const { id } = validateRequest(setActiveSchema, req.body ?? {});
-  const state = await svc.setActiveLayout(id).catch((err) => {
-    throw new ServerError(err.message, { status: 404 });
-  });
+  const state = await svc.setActiveLayout(id).catch((err) => { throw mapServiceError(err); });
   res.json(state);
 }));
 
@@ -41,9 +53,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
 }));
 
 router.delete('/:id', asyncHandler(async (req, res) => {
-  const state = await svc.deleteLayout(String(req.params.id)).catch((err) => {
-    throw new ServerError(err.message, { status: err.message.includes('Cannot delete') ? 400 : 404 });
-  });
+  const state = await svc.deleteLayout(String(req.params.id)).catch((err) => { throw mapServiceError(err); });
   res.json(state);
 }));
 

@@ -15,8 +15,14 @@ import { PATHS, atomicWrite, readJSONFile, ensureDir } from '../lib/fileUtils.js
 
 const STATE_PATH = join(PATHS.data, 'dashboard-layouts.json');
 
+// Service errors carry a `code` field so routes can map to HTTP status
+// without string-matching on err.message (which breaks on rename/i18n).
+export const ERR_NOT_FOUND = 'NOT_FOUND';
+export const ERR_BUILTIN_PROTECTED = 'BUILTIN_PROTECTED';
+const makeErr = (message, code) => Object.assign(new Error(message), { code });
+
 // Widget ids are the contract between this file and the client registry —
-// see client/src/components/dashboard/widgetRegistry.js. If a layout refers
+// see client/src/components/dashboard/widgetRegistry.jsx. If a layout refers
 // to an unknown id, the client skips it gracefully.
 const DEFAULT_LAYOUTS = [
   {
@@ -56,14 +62,23 @@ const DEFAULT_STATE = {
   layouts: DEFAULT_LAYOUTS,
 };
 
+// Sanitize a single layout entry — protect against hand-edits that produce
+// non-object elements, missing fields, or non-array widget lists.
+const sanitizeLayout = (l) => {
+  if (!l || typeof l !== 'object') return null;
+  if (typeof l.id !== 'string' || !l.id) return null;
+  if (typeof l.name !== 'string' || !l.name) return null;
+  const widgets = Array.isArray(l.widgets) ? l.widgets.filter((w) => typeof w === 'string') : [];
+  return { id: l.id, name: l.name, builtIn: !!l.builtIn, widgets };
+};
+
 export async function getState() {
   await ensureDir(PATHS.data);
   const raw = await readJSONFile(STATE_PATH, DEFAULT_STATE, { logError: false });
-  // If the file exists but has drifted (missing fields, or user deleted all
-  // layouts), merge in defaults conservatively rather than returning junk.
-  const layouts = Array.isArray(raw.layouts) && raw.layouts.length > 0
-    ? raw.layouts
-    : DEFAULT_LAYOUTS;
+  const sanitized = Array.isArray(raw.layouts)
+    ? raw.layouts.map(sanitizeLayout).filter(Boolean)
+    : [];
+  const layouts = sanitized.length > 0 ? sanitized : DEFAULT_LAYOUTS;
   const activeLayoutId = layouts.find((l) => l.id === raw.activeLayoutId)
     ? raw.activeLayoutId
     : layouts[0].id;
@@ -73,7 +88,7 @@ export async function getState() {
 export async function setActiveLayout(id) {
   const state = await getState();
   if (!state.layouts.find((l) => l.id === id)) {
-    throw new Error(`Unknown layout id: ${id}`);
+    throw makeErr(`Unknown layout id: ${id}`, ERR_NOT_FOUND);
   }
   const next = { ...state, activeLayoutId: id };
   await atomicWrite(STATE_PATH, next);
@@ -94,8 +109,8 @@ export async function saveLayout(layout) {
 export async function deleteLayout(id) {
   const state = await getState();
   const target = state.layouts.find((l) => l.id === id);
-  if (!target) throw new Error(`Unknown layout id: ${id}`);
-  if (target.builtIn) throw new Error(`Cannot delete built-in layout: ${id}`);
+  if (!target) throw makeErr(`Unknown layout id: ${id}`, ERR_NOT_FOUND);
+  if (target.builtIn) throw makeErr(`Cannot delete built-in layout: ${id}`, ERR_BUILTIN_PROTECTED);
   const remaining = state.layouts.filter((l) => l.id !== id);
   // Guard against the pathological case where the JSON was hand-edited to
   // remove every built-in — fall back to reseeding defaults rather than

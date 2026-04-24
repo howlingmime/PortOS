@@ -17,25 +17,34 @@ export default function LayoutPicker({ layouts, activeLayoutId, onSelect, onEdit
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-port-card border border-port-border hover:border-gray-600 transition-colors text-sm text-gray-300 hover:text-white min-h-[40px]"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-port-card border border-port-border hover:border-gray-600 transition-colors text-sm text-gray-300 hover:text-white min-h-[40px] focus:outline-hidden focus:ring-2 focus:ring-port-accent focus:ring-offset-2 focus:ring-offset-port-bg"
         title="Switch dashboard layout"
+        aria-label={`Dashboard layout: ${active?.name || 'none'}`}
+        aria-expanded={open}
+        aria-haspopup="menu"
       >
-        <LayoutGrid size={14} />
+        <LayoutGrid size={14} aria-hidden="true" />
         <span className="hidden sm:inline">{active?.name || 'Layout'}</span>
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1 w-56 bg-port-card border border-port-border rounded-lg shadow-2xl overflow-hidden z-50">
+        <div
+          role="menu"
+          aria-label="Dashboard layout menu"
+          className="absolute right-0 mt-1 w-56 bg-port-card border border-port-border rounded-lg shadow-2xl overflow-hidden z-50"
+        >
           <div className="py-1">
             {layouts.map((l) => (
               <button
                 key={l.id}
+                role="menuitemradio"
+                aria-checked={l.id === activeLayoutId}
                 onClick={() => { onSelect(l.id); setOpen(false); }}
                 className={`w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/5 ${
                   l.id === activeLayoutId ? 'text-white' : 'text-gray-300'
                 }`}
               >
-                {l.id === activeLayoutId ? <Check size={14} className="text-port-success" /> : <span className="w-3.5" />}
+                {l.id === activeLayoutId ? <Check size={14} className="text-port-success" aria-hidden="true" /> : <span className="w-3.5" aria-hidden="true" />}
                 <span className="flex-1 truncate">{l.name}</span>
                 {l.builtIn && <span className="text-[10px] text-gray-500 uppercase">Built-in</span>}
               </button>
@@ -43,10 +52,11 @@ export default function LayoutPicker({ layouts, activeLayoutId, onSelect, onEdit
           </div>
           <div className="border-t border-port-border">
             <button
+              role="menuitem"
               onClick={() => { setOpen(false); onEdit(); }}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white"
             >
-              <Pencil size={14} />
+              <Pencil size={14} aria-hidden="true" />
               <span>Edit layouts…</span>
             </button>
           </div>

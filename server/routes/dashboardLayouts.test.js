@@ -4,6 +4,8 @@ import { request } from '../lib/testHelper.js';
 import { errorMiddleware } from '../lib/errorHandler.js';
 
 vi.mock('../services/dashboardLayouts.js', () => ({
+  ERR_NOT_FOUND: 'NOT_FOUND',
+  ERR_BUILTIN_PROTECTED: 'BUILTIN_PROTECTED',
   getState: vi.fn(),
   setActiveLayout: vi.fn(),
   saveLayout: vi.fn(),
@@ -49,11 +51,19 @@ describe('PUT /api/dashboard/layouts/active', () => {
   });
 
   it('404s on unknown layout', async () => {
-    svc.setActiveLayout.mockRejectedValue(new Error('Unknown layout id: nope'));
+    svc.setActiveLayout.mockRejectedValue(Object.assign(new Error('Unknown layout id: nope'), { code: 'NOT_FOUND' }));
     const res = await request(makeApp())
       .put('/api/dashboard/layouts/active')
       .send({ id: 'nope' });
     expect(res.status).toBe(404);
+  });
+
+  it('500s (bubbles) on unexpected service errors — does not collapse to 404', async () => {
+    svc.setActiveLayout.mockRejectedValue(new Error('disk full'));
+    const res = await request(makeApp())
+      .put('/api/dashboard/layouts/active')
+      .send({ id: 'default' });
+    expect(res.status).toBe(500);
   });
 });
 
@@ -89,8 +99,14 @@ describe('DELETE /api/dashboard/layouts/:id', () => {
   });
 
   it('400s when trying to delete a built-in layout', async () => {
-    svc.deleteLayout.mockRejectedValue(new Error('Cannot delete built-in layout: default'));
+    svc.deleteLayout.mockRejectedValue(Object.assign(new Error('Cannot delete built-in layout: default'), { code: 'BUILTIN_PROTECTED' }));
     const res = await request(makeApp()).delete('/api/dashboard/layouts/default');
     expect(res.status).toBe(400);
+  });
+
+  it('404s when deleting an unknown layout', async () => {
+    svc.deleteLayout.mockRejectedValue(Object.assign(new Error('Unknown layout id: nope'), { code: 'NOT_FOUND' }));
+    const res = await request(makeApp()).delete('/api/dashboard/layouts/nope');
+    expect(res.status).toBe(404);
   });
 });

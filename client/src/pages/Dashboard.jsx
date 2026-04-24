@@ -41,12 +41,21 @@ export default function Dashboard() {
   }, [fetchData]);
 
   useEffect(() => {
-    api.getDashboardLayouts()
+    const fetchLayouts = () => api.getDashboardLayouts()
       .then((data) => {
         setLayouts(data.layouts);
         setActiveLayoutId(data.activeLayoutId);
       })
       .catch((err) => setError(`Layouts: ${err.message}`));
+
+    fetchLayouts();
+
+    // External switchers (the ⌘K palette) fire this event after writing
+    // to the server so the Dashboard re-syncs even when already on `/`
+    // (where navigate('/') would be a no-op and no remount happens).
+    const handleLayoutChanged = () => fetchLayouts();
+    window.addEventListener('portos:dashboard-layout-changed', handleLayoutChanged);
+    return () => window.removeEventListener('portos:dashboard-layout-changed', handleLayoutChanged);
   }, []);
 
   const sortedApps = useMemo(() =>
@@ -84,8 +93,14 @@ export default function Dashboard() {
   );
 
   const selectLayout = async (id) => {
+    const previousId = activeLayoutId;
     setActiveLayoutId(id);
-    await api.setActiveDashboardLayout(id);
+    // Revert optimistic state on failure — request() toasts the error
+    // centrally, but the picker can't stay showing the wrong selection.
+    await api.setActiveDashboardLayout(id).catch((err) => {
+      setActiveLayoutId(previousId);
+      throw err;
+    });
   };
 
   const saveLayout = async ({ id, name, widgets }) => {
