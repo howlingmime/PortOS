@@ -97,8 +97,12 @@ export async function deleteLayout(id) {
   if (!target) throw new Error(`Unknown layout id: ${id}`);
   if (target.builtIn) throw new Error(`Cannot delete built-in layout: ${id}`);
   const remaining = state.layouts.filter((l) => l.id !== id);
-  const activeLayoutId = state.activeLayoutId === id ? remaining[0].id : state.activeLayoutId;
-  const next = { activeLayoutId, layouts: remaining };
+  // Guard against the pathological case where the JSON was hand-edited to
+  // remove every built-in — fall back to reseeding defaults rather than
+  // indexing into an empty array.
+  const nextLayouts = remaining.length > 0 ? remaining : DEFAULT_LAYOUTS;
+  const activeLayoutId = state.activeLayoutId === id ? nextLayouts[0].id : state.activeLayoutId;
+  const next = { activeLayoutId, layouts: nextLayouts };
   await atomicWrite(STATE_PATH, next);
   return next;
 }

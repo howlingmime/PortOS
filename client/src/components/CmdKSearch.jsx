@@ -98,7 +98,10 @@ export default function CmdKSearch() {
           nav: (data?.nav || []).map(precompute),
           actions: (data?.actions || []).map(precompute),
         }));
-    Promise.all([manifestPromise, getDashboardLayouts()]).then(([m, dashboards]) => {
+    // Fetch layouts independently so a layouts-endpoint failure can't kill
+    // nav + actions at the same time — each recovers with an empty list.
+    const layoutsPromise = getDashboardLayouts().catch(() => ({ layouts: [] }));
+    Promise.all([manifestPromise, layoutsPromise]).then(([m, dashboards]) => {
       const layouts = (dashboards?.layouts || []).map((l) => precompute({
         id: `layout.${l.id}`,
         layoutId: l.id,
