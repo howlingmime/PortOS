@@ -63,6 +63,10 @@ const DEFAULT_STATE = {
 };
 
 const BUILTIN_IDS = new Set(DEFAULT_LAYOUTS.map((l) => l.id));
+// Kept in lockstep with routes/dashboardLayouts.js#idSchema — both layers
+// must reject ids the other can't round-trip, or the client ends up with
+// layouts it can display but not activate/delete.
+const ID_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 // Sanitize a single layout entry — protect against hand-edits that produce
 // non-object elements, missing fields, non-array widget lists, or duplicate
@@ -71,7 +75,7 @@ const BUILTIN_IDS = new Set(DEFAULT_LAYOUTS.map((l) => l.id));
 // flag can't downgrade a built-in into a deletable user layout.
 const sanitizeLayout = (l) => {
   if (!l || typeof l !== 'object') return null;
-  if (typeof l.id !== 'string' || !l.id) return null;
+  if (typeof l.id !== 'string' || !ID_RE.test(l.id) || l.id.length > 60) return null;
   if (typeof l.name !== 'string' || !l.name) return null;
   const widgets = [];
   const seen = new Set();
@@ -89,9 +93,16 @@ const sanitizeLayout = (l) => {
 export async function getState() {
   await ensureDir(PATHS.data);
   const raw = await readJSONFile(STATE_PATH, DEFAULT_STATE, { logError: false });
-  const sanitized = Array.isArray(raw.layouts)
-    ? raw.layouts.map(sanitizeLayout).filter(Boolean)
-    : [];
+  const sanitized = [];
+  const seenIds = new Set();
+  if (Array.isArray(raw.layouts)) {
+    for (const entry of raw.layouts) {
+      const s = sanitizeLayout(entry);
+      if (!s || seenIds.has(s.id)) continue; // first-occurrence wins; no React key collisions
+      seenIds.add(s.id);
+      sanitized.push(s);
+    }
+  }
   const layouts = sanitized.length > 0 ? sanitized : DEFAULT_LAYOUTS;
   const activeLayoutId = layouts.find((l) => l.id === raw.activeLayoutId)
     ? raw.activeLayoutId
