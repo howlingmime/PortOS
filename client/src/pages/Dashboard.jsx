@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import BrailleSpinner from '../components/BrailleSpinner';
 import LayoutPicker from '../components/dashboard/LayoutPicker';
 import LayoutEditor from '../components/dashboard/LayoutEditor';
-import { WIDGETS_BY_ID, WIDTH_CLASS } from '../components/dashboard/widgetRegistry.jsx';
+import { WIDGETS_BY_ID, WIDTH_CLASS, FALLBACK_LAYOUT } from '../components/dashboard/widgetRegistry.jsx';
 import { DASHBOARD_LAYOUT_CHANGED } from '../constants/events.js';
 import { Monitor } from 'lucide-react';
 import * as api from '../services/api';
@@ -87,8 +87,13 @@ export default function Dashboard() {
     [apps, sortedApps, activeApps, appStats, health, usage, fetchData]
   );
 
+  // Falls back to a local minimal layout when the /api/dashboard/layouts
+  // endpoint is unreachable (first load + transient outages). A failed
+  // refresh preserves the prior `layouts` (the .catch() branch doesn't
+  // reset them) but a failed initial load would otherwise leave the grid
+  // blank — the fallback keeps the dashboard usable until recovery.
   const activeLayout = useMemo(
-    () => layouts.find((l) => l.id === activeLayoutId) || layouts[0],
+    () => layouts.find((l) => l.id === activeLayoutId) || layouts[0] || FALLBACK_LAYOUT,
     [layouts, activeLayoutId]
   );
 

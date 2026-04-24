@@ -122,10 +122,15 @@ export default function CmdKSearch() {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    let fetchOk = true;
     getDashboardLayouts()
-      .catch(() => ({ layouts: [] }))
+      .catch(() => { fetchOk = false; return { layouts: [] }; })
       .then((dashboards) => {
         if (cancelled) return;
+        // Transient failure: preserve the previously-loaded layouts rather
+        // than wiping "Dashboard: …" commands out of the palette until the
+        // next successful open.
+        if (!fetchOk) return;
         const layouts = (dashboards?.layouts || []).map((l) => precompute({
           id: `layout.${l.id}`,
           layoutId: l.id,

@@ -38,6 +38,16 @@ export const WIDGETS = [
 
 export const WIDGETS_BY_ID = Object.fromEntries(WIDGETS.map((w) => [w.id, w]));
 
+// Local fallback used when the layouts endpoint is unreachable. Keeps the
+// dashboard usable during a transient server outage instead of rendering a
+// blank page. Intentionally minimal — the full built-ins live server-side.
+export const FALLBACK_LAYOUT = Object.freeze({
+  id: '_fallback',
+  name: 'Default (offline)',
+  builtIn: true,
+  widgets: ['apps', 'cos', 'upcoming-tasks', 'system-health'],
+});
+
 export const WIDTH_CLASS = {
   full:    'col-span-12',
   half:    'col-span-12 md:col-span-6',
