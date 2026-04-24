@@ -61,8 +61,7 @@ export default function LayoutEditor({ layouts, activeLayoutId, onClose, onSave,
   };
 
   const add = (id) => {
-    if (widgets.includes(id)) return;
-    setWidgets((prev) => [...prev, id]);
+    setWidgets((prev) => (prev.includes(id) ? prev : [...prev, id]));
     setDirty(true);
   };
 

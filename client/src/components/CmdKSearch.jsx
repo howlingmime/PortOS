@@ -86,34 +86,52 @@ export default function CmdKSearch() {
     }
   }, [open]);
 
-  // Manifest (nav + actions) is cached for the lifetime of the component —
-  // static at module load on the server. Dashboard layouts change whenever
-  // the user creates/renames one, so they're re-fetched on every open to
-  // avoid a stale list on the same page mount.
+  // Split into two effects so setManifest never retriggers the fetch loop:
+  //   1. nav + actions are static server-side; fetched once, ever.
+  //   2. layouts change when the user creates/renames; re-fetched on open.
+  // Each updates `manifest` functionally without depending on its value.
   useEffect(() => {
     if (!open) return;
-    const manifestPromise = manifest
-      ? Promise.resolve({ nav: manifest.nav, actions: manifest.actions })
-      : getPaletteManifest().then((data) => ({
-          nav: (data?.nav || []).map(precompute),
-          actions: (data?.actions || []).map(precompute),
-        }));
-    // Fetch layouts independently so a layouts-endpoint failure can't kill
-    // nav + actions at the same time — each recovers with an empty list.
-    const layoutsPromise = getDashboardLayouts().catch(() => ({ layouts: [] }));
-    Promise.all([manifestPromise, layoutsPromise]).then(([m, dashboards]) => {
-      const layouts = (dashboards?.layouts || []).map((l) => precompute({
-        id: `layout.${l.id}`,
-        layoutId: l.id,
-        layoutName: l.name,
-        label: `Dashboard: ${l.name}`,
-        section: 'Layouts',
-        aliases: ['layout', l.id, ...l.name.toLowerCase().split(/\s+/)],
-        keywords: ['dashboard', 'layout', 'view'],
+    let cancelled = false;
+    getPaletteManifest().then((data) => {
+      if (cancelled) return;
+      const nav = (data?.nav || []).map(precompute);
+      const actions = (data?.actions || []).map(precompute);
+      setManifest((prev) => ({
+        nav,
+        actions,
+        layouts: prev?.layouts || [],
       }));
-      setManifest({ nav: m.nav, actions: m.actions, layouts });
     });
-  }, [open, manifest]);
+    return () => { cancelled = true; };
+    // Intentionally runs once per open-transition; `manifest` is not a dep.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    getDashboardLayouts()
+      .catch(() => ({ layouts: [] }))
+      .then((dashboards) => {
+        if (cancelled) return;
+        const layouts = (dashboards?.layouts || []).map((l) => precompute({
+          id: `layout.${l.id}`,
+          layoutId: l.id,
+          layoutName: l.name,
+          label: `Dashboard: ${l.name}`,
+          section: 'Layouts',
+          aliases: ['layout', l.id, ...l.name.toLowerCase().split(/\s+/)],
+          keywords: ['dashboard', 'layout', 'view'],
+        }));
+        setManifest((prev) => ({
+          nav: prev?.nav || [],
+          actions: prev?.actions || [],
+          layouts,
+        }));
+      });
+    return () => { cancelled = true; };
+  }, [open]);
 
   useEffect(() => {
     if (query.length < 2) {

@@ -62,14 +62,18 @@ const DEFAULT_STATE = {
   layouts: DEFAULT_LAYOUTS,
 };
 
+const BUILTIN_IDS = new Set(DEFAULT_LAYOUTS.map((l) => l.id));
+
 // Sanitize a single layout entry — protect against hand-edits that produce
-// non-object elements, missing fields, or non-array widget lists.
+// non-object elements, missing fields, or non-array widget lists. `builtIn`
+// is derived from the id, not the persisted flag, so a hand-edit flipping
+// the flag can't downgrade a built-in into a deletable user layout.
 const sanitizeLayout = (l) => {
   if (!l || typeof l !== 'object') return null;
   if (typeof l.id !== 'string' || !l.id) return null;
   if (typeof l.name !== 'string' || !l.name) return null;
   const widgets = Array.isArray(l.widgets) ? l.widgets.filter((w) => typeof w === 'string') : [];
-  return { id: l.id, name: l.name, builtIn: !!l.builtIn, widgets };
+  return { id: l.id, name: l.name, builtIn: BUILTIN_IDS.has(l.id), widgets };
 };
 
 export async function getState() {
