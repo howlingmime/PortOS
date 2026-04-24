@@ -97,19 +97,15 @@ export default function LayoutEditor({ layouts, activeLayoutId, limits, onClose,
   };
 
   const add = (id) => {
-    let added = false;
-    setWidgets((prev) => {
-      if (prev.includes(id)) return prev;
-      // Match server's Zod cap so users don't hit a 400 on Save after
-      // silently accumulating past the limit.
-      if (prev.length >= widgetsMax) {
-        toast.error(`Layouts are capped at ${widgetsMax} widgets`);
-        return prev;
-      }
-      added = true;
-      return [...prev, id];
-    });
-    if (added) setDirty(true);
+    if (widgets.includes(id)) return;
+    // Match server's Zod cap so users don't hit a 400 on Save after
+    // silently accumulating past the limit.
+    if (widgets.length >= widgetsMax) {
+      toast.error(`Layouts are capped at ${widgetsMax} widgets`);
+      return;
+    }
+    setWidgets([...widgets, id]);
+    setDirty(true);
   };
 
   // Each async handler awaits an API write through onSave/onDuplicate/

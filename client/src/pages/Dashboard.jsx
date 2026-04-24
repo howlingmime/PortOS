@@ -45,15 +45,21 @@ export default function Dashboard() {
   }, [fetchData]);
 
   useEffect(() => {
+    // `cancelled` guard prevents setState-on-unmounted warnings (and
+    // accidental state writes) when the user navigates away before the
+    // fetch resolves, or while a DASHBOARD_LAYOUT_CHANGED fetch is in
+    // flight at unmount time.
+    let cancelled = false;
     const fetchLayouts = () => api.getDashboardLayouts()
       .then((data) => {
+        if (cancelled) return;
         setLayouts(data.layouts);
         setActiveLayoutId(data.activeLayoutId);
         if (data.limits) setLayoutLimits(data.limits);
         setLayoutsError(null);
       })
-      .catch((err) => setLayoutsError(err.message))
-      .finally(() => setLayoutsLoading(false));
+      .catch((err) => { if (!cancelled) setLayoutsError(err.message); })
+      .finally(() => { if (!cancelled) setLayoutsLoading(false); });
 
     fetchLayouts();
 
@@ -62,7 +68,10 @@ export default function Dashboard() {
     // (where navigate('/') would be a no-op and no remount happens).
     const handleLayoutChanged = () => fetchLayouts();
     window.addEventListener(DASHBOARD_LAYOUT_CHANGED, handleLayoutChanged);
-    return () => window.removeEventListener(DASHBOARD_LAYOUT_CHANGED, handleLayoutChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(DASHBOARD_LAYOUT_CHANGED, handleLayoutChanged);
+    };
   }, []);
 
   const sortedApps = useMemo(() =>
