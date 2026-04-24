@@ -144,6 +144,10 @@ export default function LayoutEditor({ layouts, activeLayoutId, limits, onClose,
     while (existingIds.has(id)) { n += 1; id = fitId(n); }
     const ok = await onDuplicate({ id, name: trimmed, widgets }).then(() => true, () => false);
     if (!ok) return;
+    // The duplicate IS saved — clear dirty so the rehydrate effect runs
+    // when the new layout lands in `layouts` props; otherwise the editor
+    // could show stale name/widgets for the new id.
+    setDirty(false);
     setEditingId(id);
     setMode('idle');
     toast.success('New layout created');
@@ -153,6 +157,10 @@ export default function LayoutEditor({ layouts, activeLayoutId, limits, onClose,
     const ok = await onDelete(editingId).then(() => true, () => false);
     if (!ok) return;
     const remaining = layouts.filter((l) => l.id !== editingId);
+    // The layout we were editing is gone — any in-flight edits on it are
+    // meaningless. Clear dirty so the rehydrate effect can sync to the
+    // next selected layout (otherwise the guard would leave stale state).
+    setDirty(false);
     setMode('idle');
     if (remaining.length > 0) setEditingId(remaining[0].id);
     else close();
