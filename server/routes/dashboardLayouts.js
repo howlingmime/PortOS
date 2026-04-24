@@ -13,7 +13,9 @@ import * as svc from '../services/dashboardLayouts.js';
 
 const router = Router();
 
-const idSchema = z.string().min(1).max(60).regex(/^[a-z0-9-]+$/, 'id must be lowercase kebab');
+// Strict kebab: alphanumeric segments joined by single dashes, no leading
+// or trailing dashes, no runs of dashes. Matches `default`, `morning-review`.
+const idSchema = z.string().min(1).max(60).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'id must be lowercase kebab');
 
 const layoutSchema = z.object({
   id: idSchema,
@@ -58,7 +60,8 @@ router.put('/:id', asyncHandler(async (req, res) => {
 }));
 
 router.delete('/:id', asyncHandler(async (req, res) => {
-  const state = await svc.deleteLayout(String(req.params.id)).catch((err) => { throw mapServiceError(err); });
+  const { id } = validateRequest(z.object({ id: idSchema }), req.params ?? {});
+  const state = await svc.deleteLayout(id).catch((err) => { throw mapServiceError(err); });
   res.json(state);
 }));
 

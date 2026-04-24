@@ -106,10 +106,13 @@ export default function Dashboard() {
   };
 
   const duplicateLayout = async ({ id, name, widgets }) => {
+    const previousId = activeLayoutId;
     const result = await api.saveDashboardLayout(id, name, widgets);
     setLayouts(result.layouts);
     setActiveLayoutId(id);
-    await api.setActiveDashboardLayout(id);
+    // Mirror selectLayout's revert-on-failure so the picker doesn't
+    // diverge from server state if the active-write fails.
+    await api.setActiveDashboardLayout(id).catch(() => setActiveLayoutId(previousId));
   };
 
   const deleteLayoutById = async (id) => {

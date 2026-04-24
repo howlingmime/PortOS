@@ -195,7 +195,10 @@ export default function LayoutEditor({ layouts, activeLayoutId, onClose, onSave,
                 value={dupName}
                 autoFocus
                 onChange={(e) => setDupName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') commitDuplicate(); if (e.key === 'Escape') setMode('idle'); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); commitDuplicate(); }
+                  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setMode('idle'); }
+                }}
                 placeholder="Name for new layout"
                 className="flex-1 bg-port-bg border border-port-border rounded-lg px-3 py-2 text-sm text-white focus:border-port-accent outline-hidden"
               />
