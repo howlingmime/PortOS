@@ -83,7 +83,11 @@ Three high-value work items drawn from an inventory of the current app surface (
 
 ---
 
-### 3. "Ask Yourself" — Unified Conversational Twin over Brain + Memory + Goals + Identity + Calendar
+### 3. "Ask Yourself" — Unified Conversational Twin over Brain + Memory + Goals + Identity + Calendar — slice (a) ✅ SHIPPED 2026-04-24
+
+> **Slice (a) — text chat + sources — shipped.** `/ask` and `/ask/:conversationId` are live. `server/services/askService.js` orchestrates parallel retrieval across memory (hybrid), brain notes, autobiography, goals, and calendar with kind-weighted reranking. Persona preamble is sourced from `character.json`. Three modes (`ask` / `advise` / `draft`) swap directives. API providers stream SSE; CLI providers single-shot. Conversations persist to `data/ask-conversations/<id>.json` with 30-day auto-expiry unless pinned. Source chips deep-link back to origin. Registered in the nav manifest so `⌘K` and voice (`ui_navigate`) resolve "ask" automatically. **Slice (b) (voice + promotion actions) still pending** — see backlog item below.
+>
+> 39 new tests (askService 11, askConversations 16, ask routes 12); full server suite stays green at 2548/2548.
 
 **Problem.** PortOS has spent many milestones building a rich model of the user: Brain (thoughts, daily log, notes, links), Memory (pgvector + BM25 hybrid retrieval), Digital Twin (identity, autobiography, personality, behavioral feedback), Goals, Calendar, MeatSpace biomarkers. These live on separate pages with separate inputs. There is still no single conversational surface where the user can ask their own system a question like *"What did I decide about my exercise routine in March?"*, *"What's on my plate this afternoon given how I slept?"*, or *"Draft a status update to my team as me."* Without this, the twin is a library nobody borrows from.
 
@@ -123,6 +127,12 @@ Three high-value work items drawn from an inventory of the current app surface (
 ---
 
 ## Backlog
+
+- [ ] **Ask Yourself — slice (b)** — voice + promotion actions on top of the shipped text chat:
+  - `ui_ask` voice tool that pipes a spoken question through `askService.runAsk` and reads the streamed answer aloud (reuses the existing voice widget's TTS path).
+  - One-click promotions on each assistant turn: "Save as Brain note" (POST `/api/brain/capture`), "Create CoS task" (POST `/api/cos/tasks`), "Attach to Goal…" (link the answer text + sources as a goal note).
+  - Promote action also sets `conversation.promoted = true` (already wired) so the conversation is exempt from 30-day auto-expiry once anything from it has been saved elsewhere.
+  - Add `Ask` to the palette action whitelist (`server/routes/palette.js`) once the voice tool exists, so `⌘K` → "ask: …" can fire a prompt without leaving the current page.
 
 - [ ] **Voice CoS tool expansion** — tools now include the original domain set plus `ui_navigate`, `ui_list_interactables`, `ui_click`, `ui_fill`, `ui_select`, `ui_check` for accessibility-style page driving. Remaining candidates:
   - `calendar_today` / `calendar_next` — surface today's Google Calendar events through the existing Google MCP integration

@@ -96,6 +96,7 @@ const navItems = [
   { to: '/city', label: 'CyberCity', icon: Building2, single: true },
   { separator: true },
   { label: 'Apps', icon: Package, dynamic: 'apps', children: [] },
+  { to: '/ask', label: 'Ask Yourself', icon: MessageCircle, single: true },
   {
     label: 'Brain',
     icon: Brain,
