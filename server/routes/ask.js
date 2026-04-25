@@ -178,8 +178,10 @@ router.post('/', asyncHandler(async (req, res) => {
       await send('delta', { text: evt.text });
     } else if (evt.type === 'done') {
       providerInfo = { providerId: evt.providerId, model: evt.model };
-      // Streaming providers accumulate via delta events; one-shot CLI
-      // providers report the full answer once at 'done'.
+      // Both API and CLI providers stream their text via `delta` events
+      // (CLI providers yield a single big chunk). The terminal `done`
+      // event also carries the full answer as a defensive fallback —
+      // populate `assistantText` from it only if no deltas arrived.
       if (!assistantText && evt.answer) assistantText = evt.answer;
     } else if (evt.type === 'error') {
       streamErrored = true;

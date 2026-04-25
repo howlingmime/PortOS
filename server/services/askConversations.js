@@ -81,11 +81,12 @@ export async function listConversations({ limit = 50 } = {}) {
     throw err;
   });
 
-  // Filenames carry a sortable timestamp prefix (`ask_<base36-ms>_…`) so a
-  // descending lexical sort gives newest-first ordering without reading any
-  // file. The full sweep below still reads every conversation — we need it
-  // to enforce the 30-day expiry on stale unpinned entries beyond the first
-  // page — but the sort lets us fill `summaries` from the head.
+  // Filenames carry a sortable timestamp prefix (`ask_<base36-ms-padded>_…`)
+  // so a descending lexical sort gives newest-first ordering without
+  // reading any file. The two-tier sweep below uses this: JSON-read the
+  // head page for summaries, `stat()` everything else and only JSON-read
+  // tail files whose mtime puts them past the expiry window (those are
+  // pruning candidates and we still need the JSON to honour `promoted`).
   const ids = entries
     .filter((f) => f.endsWith('.json'))
     .map((f) => f.slice(0, -5))
