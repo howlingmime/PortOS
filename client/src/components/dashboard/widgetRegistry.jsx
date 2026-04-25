@@ -14,26 +14,32 @@ import QuickStatsWidget from './builtins/QuickStatsWidget';
 import ActivityStreakWidget from './builtins/ActivityStreakWidget';
 import HourlyActivityWidget from './builtins/HourlyActivityWidget';
 
-// Each entry: { id, label, Component, width, gate? }. `gate(state) => bool`
+// Each entry: { id, label, Component, width, defaultH?, gate? }. `gate(state) => bool`
 // skips the widget when it has nothing useful to show. The Apps tile is
 // intentionally un-gated — it renders its own empty-state CTA so the "add
 // your first app" path is always visible on a blank install.
+//
+// `defaultH` is the row count (each row ≈ 80px) used when a widget is
+// auto-placed into the grid for the first time — picked from the widget's
+// natural content height so unmigrated layouts and newly-added widgets land
+// at a usable size instead of the generic h=4 fallback. Once a layout has
+// been edited, persisted h values win.
 export const WIDGETS = [
-  { id: 'quick-brain',       label: 'Quick Brain Capture',   Component: QuickBrainCapture,      width: 'half' },
-  { id: 'quick-task',        label: 'Quick Task',            Component: QuickTaskWidget,        width: 'half' },
-  { id: 'apps',              label: 'Apps Grid',             Component: AppsGridWidget,         width: 'full' },
-  { id: 'cos',               label: 'Chief of Staff',        Component: CosDashboardWidget,     width: 'third' },
-  { id: 'goal-progress',     label: 'Goal Progress',         Component: GoalProgressWidget,     width: 'third' },
-  { id: 'upcoming-tasks',    label: 'Upcoming Tasks',        Component: UpcomingTasksWidget,    width: 'third' },
-  { id: 'proactive-alerts',  label: 'Proactive Alerts',      Component: ProactiveAlertsWidget,  width: 'quarter' },
-  { id: 'review-hub',        label: 'Review Hub',            Component: ReviewHubCard,          width: 'quarter' },
-  { id: 'system-health',     label: 'System Health',         Component: SystemHealthWidget,     width: 'quarter' },
-  { id: 'backup',            label: 'Backup',                Component: BackupWidget,           width: 'quarter' },
-  { id: 'death-clock',       label: 'Death Clock',           Component: DeathClockWidget,       width: 'quarter' },
-  { id: 'quick-stats',       label: 'Quick Stats',           Component: QuickStatsWidget,       width: 'quarter', gate: (s) => s.apps.length > 0 },
-  { id: 'decision-log',      label: 'Decision Log',          Component: DecisionLogWidget,      width: 'quarter' },
-  { id: 'activity-streak',   label: 'Activity Streak',       Component: ActivityStreakWidget,   width: 'third',   gate: (s) => s.usage?.currentStreak > 0 || s.usage?.longestStreak > 0 },
-  { id: 'hourly-activity',   label: 'Activity by Hour',      Component: HourlyActivityWidget,   width: 'full',    gate: (s) => !!s.usage?.hourlyActivity && s.usage.hourlyActivity.some((v) => v > 0) },
+  { id: 'quick-brain',       label: 'Quick Brain Capture',   Component: QuickBrainCapture,      width: 'half',    defaultH: 3 },
+  { id: 'quick-task',        label: 'Quick Task',            Component: QuickTaskWidget,        width: 'half',    defaultH: 3 },
+  { id: 'apps',              label: 'Apps Grid',             Component: AppsGridWidget,         width: 'full',    defaultH: 5 },
+  { id: 'cos',               label: 'Chief of Staff',        Component: CosDashboardWidget,     width: 'third',   defaultH: 6 },
+  { id: 'goal-progress',     label: 'Goal Progress',         Component: GoalProgressWidget,     width: 'third',   defaultH: 5 },
+  { id: 'upcoming-tasks',    label: 'Upcoming Tasks',        Component: UpcomingTasksWidget,    width: 'third',   defaultH: 5 },
+  { id: 'proactive-alerts',  label: 'Proactive Alerts',      Component: ProactiveAlertsWidget,  width: 'quarter', defaultH: 4 },
+  { id: 'review-hub',        label: 'Review Hub',            Component: ReviewHubCard,          width: 'quarter', defaultH: 4 },
+  { id: 'system-health',     label: 'System Health',         Component: SystemHealthWidget,     width: 'quarter', defaultH: 8 },
+  { id: 'backup',            label: 'Backup',                Component: BackupWidget,           width: 'quarter', defaultH: 5 },
+  { id: 'death-clock',       label: 'Death Clock',           Component: DeathClockWidget,       width: 'quarter', defaultH: 4 },
+  { id: 'quick-stats',       label: 'Quick Stats',           Component: QuickStatsWidget,       width: 'quarter', defaultH: 3, gate: (s) => s.apps.length > 0 },
+  { id: 'decision-log',      label: 'Decision Log',          Component: DecisionLogWidget,      width: 'quarter', defaultH: 4 },
+  { id: 'activity-streak',   label: 'Activity Streak',       Component: ActivityStreakWidget,   width: 'third',   defaultH: 3, gate: (s) => s.usage?.currentStreak > 0 || s.usage?.longestStreak > 0 },
+  { id: 'hourly-activity',   label: 'Activity by Hour',      Component: HourlyActivityWidget,   width: 'full',    defaultH: 4, gate: (s) => !!s.usage?.hourlyActivity && s.usage.hourlyActivity.some((v) => v > 0) },
 ];
 
 export const WIDGETS_BY_ID = Object.fromEntries(WIDGETS.map((w) => [w.id, w]));
@@ -54,3 +60,15 @@ export const WIDTH_CLASS = {
   third:   'col-span-12 md:col-span-6 lg:col-span-4',
   quarter: 'col-span-12 sm:col-span-6 lg:col-span-3',
 };
+
+// Width keyword → 12-column grid units. Used when synthesizing a default
+// grid for a layout that hasn't been positionally edited yet.
+export const WIDTH_TO_COLS = {
+  full:    12,
+  half:    6,
+  third:   4,
+  quarter: 3,
+};
+
+export const GRID_COLS = 12;
+export const GRID_DEFAULT_H = 4;

@@ -17,6 +17,19 @@ const router = Router();
 // at the API boundary agree by construction.
 const idSchema = z.string().trim().min(1).max(svc.ID_MAX_LENGTH).regex(svc.ID_PATTERN, 'id must be lowercase kebab');
 
+// Grid items carry per-widget x/y/w/h so the dashboard can render a
+// free-form layout. Bounds mirror the service-layer sanitizeGridItem so
+// reads and writes agree by construction. The route enforces structural
+// validity here; cross-field invariants (id ∈ widgets, dedup, x+w ≤ cols)
+// are enforced by the .refine() on layoutSchema below and the service.
+const gridItemSchema = z.object({
+  id: z.string().trim().min(1).max(svc.WIDGET_ID_MAX_LENGTH),
+  x: z.number().int().min(0).max(svc.GRID_COLS - 1),
+  y: z.number().int().min(0).max(svc.GRID_ROW_MAX),
+  w: z.number().int().min(1).max(svc.GRID_COLS),
+  h: z.number().int().min(1).max(svc.GRID_ITEM_H_MAX),
+});
+
 const layoutSchema = z.object({
   id: idSchema,
   // Trim before min-length check so whitespace-only names are rejected.
@@ -28,7 +41,26 @@ const layoutSchema = z.object({
     .array(z.string().trim().min(1).max(svc.WIDGET_ID_MAX_LENGTH))
     .max(svc.WIDGETS_MAX)
     .refine((w) => new Set(w).size === w.length, { message: 'widgets must be unique' }),
-});
+  // Optional — older clients (and pre-migration layouts) post no `grid` and
+  // the dashboard auto-flows widgets. When present, grid items must:
+  //   1. reference a widget that's in the `widgets` list (no orphans),
+  //   2. be unique by id (one position per widget), and
+  //   3. fit horizontally (x + w ≤ GRID_COLS).
+  grid: z
+    .array(gridItemSchema)
+    .max(svc.WIDGETS_MAX)
+    .optional()
+    .default([]),
+}).refine(
+  (l) => l.grid.every((g) => l.widgets.includes(g.id)),
+  { message: 'grid items must reference widgets in the layout', path: ['grid'] }
+).refine(
+  (l) => new Set(l.grid.map((g) => g.id)).size === l.grid.length,
+  { message: 'grid items must be unique by id', path: ['grid'] }
+).refine(
+  (l) => l.grid.every((g) => g.x + g.w <= svc.GRID_COLS),
+  { message: 'grid item x+w must fit in cols', path: ['grid'] }
+);
 
 const setActiveSchema = z.object({
   id: idSchema,

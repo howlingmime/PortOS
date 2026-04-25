@@ -11,6 +11,9 @@ vi.mock('../services/dashboardLayouts.js', () => ({
   NAME_MAX_LENGTH: 80,
   WIDGETS_MAX: 50,
   WIDGET_ID_MAX_LENGTH: 80,
+  GRID_COLS: 12,
+  GRID_ROW_MAX: 200,
+  GRID_ITEM_H_MAX: 50,
   getState: vi.fn(),
   setActiveLayout: vi.fn(),
   saveLayout: vi.fn(),
@@ -83,6 +86,7 @@ describe('PUT /api/dashboard/layouts/:id', () => {
       id: 'my-custom',
       name: 'Custom',
       widgets: ['apps', 'cos'],
+      grid: [],
     });
   });
 
@@ -100,6 +104,84 @@ describe('PUT /api/dashboard/layouts/:id', () => {
       .send({ name: 'Custom', widgets: ['apps', 'cos', 'apps'] });
     expect(res.status).toBe(400);
     expect(svc.saveLayout).not.toHaveBeenCalled();
+  });
+
+  it('saves a layout with a grid', async () => {
+    svc.saveLayout.mockResolvedValue({ activeLayoutId: 'default', layouts: [] });
+    const res = await request(makeApp())
+      .put('/api/dashboard/layouts/my-custom')
+      .send({
+        name: 'Custom',
+        widgets: ['apps', 'cos'],
+        grid: [
+          { id: 'apps', x: 0, y: 0, w: 12, h: 4 },
+          { id: 'cos', x: 0, y: 4, w: 6, h: 3 },
+        ],
+      });
+    expect(res.status).toBe(200);
+    expect(svc.saveLayout).toHaveBeenCalledWith({
+      id: 'my-custom',
+      name: 'Custom',
+      widgets: ['apps', 'cos'],
+      grid: [
+        { id: 'apps', x: 0, y: 0, w: 12, h: 4 },
+        { id: 'cos', x: 0, y: 4, w: 6, h: 3 },
+      ],
+    });
+  });
+
+  it('rejects grid items that reference unknown widgets', async () => {
+    const res = await request(makeApp())
+      .put('/api/dashboard/layouts/my-custom')
+      .send({
+        name: 'Custom',
+        widgets: ['apps'],
+        grid: [{ id: 'apps', x: 0, y: 0, w: 4, h: 4 }, { id: 'ghost', x: 4, y: 0, w: 4, h: 4 }],
+      });
+    expect(res.status).toBe(400);
+    expect(svc.saveLayout).not.toHaveBeenCalled();
+  });
+
+  it('rejects grid items where x+w exceeds the column count', async () => {
+    const res = await request(makeApp())
+      .put('/api/dashboard/layouts/my-custom')
+      .send({
+        name: 'Custom',
+        widgets: ['apps'],
+        grid: [{ id: 'apps', x: 6, y: 0, w: 8, h: 4 }],
+      });
+    expect(res.status).toBe(400);
+    expect(svc.saveLayout).not.toHaveBeenCalled();
+  });
+
+  it('rejects duplicate grid ids', async () => {
+    const res = await request(makeApp())
+      .put('/api/dashboard/layouts/my-custom')
+      .send({
+        name: 'Custom',
+        widgets: ['apps'],
+        grid: [
+          { id: 'apps', x: 0, y: 0, w: 4, h: 4 },
+          { id: 'apps', x: 4, y: 0, w: 4, h: 4 },
+        ],
+      });
+    expect(res.status).toBe(400);
+    expect(svc.saveLayout).not.toHaveBeenCalled();
+  });
+
+  it('accepts a layout with no grid (back-compat for unmigrated clients)', async () => {
+    svc.saveLayout.mockResolvedValue({ activeLayoutId: 'default', layouts: [] });
+    const res = await request(makeApp())
+      .put('/api/dashboard/layouts/my-custom')
+      .send({ name: 'Custom', widgets: ['apps'] });
+    expect(res.status).toBe(200);
+    // Default-applied grid is an empty array — defaults inside .refine() chain.
+    expect(svc.saveLayout).toHaveBeenCalledWith({
+      id: 'my-custom',
+      name: 'Custom',
+      widgets: ['apps'],
+      grid: [],
+    });
   });
 });
 

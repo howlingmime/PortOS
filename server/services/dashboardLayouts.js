@@ -24,6 +24,11 @@ const makeErr = (message, code) => Object.assign(new Error(message), { code });
 // Widget ids are the contract between this file and the client registry —
 // see client/src/components/dashboard/widgetRegistry.jsx. If a layout refers
 // to an unknown id, the client skips it gracefully.
+// Built-in layouts ship with a `grid` so they look right out-of-the-box
+// instead of falling back to the client's row-flow synthesis. The grids
+// are designed for a typical desktop viewport (12 cols × ~80px rows): the
+// most useful widgets sit in rows 0–7 (~768px) so they're above the fold
+// without scrolling, and lower-priority widgets stack below.
 const DEFAULT_LAYOUTS = [
   {
     id: 'default',
@@ -36,24 +41,78 @@ const DEFAULT_LAYOUTS = [
       'proactive-alerts', 'review-hub', 'system-health', 'backup', 'death-clock', 'quick-stats', 'decision-log',
       'activity-streak', 'hourly-activity',
     ],
+    // Above-the-fold (rows 0–7): capture row + the 3 most-glanced widgets
+    // (system-health, cos, upcoming-tasks). Everything else stacks below.
+    grid: [
+      // Row 0–1: capture row + tasks
+      { id: 'quick-brain',      x: 0,  y: 0,  w: 3, h: 2 },
+      { id: 'quick-task',       x: 3,  y: 0,  w: 5, h: 2 },
+      { id: 'upcoming-tasks',   x: 8,  y: 0,  w: 4, h: 4 },
+      // Row 2–6: primary monitoring + alerts
+      { id: 'system-health',    x: 0,  y: 2,  w: 5, h: 5 },
+      { id: 'proactive-alerts', x: 5,  y: 2,  w: 3, h: 3 },
+      { id: 'death-clock',      x: 8,  y: 4,  w: 4, h: 2 },
+      { id: 'review-hub',       x: 5,  y: 5,  w: 3, h: 2 },
+      { id: 'activity-streak',  x: 9,  y: 6,  w: 3, h: 3 },
+      // Row 7–10: secondary widgets
+      { id: 'backup',           x: 0,  y: 7,  w: 3, h: 4 },
+      { id: 'quick-stats',      x: 3,  y: 7,  w: 3, h: 3 },
+      { id: 'goal-progress',    x: 6,  y: 7,  w: 3, h: 4 },
+      // Row 11–14: lower-priority + cos
+      { id: 'decision-log',     x: 0,  y: 11, w: 4, h: 2 },
+      { id: 'cos',              x: 4,  y: 11, w: 5, h: 4 },
+      // Row 15+: full-width visualizations + apps
+      { id: 'hourly-activity',  x: 0,  y: 15, w: 12, h: 3 },
+      { id: 'apps',             x: 0,  y: 18, w: 12, h: 8 },
+    ],
   },
   {
     id: 'focus',
     name: 'Focus',
     builtIn: true,
     widgets: ['quick-task', 'upcoming-tasks', 'cos'],
+    // All three widgets above the fold. Quick-task small at top-left for
+    // capture; upcoming-tasks tall on the right (the focus list); cos
+    // below quick-task for streak/progress context.
+    grid: [
+      { id: 'quick-task',     x: 0, y: 0, w: 6, h: 2 },
+      { id: 'upcoming-tasks', x: 6, y: 0, w: 6, h: 8 },
+      { id: 'cos',            x: 0, y: 2, w: 6, h: 6 },
+    ],
   },
   {
     id: 'morning-review',
     name: 'Morning Review',
     builtIn: true,
     widgets: ['proactive-alerts', 'upcoming-tasks', 'review-hub', 'goal-progress', 'death-clock'],
+    // Scan-and-act morning ritual — all 5 widgets above the fold.
+    // Tasks list takes the tall center column (the actionable hot zone);
+    // alerts top-left grab attention first; death-clock top-right for
+    // mortality framing; review + goals fill the remaining quadrants.
+    grid: [
+      { id: 'proactive-alerts', x: 0, y: 0, w: 4, h: 4 },
+      { id: 'upcoming-tasks',   x: 4, y: 0, w: 5, h: 8 },
+      { id: 'death-clock',      x: 9, y: 0, w: 3, h: 2 },
+      { id: 'goal-progress',    x: 9, y: 2, w: 3, h: 4 },
+      { id: 'review-hub',       x: 0, y: 4, w: 4, h: 4 },
+    ],
   },
   {
     id: 'ops',
     name: 'Ops',
     builtIn: true,
     widgets: ['system-health', 'cos', 'backup', 'apps', 'quick-stats'],
+    // System monitoring focus — system-health takes the tall left column
+    // (the primary alarm surface), cos in the center for ChiefOfStaff
+    // status, backup + quick-stats stacked on the right, apps grid fills
+    // the empty cell below cos so all 5 widgets fit above the fold.
+    grid: [
+      { id: 'system-health', x: 0, y: 0, w: 6, h: 5 },
+      { id: 'quick-stats',   x: 6, y: 0, w: 6, h: 3 },
+      { id: 'cos',           x: 6, y: 3, w: 6, h: 4 },
+      { id: 'backup',        x: 0, y: 5, w: 6, h: 3 },
+      { id: 'apps',          x: 0, y: 8, w: 12, h: 11 },
+    ],
   },
 ];
 
@@ -72,6 +131,32 @@ export const ID_MAX_LENGTH = 60;
 export const NAME_MAX_LENGTH = 80;
 export const WIDGETS_MAX = 50;
 export const WIDGET_ID_MAX_LENGTH = 80;
+
+// Grid placement bounds. The dashboard is a 12-column responsive grid; rows
+// are integer steps (each ~80px tall). GRID_ROW_MAX caps total layout depth
+// so a hand-edited file can't push y to absurd values that break the
+// container-height calculation in DashboardGrid.jsx.
+export const GRID_COLS = 12;
+export const GRID_ROW_MAX = 200;
+export const GRID_ITEM_H_MAX = 50;
+
+// Clamp a single grid item to valid bounds. Returns null when the entry is
+// unusable (missing id, non-numeric coords, etc.). Numeric fields are
+// floored before clamping so JSON containing decimals can't smuggle in
+// off-grid positions that break the snap math in the client renderer.
+const sanitizeGridItem = (g, validIds) => {
+  if (!g || typeof g !== 'object') return null;
+  if (typeof g.id !== 'string') return null;
+  const id = g.id.trim();
+  if (!id || !validIds.has(id)) return null;
+  const numOr = (v, fallback) => (Number.isFinite(v) ? Math.floor(v) : fallback);
+  const x = Math.max(0, Math.min(GRID_COLS - 1, numOr(g.x, 0)));
+  const y = Math.max(0, Math.min(GRID_ROW_MAX, numOr(g.y, 0)));
+  const wRaw = Math.max(1, Math.min(GRID_COLS, numOr(g.w, 1)));
+  const w = Math.min(wRaw, GRID_COLS - x);
+  const h = Math.max(1, Math.min(GRID_ITEM_H_MAX, numOr(g.h, 1)));
+  return { id, x, y, w, h };
+};
 
 // Sanitize a single layout entry — protect against hand-edits that produce
 // non-object elements, missing fields, non-array widget lists, or duplicate
@@ -98,7 +183,22 @@ const sanitizeLayout = (l) => {
       if (widgets.length >= WIDGETS_MAX) break;
     }
   }
-  return { id: l.id, name, builtIn: BUILTIN_IDS.has(l.id), widgets };
+  // Grid items must reference a widget in the layout's `widgets` list — a
+  // grid entry without a matching widget is dead data and would render
+  // nothing. Dedup by id so two entries can't both claim the same widget.
+  const validIds = new Set(widgets);
+  const grid = [];
+  const seenGrid = new Set();
+  if (Array.isArray(l.grid)) {
+    for (const g of l.grid) {
+      const item = sanitizeGridItem(g, validIds);
+      if (!item) continue;
+      if (seenGrid.has(item.id)) continue;
+      seenGrid.add(item.id);
+      grid.push(item);
+    }
+  }
+  return { id: l.id, name, builtIn: BUILTIN_IDS.has(l.id), widgets, grid };
 };
 
 // Bundled so clients can enforce the same limits without duplicating magic
@@ -108,7 +208,30 @@ export const LIMITS = Object.freeze({
   nameMaxLength: NAME_MAX_LENGTH,
   widgetsMax: WIDGETS_MAX,
   widgetIdMaxLength: WIDGET_ID_MAX_LENGTH,
+  gridCols: GRID_COLS,
+  gridRowMax: GRID_ROW_MAX,
+  gridItemHeightMax: GRID_ITEM_H_MAX,
 });
+
+// Read-time hydration for upgrades: existing installs already have built-in
+// layouts persisted with `grid: []` (from before the grid feature shipped).
+// When we ship better default grids, we want those installs to pick them
+// up — but only when the user hasn't already arranged the layout (grid
+// non-empty) AND hasn't customized which widgets are in it. If the widget
+// list still matches the default, swap in the default grid; otherwise
+// leave grid empty and let the client's synthesizeGrid handle it.
+function hydrateDefaultGrid(layout) {
+  if (!BUILTIN_IDS.has(layout.id)) return layout;
+  if (layout.grid.length > 0) return layout;
+  const def = DEFAULT_LAYOUTS.find((l) => l.id === layout.id);
+  if (!def?.grid) return layout;
+  // Widget-list match check: same set of ids (order doesn't matter for
+  // grid validity since positions are explicit).
+  if (layout.widgets.length !== def.widgets.length) return layout;
+  const defSet = new Set(def.widgets);
+  if (!layout.widgets.every((w) => defSet.has(w))) return layout;
+  return { ...layout, grid: def.grid.map((g) => ({ ...g })) };
+}
 
 export async function getState() {
   await ensureDir(PATHS.data);
@@ -120,7 +243,7 @@ export async function getState() {
       const s = sanitizeLayout(entry);
       if (!s || seenIds.has(s.id)) continue; // first-occurrence wins; no React key collisions
       seenIds.add(s.id);
-      sanitized.push(s);
+      sanitized.push(hydrateDefaultGrid(s));
     }
   }
   const layouts = sanitized.length > 0 ? sanitized : DEFAULT_LAYOUTS;

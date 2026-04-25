@@ -8,10 +8,10 @@ export const setActiveDashboardLayout = (id) =>
     body: JSON.stringify({ id }),
   });
 
-export const saveDashboardLayout = (id, name, widgets) =>
+export const saveDashboardLayout = (id, name, widgets, grid) =>
   request(`/dashboard/layouts/${encodeURIComponent(id)}`, {
     method: 'PUT',
-    body: JSON.stringify({ name, widgets }),
+    body: JSON.stringify({ name, widgets, grid: grid ?? [] }),
   });
 
 export const deleteDashboardLayout = (id) =>
