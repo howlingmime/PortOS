@@ -213,26 +213,6 @@ export const LIMITS = Object.freeze({
   gridItemHeightMax: GRID_ITEM_H_MAX,
 });
 
-// Read-time hydration for upgrades: existing installs already have built-in
-// layouts persisted with `grid: []` (from before the grid feature shipped).
-// When we ship better default grids, we want those installs to pick them
-// up — but only when the user hasn't already arranged the layout (grid
-// non-empty) AND hasn't customized which widgets are in it. If the widget
-// list still matches the default, swap in the default grid; otherwise
-// leave grid empty and let the client's synthesizeGrid handle it.
-function hydrateDefaultGrid(layout) {
-  if (!BUILTIN_IDS.has(layout.id)) return layout;
-  if (layout.grid.length > 0) return layout;
-  const def = DEFAULT_LAYOUTS.find((l) => l.id === layout.id);
-  if (!def?.grid) return layout;
-  // Widget-list match check: same set of ids (order doesn't matter for
-  // grid validity since positions are explicit).
-  if (layout.widgets.length !== def.widgets.length) return layout;
-  const defSet = new Set(def.widgets);
-  if (!layout.widgets.every((w) => defSet.has(w))) return layout;
-  return { ...layout, grid: def.grid.map((g) => ({ ...g })) };
-}
-
 export async function getState() {
   await ensureDir(PATHS.data);
   const raw = await readJSONFile(STATE_PATH, DEFAULT_STATE, { logError: false });
@@ -243,7 +223,7 @@ export async function getState() {
       const s = sanitizeLayout(entry);
       if (!s || seenIds.has(s.id)) continue; // first-occurrence wins; no React key collisions
       seenIds.add(s.id);
-      sanitized.push(hydrateDefaultGrid(s));
+      sanitized.push(s);
     }
   }
   const layouts = sanitized.length > 0 ? sanitized : DEFAULT_LAYOUTS;
