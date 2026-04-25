@@ -27,12 +27,15 @@ import { join } from 'path';
 import { readdir, stat, unlink } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { PATHS, atomicWrite, ensureDir, readJSONFile, safeDate } from '../lib/fileUtils.js';
-import { VALID_MODES as VALID_MODES_SET } from './askService.js';
 
 export const ASK_DIR = join(PATHS.data, 'ask-conversations');
 export const EXPIRY_DAYS = 30;
 export const TITLE_MAX_LENGTH = 120;
-export { VALID_MODES_SET as VALID_MODES };
+// Owned here (the leaf storage module) and consumed by askService. Keeping
+// this declaration on the storage side means the persistence layer has no
+// upstream imports — a fresh test can mount this file alone without pulling
+// the retrieval/provider stack via askService.
+export const VALID_MODES = new Set(['ask', 'advise', 'draft']);
 
 const ID_RE = /^ask_[a-z0-9]+_[a-f0-9]+$/;
 
@@ -153,7 +156,7 @@ export async function listConversations({ limit = 50 } = {}) {
 }
 
 export async function createConversation({ mode = 'ask', title = '' } = {}) {
-  if (!VALID_MODES_SET.has(mode)) throw new Error(`Invalid mode: ${mode}`);
+  if (!VALID_MODES.has(mode)) throw new Error(`Invalid mode: ${mode}`);
   await ensureDir(ASK_DIR);
   const now = new Date().toISOString();
   const conv = {

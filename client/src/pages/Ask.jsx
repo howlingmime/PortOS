@@ -335,10 +335,17 @@ export default function Ask() {
 
     // Append the persisted assistant turn locally rather than refetching the
     // whole conversation — server returned the canonical record in 'done'.
+    // Guard against double-append: the URL-change effect may have already
+    // GET'd the conversation after the server persisted the turn, so the
+    // turn id can already be present in `prev.turns`.
     if (persistedTurn && serverConvId) {
       setActiveConv((prev) => {
         if (!prev || (prev.id !== 'pending' && prev.id !== serverConvId)) return prev;
-        return { ...prev, id: serverConvId, turns: [...(prev.turns || []), persistedTurn], updatedAt: persistedTurn.createdAt };
+        const existingTurns = prev.turns || [];
+        if (existingTurns.some((t) => t.id === persistedTurn.id)) {
+          return prev.id === serverConvId ? prev : { ...prev, id: serverConvId };
+        }
+        return { ...prev, id: serverConvId, turns: [...existingTurns, persistedTurn], updatedAt: persistedTurn.createdAt };
       });
     }
     refreshList();

@@ -28,8 +28,11 @@ import { getGoals } from './identity.js';
 import { getCharacter } from './character.js';
 import { getEvents as getCalendarEvents } from './calendarSync.js';
 import { tokenize as bm25Tokenize, STOP_WORDS } from '../lib/bm25.js';
+import { VALID_MODES as STORAGE_VALID_MODES } from './askConversations.js';
 
-export const VALID_MODES = new Set(['ask', 'advise', 'draft']);
+// Re-export so the route can keep importing modes via askService — but
+// askConversations is the source of truth (it owns the persistence schema).
+export const VALID_MODES = STORAGE_VALID_MODES;
 export const SOURCE_KINDS = ['memory', 'brain-note', 'autobiography', 'goal', 'calendar'];
 
 const PER_SOURCE_LIMIT = {

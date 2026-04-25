@@ -133,10 +133,23 @@ router.post('/', asyncHandler(async (req, res) => {
   // `close`) before queuing more frames. Both listeners are torn down on
   // settle so a slow client that disconnects mid-drain doesn't leak
   // listeners.
+  //
+  // Guard the write itself: between the `aborted` check and the syscall,
+  // the socket can transition to destroyed, in which case `res.write` would
+  // throw `ERR_STREAM_WRITE_AFTER_END`. Treat any throw as an abort so the
+  // disconnect doesn't bubble out as a 500 after we've already flushed
+  // SSE headers (which would also surface as ERR_HTTP_HEADERS_SENT noise).
   const send = async (event, data) => {
-    if (aborted) return;
+    if (aborted || res.writableEnded || res.destroyed) return;
     const frame = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    if (!res.write(frame)) {
+    let writeOk;
+    try {
+      writeOk = res.write(frame);
+    } catch {
+      onClose();
+      return;
+    }
+    if (!writeOk) {
       await new Promise((resolve) => {
         const settle = () => {
           res.off('drain', settle);
