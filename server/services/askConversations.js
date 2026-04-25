@@ -23,7 +23,7 @@
  */
 
 import { join } from 'path';
-import { readdir, unlink } from 'fs/promises';
+import { readdir, stat, unlink } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { PATHS, atomicWrite, ensureDir, readJSONFile, safeDate } from '../lib/fileUtils.js';
 import { VALID_MODES as VALID_MODES_SET } from './askService.js';
@@ -89,13 +89,26 @@ export async function listConversations({ limit = 50 } = {}) {
   const now = Date.now();
   const expiryMs = EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
-  // Walk the whole directory so expired+unpinned conversations get pruned
-  // even if they live past the first `limit` results — otherwise a user with
-  // >limit conversations would silently violate the 30-day auto-expire
-  // contract (old files would persist indefinitely on disk).
+  // Two-tier sweep: filenames are newest-first, so we only read JSON for
+  // (a) the head of the list to fill `summaries`, and (b) anything whose
+  // mtime is older than the expiry window — those are pruning candidates
+  // and we still have to open them to honour the `promoted` flag. Fresh
+  // files past the `limit` cutoff are skipped entirely.
   for (const id of ids) {
-    const conv = await readConversation(id);
-    if (!conv) continue;
+    const headSlot = summaries.length < limit;
+    let conv = null;
+    if (headSlot) {
+      conv = await readConversation(id);
+      if (!conv) continue;
+    } else {
+      // Cheap check first — only open the JSON if mtime indicates the file
+      // could be expired. atomicWrite touches mtime on every update.
+      const mtime = await stat(pathFor(id)).then((s) => s.mtimeMs, () => null);
+      if (mtime === null) continue;
+      if ((now - mtime) <= expiryMs) continue;
+      conv = await readConversation(id);
+      if (!conv) continue;
+    }
 
     const updated = safeDate(conv.updatedAt) || safeDate(conv.createdAt);
     if (!conv.promoted && updated && (now - updated) > expiryMs) {
@@ -104,7 +117,7 @@ export async function listConversations({ limit = 50 } = {}) {
       continue;
     }
 
-    if (summaries.length < limit) {
+    if (headSlot) {
       summaries.push({
         id: conv.id,
         title: conv.title || '(untitled)',

@@ -192,10 +192,12 @@ export default function Ask() {
   // conversation it belongs to. Brand-new conversations transition through
   // `/ask` → `/ask/<id>` once the server's `open` event arrives — that
   // self-navigation must NOT cancel the stream, so we compare against the
-  // ref the stream populates.
+  // ref the stream populates. Covers the `/ask/<id>` → `/ask` case too:
+  // `conversationId` becomes undefined and `streamingConvIdRef` is still
+  // set, so the inequality fires and we abort.
   useEffect(() => {
     const streamConvId = streamingConvIdRef.current;
-    if (streamConvId && conversationId && streamConvId !== conversationId) {
+    if (streamConvId && streamConvId !== conversationId) {
       abortRef.current?.abort();
       abortRef.current = null;
       streamingConvIdRef.current = null;

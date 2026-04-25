@@ -545,6 +545,14 @@ export async function* runAsk({
     return;
   }
   const effectiveModel = model || provider.defaultModel;
+  // API providers will fail with a vague upstream 4xx if `model` is null —
+  // surface a clear actionable error before we even open the connection.
+  // CLI providers can fall back to whatever the binary defaults to, so we
+  // only enforce this for the `api` type.
+  if (provider.type === 'api' && !effectiveModel) {
+    yield { type: 'error', error: `Provider "${provider.id}" has no default model — pass an explicit model or set provider.defaultModel.` };
+    return;
+  }
   const prompt = await buildPrompt({ question, mode, sources, history });
 
   const startedAt = Date.now();
