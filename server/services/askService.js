@@ -376,7 +376,10 @@ async function* streamCompletion(provider, model, prompt, signal) {
       }
       const { value, done } = await reader.read();
       if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+      // Some SSE producers emit CRLF line terminators (`\r\n\r\n` between
+      // frames); normalise to LF so the `\n\n` frame split below works
+      // regardless of upstream.
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
       let idx;
       while ((idx = buffer.indexOf('\n\n')) !== -1) {
         const frame = buffer.slice(0, idx).trim();
@@ -384,7 +387,16 @@ async function* streamCompletion(provider, model, prompt, signal) {
         if (!frame.startsWith('data:')) continue;
         const payload = frame.slice(5).trim();
         if (payload === '[DONE]') return;
-        const parsed = JSON.parse(payload);
+        // A single malformed/partial frame from the upstream provider must
+        // not kill the whole stream — log and skip so subsequent good
+        // frames still flow.
+        let parsed;
+        try {
+          parsed = JSON.parse(payload);
+        } catch {
+          console.warn(`⚠️ Ask: skipping malformed SSE frame from ${provider.id}`);
+          continue;
+        }
         const delta = parsed?.choices?.[0]?.delta?.content;
         if (delta) yield delta;
       }

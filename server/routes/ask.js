@@ -4,7 +4,8 @@
  *   GET    /api/ask                       → list conversations (summaries)
  *   GET    /api/ask/:id                   → full conversation
  *   POST   /api/ask                       → SSE-stream a new turn (creates a
- *                                            conversation if no `id` in body)
+ *                                            conversation if no `conversationId`
+ *                                            in body)
  *   DELETE /api/ask/:id                   → delete a conversation
  *   POST   /api/ask/:id/promote           → mark conversation exempt from
  *                                            30-day auto-expiry
@@ -115,15 +116,25 @@ router.post('/', asyncHandler(async (req, res) => {
   };
   req.on('close', onClose);
 
-  const send = (event, data) => {
+  // Honour socket backpressure — for long answers with many delta frames,
+  // a slow reader could otherwise force Node to buffer unbounded SSE data
+  // in memory. If `res.write` returns false, await the next `drain` (or
+  // `close`) before queuing more frames.
+  const send = async (event, data) => {
     if (aborted) return;
-    res.write(`event: ${event}\n`);
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
+    const frame = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    if (!res.write(frame)) {
+      await new Promise((resolve) => {
+        const onDrain = () => { res.off('close', onDrain); resolve(); };
+        res.once('drain', onDrain);
+        res.once('close', onDrain);
+      });
+    }
   };
 
   // Tell the client the conversation id up-front so it can deep-link the URL
   // before the answer finishes streaming.
-  send('open', { conversationId: conversation.id, mode: body.mode });
+  await send('open', { conversationId: conversation.id, mode: body.mode });
 
   // Drop the just-appended user turn (we're about to answer it) plus take
   // the last PROMPT_HISTORY_TURNS prior turns as multi-turn context.
@@ -147,10 +158,10 @@ router.post('/', asyncHandler(async (req, res) => {
     if (aborted) break;
     if (evt.type === 'sources') {
       assistantSources = evt.sources;
-      send('sources', { sources: evt.sources });
+      await send('sources', { sources: evt.sources });
     } else if (evt.type === 'delta') {
       assistantText += evt.text;
-      send('delta', { text: evt.text });
+      await send('delta', { text: evt.text });
     } else if (evt.type === 'done') {
       providerInfo = { providerId: evt.providerId, model: evt.model };
       // Streaming providers accumulate via delta events; one-shot CLI
@@ -158,7 +169,7 @@ router.post('/', asyncHandler(async (req, res) => {
       if (!assistantText && evt.answer) assistantText = evt.answer;
     } else if (evt.type === 'error') {
       streamErrored = true;
-      send('error', { error: evt.error });
+      await send('error', { error: evt.error });
     }
   }
 
@@ -180,10 +191,17 @@ router.post('/', asyncHandler(async (req, res) => {
   }
 
   if (!aborted) {
-    // Hand back the persisted turn so the client can append to local state
-    // instead of round-tripping a full conversation refetch.
-    send('done', { conversationId: conversation.id, turn: persistedAssistantTurn });
-    res.end();
+    if (streamErrored) {
+      // Error event already flushed inside the loop — close the stream
+      // without a `done` frame so clients can cleanly distinguish failure
+      // (terminal `error`) from success (terminal `done`).
+      res.end();
+    } else {
+      // Hand back the persisted turn so the client can append to local
+      // state instead of round-tripping a full conversation refetch.
+      await send('done', { conversationId: conversation.id, turn: persistedAssistantTurn });
+      res.end();
+    }
   }
 }));
 

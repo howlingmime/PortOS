@@ -66,12 +66,16 @@ function Sidebar({ conversations, activeId, onPick, onNew, onDelete, loading, st
           return (
             <div
               key={c.id}
-              aria-disabled={lockedSwitch || undefined}
-              title={lockedSwitch ? 'Wait for the current answer to finish' : undefined}
-              className={`group flex items-center justify-between gap-2 px-3 py-2 hover:bg-port-border/30 ${c.id === activeId ? 'bg-port-border/40' : ''} ${lockedSwitch ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-              onClick={() => { if (!lockedSwitch) onPick(c.id); }}
+              className={`group relative flex items-center justify-between gap-2 ${c.id === activeId ? 'bg-port-border/40' : ''}`}
             >
-              <div className="min-w-0 flex-1">
+              <button
+                type="button"
+                disabled={lockedSwitch}
+                aria-current={c.id === activeId ? 'page' : undefined}
+                onClick={() => onPick(c.id)}
+                title={lockedSwitch ? 'Wait for the current answer to finish' : c.title}
+                className={`flex-1 min-w-0 text-left px-3 py-2 hover:bg-port-border/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent focus:outline-none focus-visible:ring-1 focus-visible:ring-port-accent`}
+              >
                 <div className="text-sm truncate">{c.title}</div>
                 <div className="text-xs text-gray-500 flex items-center gap-1.5">
                   <span>{c.mode}</span>
@@ -79,10 +83,11 @@ function Sidebar({ conversations, activeId, onPick, onNew, onDelete, loading, st
                   <span>{c.turnCount} turns</span>
                   {c.promoted && <Pin size={10} className="text-amber-400" />}
                 </div>
-              </div>
+              </button>
               <button
-                onClick={(e) => { e.stopPropagation(); onDelete(c.id); }}
-                className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-port-error transition-opacity"
+                type="button"
+                onClick={() => onDelete(c.id)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-gray-500 hover:text-port-error transition-opacity"
                 title="Delete conversation"
               >
                 <Trash2 size={14} />
@@ -171,15 +176,16 @@ export default function Ask() {
     }
   }, [activeConv?.turns?.length, streamingTurn?.content]);
 
-  // Abort any in-flight stream on unmount so we don't leave a dangling fetch
-  // pumping deltas + toasts into a component that's no longer mounted. The
-  // handleSend closure is keyed off `activeConv?.id` so a deliberate
-  // conversation switch unmounts the old subtree's stream by re-running this
-  // effect — anything still streaming dies cleanly.
+  // Abort any in-flight stream when the user navigates to a different
+  // conversation OR when the page unmounts — React Router reuses the same
+  // `Ask` instance across `/ask/:conversationId` transitions, so an
+  // unmount-only effect would leak a stream from conversation A while the
+  // user reads conversation B. Tying the cleanup to `conversationId`
+  // guarantees stale events can't land in the wrong local state.
   useEffect(() => () => {
     abortRef.current?.abort();
     abortRef.current = null;
-  }, []);
+  }, [conversationId]);
 
   const startNew = useCallback(() => {
     if (streaming) return;
