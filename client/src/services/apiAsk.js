@@ -34,27 +34,40 @@ export async function streamAskTurn(payload, { onEvent, signal } = {}) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
-  let currentEvent = 'message';
+
+  // Match the SSE parser used in `apiOpenClaw.js`: tolerate `\r\n\r\n`
+  // separators (some proxies normalise line endings), preserve multi-line
+  // `data:` frames by joining with `\n`, and strip the optional single
+  // leading space from each data line per the SSE spec.
+  const flushFrame = (frame) => {
+    const lines = frame.split(/\r?\n/);
+    let eventName = 'message';
+    const dataLines = [];
+    for (const line of lines) {
+      if (line.startsWith('event:')) eventName = line.slice(6).trim() || 'message';
+      else if (line.startsWith('data:')) {
+        const raw = line.slice(5);
+        dataLines.push(raw.startsWith(' ') ? raw.slice(1) : raw);
+      }
+    }
+    if (!dataLines.length) return;
+    const rawData = dataLines.join('\n');
+    let data;
+    try { data = JSON.parse(rawData); } catch { data = { raw: rawData }; }
+    onEvent?.({ event: eventName, data });
+  };
 
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-
-    let frameEnd;
-    while ((frameEnd = buffer.indexOf('\n\n')) !== -1) {
-      const frame = buffer.slice(0, frameEnd);
-      buffer = buffer.slice(frameEnd + 2);
-      currentEvent = 'message';
-      let dataLine = '';
-      for (const line of frame.split('\n')) {
-        if (line.startsWith('event:')) currentEvent = line.slice(6).trim();
-        else if (line.startsWith('data:')) dataLine += line.slice(5).trim();
-      }
-      if (!dataLine) continue;
-      let data = null;
-      try { data = JSON.parse(dataLine); } catch { data = { raw: dataLine }; }
-      onEvent?.({ event: currentEvent, data });
-    }
+    const parts = buffer.split(/\r?\n\r?\n/);
+    buffer = parts.pop() || '';
+    for (const part of parts) flushFrame(part);
   }
+
+  // Flush any final un-terminated frame (server closed without a trailing
+  // double newline).
+  buffer += decoder.decode();
+  if (buffer.trim()) flushFrame(buffer);
 }

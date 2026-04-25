@@ -105,9 +105,12 @@ router.post('/', asyncHandler(async (req, res) => {
   res.flushHeaders?.();
 
   // Propagate client disconnects (browser nav, tab close, abort) into
-  // retrieval + provider streaming so we don't keep burning tokens/CPU on
-  // a stream nobody's reading. `aborted` short-circuits the post-loop
-  // persistence too.
+  // provider streaming and the post-retrieval generator loop so we don't
+  // keep burning tokens/CPU on a stream nobody's reading. The retrieval
+  // fan-out itself doesn't currently take a signal — those queries are
+  // bounded (~hundreds of ms) so we let them finish; once retrieval
+  // returns, the abort short-circuits before any further SSE writes or
+  // provider work. `aborted` also gates the post-loop persistence.
   const abortController = new AbortController();
   let aborted = false;
   const onClose = () => {

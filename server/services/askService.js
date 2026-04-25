@@ -140,9 +140,12 @@ async function retrieveBrainNotes(question, queryTokens) {
     candidates.push({ kind: 'brain-note', subkind: 'project', recordId: proj.id, title: proj.title || '(project)', snippet: text, href: `/brain/memory?type=projects&id=${encodeURIComponent(proj.id)}`, updatedAt: proj.updatedAt || proj.createdAt });
   }
   for (const entry of inbox || []) {
-    const text = entry.text || entry.summary || '';
+    // Brain inbox records use `capturedText` / `capturedAt` (see
+    // brainStorage.getInboxLog). Fall back to legacy field names for
+    // forward-compat with any older entries that may exist on disk.
+    const text = entry.capturedText || entry.text || entry.summary || '';
     if (!text) continue;
-    candidates.push({ kind: 'brain-note', subkind: 'inbox', recordId: entry.id, title: text.slice(0, 80), snippet: text, href: '/brain/inbox', updatedAt: entry.timestamp || entry.createdAt });
+    candidates.push({ kind: 'brain-note', subkind: 'inbox', recordId: entry.id, title: text.slice(0, 80), snippet: text, href: '/brain/inbox', updatedAt: entry.capturedAt || entry.timestamp || entry.createdAt });
   }
 
   for (const c of candidates) {
@@ -348,20 +351,39 @@ async function* streamCompletion(provider, model, prompt, signal) {
     const headers = { 'Content-Type': 'application/json' };
     if (provider.apiKey) headers['Authorization'] = `Bearer ${provider.apiKey}`;
     // Combine the per-provider timeout with the caller's abort signal so
-    // either one tearing down propagates to the upstream fetch.
-    const timeoutSignal = AbortSignal.timeout(provider.timeout || 300000);
-    const fetchSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
-    const response = await fetch(`${provider.endpoint}/chat/completions`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.4,
-        stream: true,
-      }),
-      signal: fetchSignal,
-    });
+    // either one tearing down propagates to the upstream fetch. Mirrors the
+    // `AbortSignal.any` fallback in `lib/fetchWithTimeout.js` so older Node
+    // builds without `AbortSignal.any` keep working.
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), provider.timeout || 300000);
+    let fetchSignal = timeoutController.signal;
+    let externalAbortHandler;
+    if (signal) {
+      if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function') {
+        fetchSignal = AbortSignal.any([timeoutController.signal, signal]);
+      } else {
+        externalAbortHandler = () => timeoutController.abort();
+        if (signal.aborted) timeoutController.abort();
+        else signal.addEventListener('abort', externalAbortHandler, { once: true });
+      }
+    }
+    let response;
+    try {
+      response = await fetch(`${provider.endpoint}/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.4,
+          stream: true,
+        }),
+        signal: fetchSignal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+      if (signal && externalAbortHandler) signal.removeEventListener('abort', externalAbortHandler);
+    }
     if (!response.ok || !response.body) {
       const text = await response.text().catch(() => '');
       throw new Error(`AI API error: ${response.status} - ${text.slice(0, 500)}`);

@@ -206,7 +206,14 @@ export default function Ask() {
       return;
     }
     pendingDeleteRef.current = { id: null, expiresAt: 0 };
-    await api.deleteAskConversation(id).catch(() => null);
+    // Only mutate local state if the server confirms the delete — otherwise
+    // a transient failure would hide a row that's still on disk and would
+    // pop back on the next list refresh.
+    const ok = await api.deleteAskConversation(id).then(() => true, (err) => {
+      toast.error(err?.message || 'Failed to delete conversation');
+      return false;
+    });
+    if (!ok) return;
     setConversations((prev) => prev.filter((c) => c.id !== id));
     if (id === conversationId) navigate('/ask');
   }, [activeConv?.id, conversationId, navigate, streaming]);

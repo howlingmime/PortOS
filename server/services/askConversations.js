@@ -85,8 +85,11 @@ export async function listConversations({ limit = 50 } = {}) {
   const now = Date.now();
   const expiryMs = EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
+  // Walk the whole directory so expired+unpinned conversations get pruned
+  // even if they live past the first `limit` results — otherwise a user with
+  // >limit conversations would silently violate the 30-day auto-expire
+  // contract (old files would persist indefinitely on disk).
   for (const id of ids) {
-    if (summaries.length >= limit) break;
     const conv = await readConversation(id);
     if (!conv) continue;
 
@@ -97,15 +100,17 @@ export async function listConversations({ limit = 50 } = {}) {
       continue;
     }
 
-    summaries.push({
-      id: conv.id,
-      title: conv.title || '(untitled)',
-      mode: conv.mode,
-      createdAt: conv.createdAt,
-      updatedAt: conv.updatedAt,
-      turnCount: Array.isArray(conv.turns) ? conv.turns.length : 0,
-      promoted: !!conv.promoted,
-    });
+    if (summaries.length < limit) {
+      summaries.push({
+        id: conv.id,
+        title: conv.title || '(untitled)',
+        mode: conv.mode,
+        createdAt: conv.createdAt,
+        updatedAt: conv.updatedAt,
+        turnCount: Array.isArray(conv.turns) ? conv.turns.length : 0,
+        promoted: !!conv.promoted,
+      });
+    }
   }
 
   return summaries;
