@@ -365,9 +365,10 @@ export default function Ask() {
                 {m.label}
               </button>
             ))}
-            {activeConv && (
+            {activeConv && activeConv.id !== 'pending' && (
               <button
                 onClick={handlePromote}
+                aria-label={activeConv.promoted ? 'Unpin conversation' : 'Pin conversation'}
                 title={activeConv.promoted ? 'Unpin (allow auto-expiry after 30d)' : 'Pin (exempt from auto-expiry)'}
                 className={`p-1.5 rounded-md transition-colors ${activeConv.promoted ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-white'}`}
               >

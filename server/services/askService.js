@@ -403,6 +403,24 @@ async function* streamCompletion(provider, model, prompt, signal) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    // Returns `{ delta, done }`. `done: true` means we hit `[DONE]` and
+    // should stop. A single malformed/partial frame from the upstream
+    // provider must not kill the whole stream — log and skip so subsequent
+    // good frames still flow.
+    const parseFrame = (frame) => {
+      const trimmed = frame.trim();
+      if (!trimmed.startsWith('data:')) return { delta: null, done: false };
+      const payload = trimmed.slice(5).trim();
+      if (payload === '[DONE]') return { delta: null, done: true };
+      let parsed;
+      try {
+        parsed = JSON.parse(payload);
+      } catch {
+        console.warn(`⚠️ Ask: skipping malformed SSE frame from ${provider.id}`);
+        return { delta: null, done: false };
+      }
+      return { delta: parsed?.choices?.[0]?.delta?.content || null, done: false };
+    };
     try {
       while (true) {
         if (signal?.aborted) {
@@ -417,24 +435,20 @@ async function* streamCompletion(provider, model, prompt, signal) {
         buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
         let idx;
         while ((idx = buffer.indexOf('\n\n')) !== -1) {
-          const frame = buffer.slice(0, idx).trim();
+          const frame = buffer.slice(0, idx);
           buffer = buffer.slice(idx + 2);
-          if (!frame.startsWith('data:')) continue;
-          const payload = frame.slice(5).trim();
-          if (payload === '[DONE]') return;
-          // A single malformed/partial frame from the upstream provider must
-          // not kill the whole stream — log and skip so subsequent good
-          // frames still flow.
-          let parsed;
-          try {
-            parsed = JSON.parse(payload);
-          } catch {
-            console.warn(`⚠️ Ask: skipping malformed SSE frame from ${provider.id}`);
-            continue;
-          }
-          const delta = parsed?.choices?.[0]?.delta?.content;
+          const { delta, done: terminal } = parseFrame(frame);
           if (delta) yield delta;
+          if (terminal) return;
         }
+      }
+      // Flush any final un-terminated frame — some upstreams close the
+      // socket without a trailing `\n\n`, so the last delta would
+      // otherwise sit forever in `buffer` and get dropped.
+      buffer += decoder.decode().replace(/\r\n/g, '\n');
+      if (buffer.trim()) {
+        const { delta } = parseFrame(buffer);
+        if (delta) yield delta;
       }
     } finally {
       cleanup();

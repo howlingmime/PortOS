@@ -13,13 +13,14 @@
  * Turn shape:
  *   { id, role: 'user'|'assistant', content, sources?, mode?, providerId?, model?, createdAt }
  *
- * Conversation ids are sortable: `ask_<base36-ms>_<hex>`. Lexically sorting
- * filenames descending returns newest-first without reading any file, which
- * lets `listConversations` collect its `limit` summaries from the head of
- * the list. The expiry-prune pass still has to walk the full directory
- * (otherwise stale unpinned conversations beyond the first page would
- * persist past 30 days) — bounded by max-30-day's worth of files in a
- * single-user app, so cost is negligible in practice.
+ * Conversation ids are sortable: `ask_<base36-ms-padded>_<hex>`. Lexically
+ * sorting filenames descending returns newest-first without reading any
+ * file, which lets `listConversations` JSON-parse only the head of the
+ * list to fill summaries. Beyond the page cutoff we `stat()` each file
+ * (mtime fast path) and only open the JSON for files whose mtime is older
+ * than the 30-day expiry — those need a JSON read to honour the `promoted`
+ * flag. Net cost: O(limit) JSON reads + O(N) stats for fresh tails, plus
+ * O(stale-files) JSON reads for the prune sweep.
  */
 
 import { join } from 'path';
@@ -35,9 +36,15 @@ export { VALID_MODES_SET as VALID_MODES };
 
 const ID_RE = /^ask_[a-z0-9]+_[a-f0-9]+$/;
 
+// Pad base36-ms to 9 chars (35^9 > 5e13, valid until year ~3700) so
+// filename lexical order always matches chronological order — without
+// padding, a digit rollover would make a newer id sort *before* an older
+// one and the newest-first listing would silently flip.
+const BASE36_TS_WIDTH = 9;
+
 function generateId() {
-  // Sortable timestamp + short random suffix; safe filename component.
-  return `ask_${Date.now().toString(36)}_${randomUUID().split('-')[0]}`;
+  const ts = Date.now().toString(36).padStart(BASE36_TS_WIDTH, '0');
+  return `ask_${ts}_${randomUUID().split('-')[0]}`;
 }
 
 export function isValidId(id) {

@@ -113,7 +113,9 @@ router.post('/', asyncHandler(async (req, res) => {
   // fan-out itself doesn't currently take a signal — those queries are
   // bounded (~hundreds of ms) so we let them finish; once retrieval
   // returns, the abort short-circuits before any further SSE writes or
-  // provider work. `aborted` also gates the post-loop persistence.
+  // provider work. `aborted` also gates further SSE writes (the socket is
+  // dead) but we still persist whatever assistant text was accumulated up
+  // to that point so the conversation isn't lossy on reconnect.
   const abortController = new AbortController();
   let aborted = false;
   const onClose = () => {
