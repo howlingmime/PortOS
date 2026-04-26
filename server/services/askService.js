@@ -158,13 +158,18 @@ async function retrieveBrainNotes(question, queryTokens) {
   // chips land on the section page; the record id rides in `meta` for a
   // future record-level deep-link to consume without touching the source
   // shape. (Same pattern as memory/calendar after round 18.)
+  // The title is already shown on the chip and prompt source line, so the
+  // snippet should carry the body (description) rather than restate the
+  // title. Fall back to the title only when the description is missing
+  // entirely. Lexical scoring downstream still includes the title via the
+  // `${c.title} ${c.snippet}` join, so ranking quality is unchanged.
   for (const idea of ideasArr || []) {
-    const text = `${idea.title || ''} ${idea.description || ''}`.trim();
-    candidates.push({ kind: 'brain-note', subkind: 'idea', recordId: idea.id, title: idea.title || '(idea)', snippet: normalizeSnippet(text), href: '/brain/memory', updatedAt: idea.updatedAt || idea.createdAt });
+    const body = (idea.description || '').trim();
+    candidates.push({ kind: 'brain-note', subkind: 'idea', recordId: idea.id, title: idea.title || '(idea)', snippet: normalizeSnippet(body || idea.title || ''), href: '/brain/memory', updatedAt: idea.updatedAt || idea.createdAt });
   }
   for (const proj of projectsArr || []) {
-    const text = `${proj.title || ''} ${proj.description || ''}`.trim();
-    candidates.push({ kind: 'brain-note', subkind: 'project', recordId: proj.id, title: proj.title || '(project)', snippet: normalizeSnippet(text), href: '/brain/memory', updatedAt: proj.updatedAt || proj.createdAt });
+    const body = (proj.description || '').trim();
+    candidates.push({ kind: 'brain-note', subkind: 'project', recordId: proj.id, title: proj.title || '(project)', snippet: normalizeSnippet(body || proj.title || ''), href: '/brain/memory', updatedAt: proj.updatedAt || proj.createdAt });
   }
   for (const entry of inbox || []) {
     // Brain inbox records use `capturedText` / `capturedAt` (see
