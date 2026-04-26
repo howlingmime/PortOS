@@ -254,7 +254,10 @@ router.post('/', asyncHandler(async (req, res) => {
     await send('error', { error: err?.message || 'internal error' }).catch(() => {});
   } finally {
     req.off('close', onClose);
-    if (!res.writableEnded) res.end();
+    // Guard both `writableEnded` AND `destroyed` — if the client disconnected
+    // mid-stream the underlying socket may already be torn down, and calling
+    // `res.end()` on a destroyed stream throws an unhandled write error.
+    if (!res.writableEnded && !res.destroyed) res.end();
   }
 }));
 
