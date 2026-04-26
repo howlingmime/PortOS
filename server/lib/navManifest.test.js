@@ -77,12 +77,14 @@ describe('resolveNavCommand — fuzzy matching', () => {
 describe('nav contract — tabbed pages match their TABS constants', () => {
   for (const { prefix, constantsFile } of TABBED_PAGES) {
     describe(prefix, () => {
-      const tabIds = extractTabIds(path.join(REPO_ROOT, constantsFile));
-      const tabIdSet = new Set(tabIds);
+      // Read inside it() bodies (not at describe time) so a moved/renamed
+      // constants file surfaces as a focused test failure rather than
+      // aborting the entire suite during Vitest's collection phase.
       const navEntries = NAV_COMMANDS.filter((c) => c.path.startsWith(`${prefix}/`));
       const navTabs = navEntries.map((c) => ({ tab: c.path.slice(prefix.length + 1), command: c }));
 
       it('every nav manifest tab resolves to a real TAB id', () => {
+        const tabIdSet = new Set(extractTabIds(path.join(REPO_ROOT, constantsFile)));
         const orphans = navTabs
           .filter(({ tab }) => !tabIdSet.has(tab))
           .map(({ command, tab }) => `${command.id} (${command.path}) → unknown tab "${tab}"`);
@@ -90,6 +92,7 @@ describe('nav contract — tabbed pages match their TABS constants', () => {
       });
 
       it('every TAB id is reachable via the nav manifest', () => {
+        const tabIds = extractTabIds(path.join(REPO_ROOT, constantsFile));
         const navTabSet = new Set(navTabs.map((t) => t.tab));
         const missing = tabIds.filter((id) => !navTabSet.has(id));
         expect(missing).toEqual([]);
