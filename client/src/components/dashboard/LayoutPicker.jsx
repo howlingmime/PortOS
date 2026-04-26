@@ -50,7 +50,15 @@ export default function LayoutPicker({ layouts, activeLayoutId, onSelect, onEdit
     };
     compute();
     window.addEventListener('resize', compute);
-    return () => window.removeEventListener('resize', compute);
+    // Capture-phase scroll catches scrolls in any ancestor (the Dashboard
+    // sits inside Layout's overflow-auto <main>, so window-level scroll
+    // events alone wouldn't fire and the fixed-positioned menu would
+    // detach from its trigger as the page scrolled).
+    window.addEventListener('scroll', compute, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('resize', compute);
+      window.removeEventListener('scroll', compute, { capture: true });
+    };
   }, [open]);
 
   return (
