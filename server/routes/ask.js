@@ -174,66 +174,76 @@ router.post('/', asyncHandler(async (req, res) => {
   let assistantSources = [];
   let providerInfo = {};
 
+  // From here on, headers are flushed and the stream is "in SSE mode" —
+  // any thrown error must convert to a terminal SSE `error` frame instead
+  // of being thrown to asyncHandler (which would try to send a JSON 500
+  // body and trigger ERR_HTTP_HEADERS_SENT). The try/finally guarantees
+  // the close listener is detached even on a thrown path.
   let streamErrored = false;
-  for await (const evt of runAsk({
-    question: body.question,
-    mode: body.mode,
-    history,
-    timeWindow: body.timeWindow,
-    maxSources: body.maxSources,
-    providerId: body.providerId,
-    model: body.model,
-    signal: abortController.signal,
-  })) {
-    if (aborted) break;
-    if (evt.type === 'sources') {
-      assistantSources = evt.sources;
-      await send('sources', { sources: evt.sources });
-    } else if (evt.type === 'delta') {
-      assistantText += evt.text;
-      await send('delta', { text: evt.text });
-    } else if (evt.type === 'done') {
-      providerInfo = { providerId: evt.providerId, model: evt.model };
-      // Both API and CLI providers stream their text via `delta` events
-      // (CLI providers yield a single big chunk). The terminal `done`
-      // event also carries the full answer as a defensive fallback —
-      // populate `assistantText` from it only if no deltas arrived.
-      if (!assistantText && evt.answer) assistantText = evt.answer;
-    } else if (evt.type === 'error') {
-      streamErrored = true;
-      await send('error', { error: evt.error });
-    }
-  }
-
-  req.off('close', onClose);
-
-  // If the client bailed mid-stream we still persist whatever assistant text
-  // we accumulated so the conversation isn't silently lossy on reconnect,
-  // but we don't try to write any more SSE frames to a dead socket.
-  let persistedAssistantTurn = null;
-  if (!streamErrored && assistantText) {
-    const result = await convs.appendTurn(conversation.id, {
-      role: 'assistant',
-      content: assistantText,
-      sources: assistantSources,
+  try {
+    for await (const evt of runAsk({
+      question: body.question,
       mode: body.mode,
-      ...providerInfo,
-    });
-    persistedAssistantTurn = result.turn;
-  }
-
-  if (!aborted) {
-    if (streamErrored) {
-      // Error event already flushed inside the loop — close the stream
-      // without a `done` frame so clients can cleanly distinguish failure
-      // (terminal `error`) from success (terminal `done`).
-      res.end();
-    } else {
-      // Hand back the persisted turn so the client can append to local
-      // state instead of round-tripping a full conversation refetch.
-      await send('done', { conversationId: conversation.id, turn: persistedAssistantTurn });
-      res.end();
+      history,
+      timeWindow: body.timeWindow,
+      maxSources: body.maxSources,
+      providerId: body.providerId,
+      model: body.model,
+      signal: abortController.signal,
+    })) {
+      if (aborted) break;
+      if (evt.type === 'sources') {
+        assistantSources = evt.sources;
+        await send('sources', { sources: evt.sources });
+      } else if (evt.type === 'delta') {
+        assistantText += evt.text;
+        await send('delta', { text: evt.text });
+      } else if (evt.type === 'done') {
+        providerInfo = { providerId: evt.providerId, model: evt.model };
+        // Both API and CLI providers stream their text via `delta` events
+        // (CLI providers yield a single big chunk). The terminal `done`
+        // event also carries the full answer as a defensive fallback —
+        // populate `assistantText` from it only if no deltas arrived.
+        if (!assistantText && evt.answer) assistantText = evt.answer;
+      } else if (evt.type === 'error') {
+        streamErrored = true;
+        await send('error', { error: evt.error });
+      }
     }
+
+    // If the client bailed mid-stream we still persist whatever assistant
+    // text we accumulated so the conversation isn't silently lossy on
+    // reconnect — but a write failure here must not bubble out either.
+    let persistedAssistantTurn = null;
+    if (!streamErrored && assistantText) {
+      const result = await convs.appendTurn(conversation.id, {
+        role: 'assistant',
+        content: assistantText,
+        sources: assistantSources,
+        mode: body.mode,
+        ...providerInfo,
+      });
+      persistedAssistantTurn = result.turn;
+    }
+
+    if (!aborted) {
+      if (streamErrored) {
+        // Error event already flushed inside the loop — close the stream
+        // without a `done` frame so clients can cleanly distinguish
+        // failure (terminal `error`) from success (terminal `done`).
+      } else {
+        // Hand back the persisted turn so the client can append to local
+        // state instead of round-tripping a full conversation refetch.
+        await send('done', { conversationId: conversation.id, turn: persistedAssistantTurn });
+      }
+    }
+  } catch (err) {
+    streamErrored = true;
+    console.error(`❌ Ask SSE handler error: ${err?.message || err}`);
+    await send('error', { error: err?.message || 'internal error' }).catch(() => {});
+  } finally {
+    req.off('close', onClose);
+    if (!res.writableEnded) res.end();
   }
 }));
 

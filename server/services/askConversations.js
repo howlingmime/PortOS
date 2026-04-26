@@ -190,9 +190,11 @@ export async function appendTurn(conversationId, turn) {
   };
   conv.turns = [...(conv.turns || []), stamped];
   // First user turn becomes the conversation title — give the listing a
-  // useful label without a separate naming step.
+  // useful label without a separate naming step. Title from `stamped.content`
+  // (the normalised, persisted value) so a non-string `turn.content` can't
+  // produce a title that disagrees with the stored turn body.
   if (turn.role === 'user' && (!conv.title || conv.title === '(new conversation)')) {
-    conv.title = truncateTitle(turn.content);
+    conv.title = truncateTitle(stamped.content);
   }
   conv.updatedAt = stamped.createdAt;
   await atomicWrite(pathFor(conversationId), conv);
