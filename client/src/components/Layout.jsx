@@ -190,6 +190,7 @@ const navItems = [
     ]
   },
   { to: '/goals/list', label: 'Goals', icon: Target, single: true },
+  { to: '/image-gen', label: 'Image Gen', icon: ImageIcon, single: true },
   { to: '/insights/overview', label: 'Insights', icon: Lightbulb, single: true },
   {
     label: 'MeatSpace',

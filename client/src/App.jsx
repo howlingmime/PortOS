@@ -67,6 +67,7 @@ const OpenClawPage = lazyWithReload(() => import('./pages/OpenClaw'));
 const Submodules = lazyWithReload(() => import('./pages/Submodules'));
 const ChiefOfStaff = lazyWithReload(() => import('./pages/ChiefOfStaff'));
 const Ask = lazyWithReload(() => import('./pages/Ask'));
+const ImageGen = lazyWithReload(() => import('./pages/ImageGen'));
 
 // Loading fallback for lazy-loaded pages
 const PageLoader = () => (
@@ -165,6 +166,7 @@ export default function App() {
           <Route path="character" element={<CharacterSheet />} />
           <Route path="ask" element={<Ask />} />
           <Route path="ask/:conversationId" element={<Ask />} />
+          <Route path="image-gen" element={<ImageGen />} />
           <Route path="wiki" element={<Navigate to="/wiki/overview" replace />} />
           <Route path="wiki/:tab" element={<Wiki />} />
           <Route path="agents" element={<Agents />} />
