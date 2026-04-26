@@ -1,9 +1,15 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { LayoutGrid, Check, Pencil } from 'lucide-react';
 
 export default function LayoutPicker({ layouts, activeLayoutId, onSelect, onEdit }) {
   const [open, setOpen] = useState(false);
+  // Computed fixed-position style applied only when right-aligning to the
+  // trigger button would push the dropdown off the left edge of the
+  // viewport (typical on mobile, where the picker sits mid-row). Null →
+  // use the default `absolute right-0` placement.
+  const [menuPos, setMenuPos] = useState(null);
   const ref = useRef(null);
+  const btnRef = useRef(null);
   const active = layouts.find((l) => l.id === activeLayoutId) || layouts[0];
 
   useEffect(() => {
@@ -18,9 +24,39 @@ export default function LayoutPicker({ layouts, activeLayoutId, onSelect, onEdit
     };
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPos(null);
+      return;
+    }
+    const compute = () => {
+      if (!btnRef.current) return;
+      const rect = btnRef.current.getBoundingClientRect();
+      const padding = 8;
+      const desiredWidth = 224; // matches w-56
+      // If aligning the dropdown's right edge with the button's right edge
+      // would clip the left side, anchor it to the viewport's right edge
+      // instead via fixed positioning.
+      if (rect.right - desiredWidth < padding) {
+        setMenuPos({
+          position: 'fixed',
+          top: rect.bottom + 4,
+          right: padding,
+          left: 'auto',
+        });
+      } else {
+        setMenuPos(null);
+      }
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    return () => window.removeEventListener('resize', compute);
+  }, [open]);
+
   return (
     <div ref={ref} className="relative">
       <button
+        ref={btnRef}
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-port-card border border-port-border hover:border-gray-600 transition-colors text-sm text-gray-300 hover:text-white min-h-[40px] focus:outline-hidden focus:ring-2 focus:ring-port-accent focus:ring-offset-2 focus:ring-offset-port-bg"
         title="Switch dashboard layout"
@@ -35,7 +71,8 @@ export default function LayoutPicker({ layouts, activeLayoutId, onSelect, onEdit
       {open && (
         <div
           aria-label="Dashboard layout menu"
-          className="absolute right-0 mt-1 w-56 bg-port-card border border-port-border rounded-lg shadow-2xl overflow-hidden z-50"
+          className={`mt-1 w-56 max-w-[calc(100vw-1rem)] bg-port-card border border-port-border rounded-lg shadow-2xl overflow-hidden z-50 ${menuPos ? '' : 'absolute right-0'}`}
+          style={menuPos || undefined}
         >
           <div className="py-1">
             {layouts.map((l) => (
@@ -48,20 +85,20 @@ export default function LayoutPicker({ layouts, activeLayoutId, onSelect, onEdit
                   // failure, swallow here to avoid unhandled rejections.
                   Promise.resolve(onSelect(l.id)).catch(() => {});
                 }}
-                className={`w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/5 ${
+                className={`w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/5 min-h-[40px] ${
                   l.id === activeLayoutId ? 'text-white' : 'text-gray-300'
                 }`}
               >
-                {l.id === activeLayoutId ? <Check size={14} className="text-port-success" aria-hidden="true" /> : <span className="w-3.5" aria-hidden="true" />}
+                {l.id === activeLayoutId ? <Check size={14} className="text-port-success shrink-0" aria-hidden="true" /> : <span className="w-3.5 shrink-0" aria-hidden="true" />}
                 <span className="flex-1 truncate">{l.name}</span>
-                {l.builtIn && <span className="text-[10px] text-gray-500 uppercase">Built-in</span>}
+                {l.builtIn && <span className="text-[10px] text-gray-500 uppercase shrink-0">Built-in</span>}
               </button>
             ))}
           </div>
           <div className="border-t border-port-border">
             <button
               onClick={() => { setOpen(false); onEdit(); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white min-h-[40px]"
             >
               <Pencil size={14} aria-hidden="true" />
               <span>Edit layouts…</span>
