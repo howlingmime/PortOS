@@ -1,5 +1,28 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { NAV_COMMANDS, getNavAliasMap, resolveNavCommand } from './navManifest.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
+
+// Maps URL prefix → file holding the page's TABS constant. Each page validates
+// the :tab param against its own TABS list, so the nav manifest must agree.
+const TABBED_PAGES = [
+  { prefix: '/brain', constantsFile: 'client/src/components/brain/constants.js' },
+  { prefix: '/cos', constantsFile: 'client/src/components/cos/constants.js' },
+  { prefix: '/digital-twin', constantsFile: 'client/src/components/digital-twin/constants.js' },
+  { prefix: '/meatspace', constantsFile: 'client/src/components/meatspace/constants.js' },
+];
+
+// Extract `id: '<value>'` from the first `export const TABS = [ ... ];` block.
+function extractTabIds(constantsPath) {
+  const src = fs.readFileSync(constantsPath, 'utf8');
+  const block = src.match(/export const TABS\s*=\s*\[([\s\S]*?)\];/);
+  if (!block) throw new Error(`No TABS array found in ${constantsPath}`);
+  return [...block[1].matchAll(/id:\s*['"]([^'"]+)['"]/g)].map((m) => m[1]);
+}
 
 describe('navManifest — shape invariants', () => {
   it('every command has id, path, label, section', () => {
@@ -49,6 +72,30 @@ describe('resolveNavCommand — fuzzy matching', () => {
     expect(hit?.matched).toBe('gsd');
     expect(hit?.path).toBe('/cos/gsd');
   });
+});
+
+describe('nav contract — tabbed pages match their TABS constants', () => {
+  for (const { prefix, constantsFile } of TABBED_PAGES) {
+    describe(prefix, () => {
+      const tabIds = extractTabIds(path.join(REPO_ROOT, constantsFile));
+      const tabIdSet = new Set(tabIds);
+      const navEntries = NAV_COMMANDS.filter((c) => c.path.startsWith(`${prefix}/`));
+      const navTabs = navEntries.map((c) => ({ tab: c.path.slice(prefix.length + 1), command: c }));
+
+      it('every nav manifest tab resolves to a real TAB id', () => {
+        const orphans = navTabs
+          .filter(({ tab }) => !tabIdSet.has(tab))
+          .map(({ command, tab }) => `${command.id} (${command.path}) → unknown tab "${tab}"`);
+        expect(orphans).toEqual([]);
+      });
+
+      it('every TAB id is reachable via the nav manifest', () => {
+        const navTabSet = new Set(navTabs.map((t) => t.tab));
+        const missing = tabIds.filter((id) => !navTabSet.has(id));
+        expect(missing).toEqual([]);
+      });
+    });
+  }
 });
 
 describe('getNavAliasMap — voice-agent compatibility', () => {

@@ -4,30 +4,8 @@ import Layout from './components/Layout';
 import { getSettings, updateSettings } from './services/api';
 import BrailleSpinner from './components/BrailleSpinner';
 import Dashboard from './pages/Dashboard';
-import Ambient from './pages/Ambient';
 import Apps from './pages/Apps';
-import CreateApp from './pages/CreateApp';
-import Templates from './pages/Templates';
-import PromptManager from './pages/PromptManager';
-import Brain from './pages/Brain';
-import Security from './pages/Security';
-import DigitalTwin from './pages/DigitalTwin';
-import Agents from './pages/Agents';
-import Uploads from './pages/Uploads';
-import Settings from './pages/Settings';
-import Shell from './pages/Shell';
-import BrowserPage from './pages/Browser';
-import Jira from './pages/Jira';
-import JiraReports from './pages/JiraReports';
-import DataManager from './pages/DataManager';
-import Insights from './pages/Insights';
-import Instances from './pages/Instances';
-import MeatSpace from './pages/MeatSpace';
-import Post from './pages/Post';
-import Review from './pages/Review';
-import Loops from './pages/Loops';
-import CharacterSheet from './pages/CharacterSheet';
-import Wiki from './pages/Wiki';
+import Ambient from './pages/Ambient';
 
 // Auto-reload on stale chunk errors (e.g., after a rebuild changes chunk hashes)
 // Uses sessionStorage to prevent infinite reload loops (max 1 reload per session)
@@ -68,6 +46,28 @@ const Submodules = lazyWithReload(() => import('./pages/Submodules'));
 const ChiefOfStaff = lazyWithReload(() => import('./pages/ChiefOfStaff'));
 const Ask = lazyWithReload(() => import('./pages/Ask'));
 const ImageGen = lazyWithReload(() => import('./pages/ImageGen'));
+const CreateApp = lazyWithReload(() => import('./pages/CreateApp'));
+const Templates = lazyWithReload(() => import('./pages/Templates'));
+const PromptManager = lazyWithReload(() => import('./pages/PromptManager'));
+const Brain = lazyWithReload(() => import('./pages/Brain'));
+const Security = lazyWithReload(() => import('./pages/Security'));
+const DigitalTwin = lazyWithReload(() => import('./pages/DigitalTwin'));
+const Agents = lazyWithReload(() => import('./pages/Agents'));
+const Uploads = lazyWithReload(() => import('./pages/Uploads'));
+const Settings = lazyWithReload(() => import('./pages/Settings'));
+const Shell = lazyWithReload(() => import('./pages/Shell'));
+const BrowserPage = lazyWithReload(() => import('./pages/Browser'));
+const Jira = lazyWithReload(() => import('./pages/Jira'));
+const JiraReports = lazyWithReload(() => import('./pages/JiraReports'));
+const DataManager = lazyWithReload(() => import('./pages/DataManager'));
+const Insights = lazyWithReload(() => import('./pages/Insights'));
+const Instances = lazyWithReload(() => import('./pages/Instances'));
+const MeatSpace = lazyWithReload(() => import('./pages/MeatSpace'));
+const Post = lazyWithReload(() => import('./pages/Post'));
+const Review = lazyWithReload(() => import('./pages/Review'));
+const Loops = lazyWithReload(() => import('./pages/Loops'));
+const CharacterSheet = lazyWithReload(() => import('./pages/CharacterSheet'));
+const Wiki = lazyWithReload(() => import('./pages/Wiki'));
 
 // Loading fallback for lazy-loaded pages
 const PageLoader = () => (

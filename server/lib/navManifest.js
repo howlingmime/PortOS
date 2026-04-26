@@ -25,6 +25,7 @@ export const NAV_COMMANDS = [
   { id: 'nav.brain.config', path: '/brain/config', label: 'Config', section: 'Brain', aliases: ['brain-config'] },
   { id: 'nav.brain.daily-log', path: '/brain/daily-log', label: 'Daily Log', section: 'Brain', aliases: ['daily-log', 'journal'] },
   { id: 'nav.brain.digest', path: '/brain/digest', label: 'Digest', section: 'Brain', aliases: ['brain-digest'] },
+  { id: 'nav.brain.feeds', path: '/brain/feeds', label: 'Feeds', section: 'Brain', aliases: ['brain-feeds', 'feeds', 'rss'], keywords: ['rss', 'subscriptions'] },
   { id: 'nav.brain.graph', path: '/brain/graph', label: 'Graph', section: 'Brain', aliases: ['brain-graph'] },
   { id: 'nav.brain.links', path: '/brain/links', label: 'Links', section: 'Brain', aliases: ['brain-links'] },
   { id: 'nav.brain.memory', path: '/brain/memory', label: 'Memory', section: 'Brain', aliases: ['brain-memory', 'memory'] },
@@ -50,7 +51,6 @@ export const NAV_COMMANDS = [
   { id: 'nav.cos.learning', path: '/cos/learning', label: 'Learning', section: 'Chief of Staff', aliases: ['cos-learning'] },
   { id: 'nav.cos.memory', path: '/cos/memory', label: 'Memory', section: 'Chief of Staff', aliases: ['cos-memory'] },
   { id: 'nav.cos.schedule', path: '/cos/schedule', label: 'Schedule', section: 'Chief of Staff', aliases: ['schedule', 'cos-schedule'] },
-  { id: 'nav.cos.scripts', path: '/cos/scripts', label: 'Scripts', section: 'Chief of Staff', aliases: ['cos-scripts'] },
   { id: 'nav.cos.productivity', path: '/cos/productivity', label: 'Streaks', section: 'Chief of Staff', aliases: ['streaks', 'cos-productivity'] },
   { id: 'nav.cos.jobs', path: '/cos/jobs', label: 'System Tasks', section: 'Chief of Staff', aliases: ['cos-jobs', 'system-tasks'] },
 
@@ -79,6 +79,7 @@ export const NAV_COMMANDS = [
   { id: 'nav.twin.interview', path: '/digital-twin/interview', label: 'Interview', section: 'Digital Twin', aliases: ['twin-interview'] },
   { id: 'nav.twin.taste', path: '/digital-twin/taste', label: 'Taste', section: 'Digital Twin', aliases: ['twin-taste'] },
   { id: 'nav.twin.test', path: '/digital-twin/test', label: 'Test', section: 'Digital Twin', aliases: ['twin-test'] },
+  { id: 'nav.twin.time-capsule', path: '/digital-twin/time-capsule', label: 'Time Capsule', section: 'Digital Twin', aliases: ['time-capsule', 'twin-time-capsule', 'capsule'], keywords: ['legacy', 'archive', 'snapshot'] },
 
   { id: 'nav.meatspace.overview', path: '/meatspace/overview', label: 'Overview', section: 'MeatSpace', aliases: ['meatspace'] },
   { id: 'nav.meatspace.health', path: '/meatspace/health', label: 'Health', section: 'MeatSpace', aliases: ['meatspace-health', 'health'] },
