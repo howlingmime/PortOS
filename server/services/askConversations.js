@@ -37,7 +37,7 @@ export const TITLE_MAX_LENGTH = 120;
 // the retrieval/provider stack via askService.
 export const VALID_MODES = new Set(['ask', 'advise', 'draft']);
 
-// Pad base36-ms to 9 chars (35^9 > 5e13, valid until year ~3700) so
+// Pad base36-ms to 9 chars (36^9 > 1e14, valid until year ~5100) so
 // filename lexical order always matches chronological order — without
 // padding, a digit rollover would make a newer id sort *before* an older
 // one and the newest-first listing would silently flip. The hex suffix is

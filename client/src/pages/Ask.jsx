@@ -300,6 +300,12 @@ export default function Ask() {
       setStreamingTurn({ content: chunks.join(''), sources: collectedSources });
     };
     let persistedTurn = null;
+    // Tracks whether the SSE stream actually opened — until the first 'open'
+    // event lands, the optimistic state isn't backed by a server record. A
+    // network/4xx failure before then must roll back local state so a refresh
+    // doesn't ghost a turn that was never persisted.
+    let streamOpened = false;
+    let streamFailure = null;
 
     await api.streamAskTurn(
       { conversationId: persistedConvId, question: trimmed, mode },
@@ -310,6 +316,7 @@ export default function Ask() {
           // otherwise we'd write into a stale conversation's local state.
           if (controller.signal.aborted) return;
           if (event === 'open') {
+            streamOpened = true;
             serverConvId = data.conversationId;
             // Pin the stream to its conversation id so the navigate() below
             // (which fires on first send) doesn't get treated as a
@@ -332,7 +339,10 @@ export default function Ask() {
         },
       },
     ).catch((err) => {
-      if (err.name !== 'AbortError') toast.error(err.message || 'Ask failed');
+      if (err.name !== 'AbortError') {
+        streamFailure = err;
+        toast.error(err.message || 'Ask failed');
+      }
     });
 
     // Cancel any rAF queued after the last delta so a flush can't race with
@@ -350,6 +360,25 @@ export default function Ask() {
     // Skip post-stream state writes if the user navigated/unmounted — those
     // updates would land in a stale conversation.
     if (wasAborted) return;
+
+    // If the stream failed before the server even acknowledged it (network
+    // error, 4xx, transport hiccup), roll back the optimistic state — the
+    // user turn was never persisted, so leaving it in local state would
+    // ghost it on refresh / cause a duplicate when the user retries.
+    if (streamFailure && !streamOpened) {
+      setActiveConv((prev) => {
+        if (!prev) return prev;
+        // Brand-new 'pending' conversation: drop the whole conversation so
+        // the empty state returns; the user can retry without artifacts.
+        if (prev.id === 'pending') return null;
+        // Existing conversation: pop just the optimistic user turn.
+        const turns = (prev.turns || []).filter((t) => t.id !== optimisticUserTurn.id);
+        return { ...prev, turns };
+      });
+      // Restore the question so the user can retry without re-typing.
+      setQuestion(trimmed);
+      return;
+    }
 
     // Append the persisted assistant turn locally rather than refetching the
     // whole conversation — server returned the canonical record in 'done'.
