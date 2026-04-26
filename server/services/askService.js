@@ -102,8 +102,12 @@ async function retrieveMemories(question) {
       title: mem.summary || mem.type || 'Memory',
       snippet: normalizeSnippet(mem.content),
       relevance: hits[i].rrfScore ?? hits[i].similarity ?? 0.5,
-      href: `/brain/memory?id=${encodeURIComponent(mem.id)}`,
-      meta: { type: mem.type, importance: mem.importance, updatedAt: mem.updatedAt },
+      // Memory tab doesn't yet honour an `id` query param, so the chip
+      // navigates to the section landing page; the memory's id is still
+      // surfaced via `meta` so a future deep-link can use it without
+      // changing the source contract.
+      href: '/brain/memory',
+      meta: { id: mem.id, type: mem.type, importance: mem.importance, updatedAt: mem.updatedAt },
     });
   }
   return sources;
@@ -233,7 +237,11 @@ async function retrieveCalendar(queryTokens, timeWindow) {
       id: `calendar:${e.id || `${e.startTime}-${e.title}`}`,
       title: e.title || '(event)',
       snippet: normalizeSnippet([e.startTime || '', e.location || '', (e.description || '').slice(0, 200)].filter(Boolean).join(' · ')),
-      href: `/calendar/agenda?date=${encodeURIComponent(e.startTime || '')}`,
+      // AgendaTab doesn't currently honour a `date` query param. Land the
+      // chip on the agenda and stash the timestamp + accountId in meta so
+      // a future deep-link wiring can pick them up without touching the
+      // source contract.
+      href: '/calendar/agenda',
       relevance: lexicalScore(text, queryTokens),
       meta: { startTime: e.startTime, endTime: e.endTime, accountId: e.accountId },
     };

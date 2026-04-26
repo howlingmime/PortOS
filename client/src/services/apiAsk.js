@@ -18,12 +18,22 @@ export const promoteAskConversation = (id, promoted = true) => request(`/ask/${e
  * Events: 'open' | 'sources' | 'delta' | 'error' | 'done'
  */
 export async function streamAskTurn(payload, { onEvent, signal } = {}) {
+  // Mirror the apiCore / apiOpenClaw fetch pattern: catch transport-layer
+  // failures (network down, DNS, TLS) and rethrow as a consistent message
+  // rather than letting the browser's "TypeError: Failed to fetch" surface
+  // verbatim. Preserve AbortError so caller-side cancellation isn't masked.
   const response = await fetch(`${API_BASE}/ask`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
     body: JSON.stringify(payload),
     signal,
+  }).catch((err) => {
+    if (err?.name === 'AbortError') throw err;
+    return null;
   });
+  if (!response) {
+    throw new Error('Server unreachable — check your connection and try again');
+  }
   if (!response.ok || !response.body) {
     const text = await response.text().catch(() => '');
     let message = `HTTP ${response.status}`;
