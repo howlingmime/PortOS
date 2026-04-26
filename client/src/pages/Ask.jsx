@@ -436,7 +436,7 @@ export default function Ask() {
   const showEmptyState = !conversationId && !streaming;
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] -m-4">
+    <div className="flex flex-col md:flex-row h-full">
       <Sidebar
         conversations={conversations}
         activeId={conversationId}

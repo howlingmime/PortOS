@@ -74,7 +74,9 @@ import {
   BookOpen,
   NotebookPen,
   Search,
-  Mic
+  Mic,
+  Rss,
+  Archive
 } from 'lucide-react';
 /* global __APP_VERSION__ */
 import Logo from './Logo';
@@ -104,6 +106,7 @@ const navItems = [
       { to: '/brain/config', label: 'Config', icon: Settings },
       { to: '/brain/daily-log', label: 'Daily Log', icon: NotebookPen },
       { to: '/brain/digest', label: 'Digest', icon: Calendar },
+      { to: '/brain/feeds', label: 'Feeds', icon: Rss },
       { to: '/brain/graph', label: 'Graph', icon: Network },
       { to: '/brain/inbox', label: 'Inbox', icon: MessageSquare },
       { to: '/brain/links', label: 'Links', icon: Link2 },
@@ -142,7 +145,6 @@ const navItems = [
       { to: '/loops', label: 'Loops', icon: RefreshCw },
       { to: '/cos/memory', label: 'Memory', icon: Brain },
       { to: '/cos/schedule', label: 'Schedule', icon: Clock },
-      { to: '/cos/scripts', label: 'Scripts', icon: Terminal },
       { to: '/cos/productivity', label: 'Streaks', icon: Flame },
       { to: '/cos/jobs', label: 'System Tasks', icon: Bot },
       { to: '/cos/tasks', label: 'Tasks', icon: FileText }
@@ -186,7 +188,8 @@ const navItems = [
       { to: '/digital-twin/interview', label: 'Interview', icon: MessageSquare },
       { to: '/digital-twin/overview', label: 'Overview', icon: Heart },
       { to: '/digital-twin/taste', label: 'Taste', icon: Palette },
-      { to: '/digital-twin/test', label: 'Test', icon: CheckCircle }
+      { to: '/digital-twin/test', label: 'Test', icon: CheckCircle },
+      { to: '/digital-twin/time-capsule', label: 'Time Capsule', icon: Archive }
     ]
   },
   { to: '/goals/list', label: 'Goals', icon: Target, single: true },
@@ -704,6 +707,8 @@ export default function Layout() {
         {/* Main content */}
         {(() => {
           const isFullWidth = location.pathname === '/character' ||
+            location.pathname === '/ask' ||
+            location.pathname.startsWith('/ask/') ||
             location.pathname.startsWith('/calendar') ||
             location.pathname.startsWith('/cos') ||
             location.pathname.startsWith('/brain') ||

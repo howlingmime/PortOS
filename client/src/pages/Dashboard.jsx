@@ -236,7 +236,7 @@ export default function Dashboard() {
             {activeApps.length} app{activeApps.length !== 1 ? 's' : ''} registered{apps.length !== activeApps.length ? ` (${apps.length - activeApps.length} archived)` : ''}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           {health && (
             <div className="text-sm text-gray-500">
               Server: <span className="text-port-success">Online</span>
