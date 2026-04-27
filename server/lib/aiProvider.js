@@ -3,6 +3,42 @@
  * Used by insightsService, identity, goalCheckIn, taste-questionnaire, etc.
  */
 
+import { getAllProviders } from '../services/providers.js';
+
+const isAPI = (p) => p && p.type === 'api' && p.enabled !== false;
+
+/**
+ * Resolve an API-type provider for features that can only run against an API
+ * endpoint (CLI providers don't support the simple chat-completions call path).
+ *
+ * Resolution order:
+ *   1. The requested provider (if API-type)
+ *   2. The user's active provider (if API-type)
+ *   3. The first enabled API provider configured
+ *
+ * Returns null when no API provider is configured — callers should surface a
+ * "configure an API provider" hint rather than re-throwing.
+ */
+export async function resolveAPIProvider(requestedProviderId) {
+  // One read of providers.json — getAllProviders returns both the active id
+  // and the full list, so we don't need separate getProviderById/getActiveProvider
+  // round-trips for each step of the fallback chain.
+  const all = await getAllProviders().catch(() => null);
+  const providers = Array.isArray(all?.providers)
+    ? all.providers
+    : Object.values(all?.providers || {});
+
+  if (requestedProviderId) {
+    const requested = providers.find(p => p.id === requestedProviderId);
+    if (isAPI(requested)) return requested;
+  }
+  if (all?.activeProvider) {
+    const active = providers.find(p => p.id === all.activeProvider);
+    if (isAPI(active)) return active;
+  }
+  return providers.find(isAPI) || null;
+}
+
 /**
  * Call an API-based AI provider with a simple prompt.
  * Returns { text } on success, { error } on failure.
