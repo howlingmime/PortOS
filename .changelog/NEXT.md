@@ -11,3 +11,7 @@
 ## Changed
 
 - **Send to Video carries the source image's prompts.** Clicking "Send to Video" on an Image Gen result, gallery card, or lightbox — or the same action from Media History — now pre-populates the Video Gen prompt and negative prompt from the source image's metadata. Previously only the source image filename was passed, leaving the user to retype or paste the prompt to keep the same scene direction. The flow piggybacks on the existing `?sourceImageFile=` query-param hand-off: `?prompt=` and `?negativePrompt=` are added when the source has them, and `VideoGen.jsx` reads both on first render and re-syncs on subsequent navigations (mirroring the existing source-image effect). Files: `client/src/pages/ImageGen.jsx`, `client/src/pages/MediaHistory.jsx`, `client/src/pages/VideoGen.jsx`.
+
+## Fixed
+
+- **Voice mode works on Windows.** The voice setup script and TTS engine now run correctly on Windows: `bootstrap.js` invokes `pwsh` with a PowerShell setup script (`scripts/setup-voice.ps1`) instead of the macOS-only bash/Homebrew script; `which` uses `where` on Windows; `verifyBinaries` checks the local piper install path first (skipping a wasteful PATH subprocess when the binary is present); `tts-piper.js` writes piper output to a temp file on Windows to avoid CR+LF corruption of binary WAV data from text-mode stdout. Shared platform constants (`IS_WIN`, `PIPER_BIN_NAME`) extracted to `config.js`.
