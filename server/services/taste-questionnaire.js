@@ -668,7 +668,12 @@ Respond with a concise profile in this exact structure:
 **In Their Words:**
 - [1-2 direct quotes that capture their taste]`;
 
-  const result = await callProviderAISimple(provider, modelId, prompt, { temperature: 0.3, max_tokens: 1000 });
+  const result = await callProviderAISimple(provider, modelId, prompt, {
+    temperature: 0.3,
+    max_tokens: 1000,
+    op: `taste-summary:${sectionId}`,
+    opLabel: `Generating ${config.label} taste summary`
+  });
 
   if (result.error) throw new Error(`AI analysis failed: ${result.error}`);
 
@@ -736,7 +741,12 @@ ${allTranscripts}
 **Summary Tags:**
 [5-8 descriptive tags like: "brutalist minimalist", "atmospheric storyteller", "texture-obsessed", etc.]`;
 
-  const result = await callProviderAISimple(provider, modelId, prompt, { temperature: 0.3, max_tokens: 1500 });
+  const result = await callProviderAISimple(provider, modelId, prompt, {
+    temperature: 0.3,
+    max_tokens: 1500,
+    op: 'taste-summary:overall',
+    opLabel: 'Generating unified taste profile'
+  });
 
   if (result.error) throw new Error(`AI analysis failed: ${result.error}`);
 
@@ -900,7 +910,12 @@ ${transcript || '(No responses yet for this section)'}
 ## Instructions
 Generate exactly ONE question. Do not include any preamble, numbering, or explanation. Just the question text itself. Keep it under 150 words. Make it feel like a question from someone who genuinely knows and is curious about this person.`;
 
-  const result = await callProviderAISimple(provider, modelId, prompt, { temperature: 0.8, max_tokens: 200 });
+  const result = await callProviderAISimple(provider, modelId, prompt, {
+    temperature: 0.8,
+    max_tokens: 200,
+    op: `taste-deep-question:${sectionId}`,
+    opLabel: `Crafting a deeper ${config.label} question`
+  });
 
   if (result.error || !result.text?.trim()) {
     console.log(`🎨 Personalized question generation failed for ${sectionId}: ${result.error || 'empty response'}`);

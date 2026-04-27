@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import * as api from '../../../services/api';
 import toast from '../../ui/Toast';
+import MarkdownOutput from '../../cos/MarkdownOutput';
 
 const SECTION_ICONS = {
   movies: Film,
@@ -318,7 +319,7 @@ export default function TasteTab({ onRefresh }) {
                   <Sparkles size={14} />
                   AI Summary
                 </h3>
-                <div className="text-gray-300 text-sm whitespace-pre-wrap mb-3">{section.summary}</div>
+                <div className="text-sm mb-3"><MarkdownOutput content={section.summary} /></div>
 
                 {/* Behavioral Feedback */}
                 <div className="pt-3 border-t border-port-border">
@@ -400,6 +401,15 @@ export default function TasteTab({ onRefresh }) {
               <span className="text-green-400">All questions for this section are complete.</span>
             </div>
           </div>
+          {section?.summary && (
+            <div className="bg-port-card rounded-lg border border-violet-500/30 p-4 mb-4">
+              <h3 className="text-sm font-medium text-violet-400 mb-2 flex items-center gap-2">
+                <Sparkles size={14} />
+                AI Summary
+              </h3>
+              <div className="text-sm"><MarkdownOutput content={section.summary} /></div>
+            </div>
+          )}
           {!selectedProvider && (
             <div className="p-4 bg-port-warning/10 border border-port-warning/30 rounded-lg mb-4 text-sm text-port-warning">
               No API-based provider configured — Go Deeper and Generate Summary need one.{' '}
@@ -682,8 +692,8 @@ export default function TasteTab({ onRefresh }) {
                     {expandedSummary === section.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                   </button>
                   {expandedSummary === section.id && (
-                    <div className="mt-2 p-3 bg-port-bg rounded-lg text-xs text-gray-300 whitespace-pre-wrap max-h-48 overflow-auto">
-                      {section.summary}
+                    <div className="mt-2 p-3 bg-port-bg rounded-lg max-h-72 overflow-auto">
+                      <MarkdownOutput content={section.summary} />
                     </div>
                   )}
                 </div>
@@ -700,7 +710,7 @@ export default function TasteTab({ onRefresh }) {
             <Sparkles className="w-5 h-5 text-violet-400" />
             Unified Taste Profile
           </h3>
-          <div className="text-gray-300 text-sm whitespace-pre-wrap">{profile.profileSummary}</div>
+          <div className="text-sm"><MarkdownOutput content={profile.profileSummary} /></div>
         </div>
       )}
 

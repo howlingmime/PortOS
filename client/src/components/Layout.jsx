@@ -83,6 +83,7 @@ import { useErrorNotifications } from '../hooks/useErrorNotifications';
 import { useNotifications } from '../hooks/useNotifications';
 import { useAgentFeedbackToast } from '../hooks/useAgentFeedbackToast';
 import { useUpdateChecker } from '../hooks/useUpdateChecker';
+import { useAIStatusNotifications } from '../hooks/useAIStatusNotifications';
 import NotificationDropdown from './NotificationDropdown';
 import ThemeSwitcher from './ThemeSwitcher';
 import CmdKSearch from './CmdKSearch';
@@ -299,6 +300,9 @@ export default function Layout() {
 
   // Subscribe to agent completion feedback toasts
   useAgentFeedbackToast();
+
+  // Live AI operation status (model loads, "calling LM Studio…", etc.)
+  useAIStatusNotifications();
 
   // Check for PortOS updates and show toast when available
   useUpdateChecker();

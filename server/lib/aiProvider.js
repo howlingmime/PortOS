@@ -4,6 +4,7 @@
  */
 
 import { getAllProviders } from '../services/providers.js';
+import { startAIOp } from '../services/aiStatusEvents.js';
 
 const isAPI = (p) => p && p.type === 'api' && p.enabled !== false;
 
@@ -58,7 +59,7 @@ const lmStudioBaseFromEndpoint = (endpoint) =>
  * is provider-config-driven so any caller of callProviderAISimple gets the
  * same auto-recovery on first-use cold starts.
  */
-async function ensureLMStudioModelLoaded(provider) {
+async function ensureLMStudioModelLoaded(provider, statusOp) {
   const baseUrl = lmStudioBaseFromEndpoint(provider.endpoint);
   if (!baseUrl) return null;
 
@@ -90,7 +91,9 @@ async function ensureLMStudioModelLoaded(provider) {
 
   const target = preferences.map(findInList).find(Boolean) || llms[0];
   console.log(`📦 LM Studio reported no models loaded — auto-loading: ${target.id}`);
+  statusOp?.update('model:loading', `Loading ${target.id} into LM Studio…`, { model: target.id });
 
+  const loadStart = Date.now();
   const loadCtl = new AbortController();
   const loadTimer = setTimeout(() => loadCtl.abort(), 120000);
   const loadResp = await fetch(`${baseUrl}/api/v1/models/load`, {
@@ -103,10 +106,13 @@ async function ensureLMStudioModelLoaded(provider) {
   if (!loadResp.ok) {
     const errText = loadResp._err || await loadResp.text?.().catch(() => 'unknown error') || 'unknown error';
     console.error(`❌ Failed to auto-load LM Studio model ${target.id}: ${errText}`);
+    statusOp?.update('error', `Failed to load ${target.id}: ${errText}`, { model: target.id });
     return null;
   }
 
-  console.log(`✅ LM Studio model loaded: ${target.id}`);
+  const loadMs = Date.now() - loadStart;
+  console.log(`✅ LM Studio model loaded: ${target.id} (${loadMs}ms)`);
+  statusOp?.update('model:loaded', `${target.id} loaded (${(loadMs / 1000).toFixed(1)}s)`, { model: target.id });
   return target.id;
 }
 
@@ -149,24 +155,56 @@ async function postChatCompletion(provider, model, prompt, { temperature, max_to
  * actually-loaded model id rather than re-sending the original `model`,
  * since LM Studio's model resolver is name-fuzzy and always returns the
  * loaded one in chat-completion responses anyway.
+ *
+ * Pass `op` + `opLabel` to surface live status toasts in the UI via the
+ * `ai:status` Socket.IO channel. The op slug groups all phase events under
+ * one toast id so "loading model → calling → done" updates the same toast.
  */
-export async function callProviderAISimple(provider, model, prompt, { temperature = 0.3, max_tokens = 1000 } = {}) {
+export async function callProviderAISimple(provider, model, prompt, options = {}) {
+  const { temperature = 0.3, max_tokens = 1000, op, opLabel } = options;
   if (provider.type !== 'api') {
     return { error: 'This operation requires an API-based provider' };
   }
   const opts = { temperature, max_tokens, timeout: provider.timeout || 300000 };
 
+  // Always emit status events (server logs + UI toasts) for AI calls. Callers
+  // can pass `op` to give the toast a meaningful label; otherwise it's labeled
+  // generically by provider+model so the user still sees model loads etc.
+  const effectiveOp = op || `ai-call:${provider.id}`;
+  const effectiveLabel = opLabel || `Calling ${provider.name || provider.id}…`;
+  const statusOp = startAIOp({
+    op: effectiveOp,
+    label: effectiveLabel,
+    providerId: provider.id,
+    providerName: provider.name,
+    model,
+    silent: !op
+  });
+
+  const doneLabel = effectiveLabel.replace(/…$/, '');
+  const startMs = Date.now();
+  const elapsedSec = () => ((Date.now() - startMs) / 1000).toFixed(1);
+
   const first = await postChatCompletion(provider, model, prompt, opts);
-  if (!first.error) return { text: first.text };
+  if (!first.error) {
+    statusOp.complete(`${doneLabel} done (${elapsedSec()}s)`);
+    return { text: first.text };
+  }
 
   if (first.status === 400 && LM_STUDIO_NO_MODEL_RE.test(first.body || '')) {
-    const loaded = await ensureLMStudioModelLoaded(provider);
+    const loaded = await ensureLMStudioModelLoaded(provider, statusOp);
     if (loaded) {
+      statusOp.update('start', `Calling ${provider.name || provider.id} (${loaded})…`, { model: loaded });
       const retry = await postChatCompletion(provider, loaded, prompt, opts);
-      if (!retry.error) return { text: retry.text };
+      if (!retry.error) {
+        statusOp.complete(`${doneLabel} done (${elapsedSec()}s)`, { model: loaded });
+        return { text: retry.text };
+      }
+      statusOp.error(retry.error, { model: loaded });
       return { error: retry.error };
     }
   }
+  statusOp.error(first.error);
   return { error: first.error };
 }
 
