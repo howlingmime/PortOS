@@ -156,9 +156,12 @@ html[data-port-theme] .bg-port-bg {
   background-color: rgb(var(--port-bg) / var(--port-bg-alpha)) !important;
 }
 
-html[data-port-theme] .bg-port-card,
-html[data-port-theme] [class~="bg-port-card/50"] {
+html[data-port-theme] .bg-port-card {
   background-color: rgb(var(--port-card) / var(--port-card-alpha)) !important;
+}
+
+html[data-port-theme] [class~="bg-port-card/50"] {
+  background-color: rgb(var(--port-card) / calc(var(--port-card-alpha) * 0.5)) !important;
 }
 
 html[data-port-theme] .border-port-border,
@@ -249,9 +252,12 @@ html[data-port-theme] aside nav [aria-current="page"] {
   background: var(--port-active-bg) !important;
 }
 
-html[data-port-theme] .bg-port-border,
-html[data-port-theme] [class~="bg-port-border/50"] {
+html[data-port-theme] .bg-port-border {
   background: var(--port-control-bg) !important;
+}
+
+html[data-port-theme] [class~="bg-port-border/50"] {
+  background: color-mix(in srgb, var(--port-control-bg) 50%, transparent) !important;
 }
 
 html[data-port-theme] [class*="hover:bg-port-border"]:hover {
