@@ -328,7 +328,7 @@ export function ImageGenTab() {
         </div>
         <p className="text-xs text-gray-500">
           Send a prompt through the active backend to verify end-to-end. For richer controls, visit the
-          <a href="/image-gen" className="text-port-accent hover:underline ml-1">Image Gen</a> page.
+          <a href="/media/image" className="text-port-accent hover:underline ml-1">Image Gen</a> page.
         </p>
         <textarea
           value={testPrompt}

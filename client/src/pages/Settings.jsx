@@ -19,7 +19,7 @@ const TABS = [
 // it makes sense. Redirect old direct URLs to the new home so bookmarks and
 // stale palette entries keep working.
 const REDIRECTS = {
-  'image-gen': '/image-gen?settings=1'
+  'image-gen': '/media/image?settings=1'
 };
 
 export default function Settings() {
