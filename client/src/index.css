@@ -107,9 +107,6 @@ html, body, #root {
 body {
   background-color: rgb(var(--port-bg));
   color: rgb(var(--port-text));
-  background-image: var(--port-body-texture), var(--port-body-gradient);
-  background-attachment: fixed;
-  background-size: 28px 28px, cover;
   font-family: var(--port-font-ui);
   letter-spacing: 0;
 }
@@ -126,6 +123,7 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background-image: var(--port-body-texture), var(--port-body-gradient);
+  background-attachment: fixed;
   background-size: 28px 28px, cover;
   opacity: var(--port-body-overlay-opacity);
 }
