@@ -55,6 +55,7 @@
   --port-border-style: solid;
   --port-body-gradient: none;
   --port-body-texture: none;
+  --port-body-size: cover, cover;
   --port-body-overlay-opacity: 0;
   --port-app-backdrop: rgb(var(--port-bg));
   --port-sidebar-bg: rgb(var(--port-card));
@@ -282,7 +283,7 @@ html[data-port-theme] [class~="bg-port-error"][class~="text-white"] {
   color: rgb(var(--port-on-error)) !important;
 }
 
-html[data-port-theme] :is(.bg-port-error, .bg-port-warning, .bg-port-success, .bg-port-accent) {
+html[data-port-theme] :is(.bg-port-error, .bg-port-warning, .bg-port-success, .bg-port-accent):not([class~="rounded"]):not([class*="rounded-"]) {
   border-radius: var(--port-radius-lg);
 }
 
