@@ -182,7 +182,7 @@ export default function MediaHistory() {
               <MediaCard
                 key={it.key}
                 item={it}
-                onPreview={setPreview}
+                onPreview={(media) => setPreview(media)}
                 onClick={inStitch ? () => toggleSelect(it.id) : undefined}
                 onRemix={!stitchMode ? handleRemix : undefined}
                 onSendToVideo={!stitchMode ? handleSendToVideo : undefined}
