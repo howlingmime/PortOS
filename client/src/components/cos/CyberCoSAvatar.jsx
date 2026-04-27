@@ -1,6 +1,6 @@
 import { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Float, MeshDistortMaterial, Sparkles } from '@react-three/drei';
+import { Float, MeshDistortMaterial, OrbitControls, Sparkles } from '@react-three/drei';
 import * as THREE from 'three';
 import { AGENT_STATES } from './constants';
 
@@ -424,13 +424,23 @@ function Scene({ state, speaking }) {
 
       {/* Ground glow */}
       <GroundGlow color={color} />
+
+      {/* Drag-to-rotate controls */}
+      <OrbitControls
+        enablePan={false}
+        enableZoom={false}
+        enableDamping
+        dampingFactor={0.08}
+        rotateSpeed={0.6}
+        makeDefault
+      />
     </>
   );
 }
 
 export default function CyberCoSAvatar({ state, speaking }) {
   return (
-    <div className="relative w-full max-w-[8rem] lg:max-w-[12rem] aspect-[5/6]">
+    <div className="relative w-full max-w-[8rem] lg:max-w-[12rem] aspect-[5/6] cursor-grab active:cursor-grabbing touch-none" title="Drag to rotate">
       <Canvas
         camera={{ position: [0, 0, 3.5], fov: 45 }}
         style={{ background: 'transparent' }}
