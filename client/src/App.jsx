@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
 import { getSettings, updateSettings } from './services/api';
 import BrailleSpinner from './components/BrailleSpinner';
@@ -45,7 +45,11 @@ const OpenClawPage = lazyWithReload(() => import('./pages/OpenClaw'));
 const Submodules = lazyWithReload(() => import('./pages/Submodules'));
 const ChiefOfStaff = lazyWithReload(() => import('./pages/ChiefOfStaff'));
 const Ask = lazyWithReload(() => import('./pages/Ask'));
+const MediaGen = lazyWithReload(() => import('./pages/MediaGen'));
 const ImageGen = lazyWithReload(() => import('./pages/ImageGen'));
+const VideoGen = lazyWithReload(() => import('./pages/VideoGen'));
+const MediaHistory = lazyWithReload(() => import('./pages/MediaHistory'));
+const MediaModels = lazyWithReload(() => import('./pages/MediaModels'));
 const CreateApp = lazyWithReload(() => import('./pages/CreateApp'));
 const Templates = lazyWithReload(() => import('./pages/Templates'));
 const PromptManager = lazyWithReload(() => import('./pages/PromptManager'));
@@ -75,6 +79,13 @@ const PageLoader = () => (
     <BrailleSpinner text="Loading" />
   </div>
 );
+
+// Preserve query string when redirecting legacy media routes — Settings.jsx's
+// /image-gen?settings=1 chain depends on ?settings=1 reaching the new path.
+function RedirectWithSearch({ to }) {
+  const { search } = useLocation();
+  return <Navigate to={`${to}${search}`} replace />;
+}
 
 // Force full reload on HMR — partial hot-replacement of the route tree
 // causes stale lazy imports and React Router errors on nested paths
@@ -166,7 +177,17 @@ export default function App() {
           <Route path="character" element={<CharacterSheet />} />
           <Route path="ask" element={<Ask />} />
           <Route path="ask/:conversationId" element={<Ask />} />
-          <Route path="image-gen" element={<ImageGen />} />
+          <Route path="media" element={<MediaGen />}>
+            <Route index element={<Navigate to="/media/image" replace />} />
+            <Route path="image" element={<ImageGen />} />
+            <Route path="video" element={<VideoGen />} />
+            <Route path="history" element={<MediaHistory />} />
+            <Route path="models" element={<MediaModels />} />
+          </Route>
+          <Route path="image-gen" element={<RedirectWithSearch to="/media/image" />} />
+          <Route path="video-gen" element={<RedirectWithSearch to="/media/video" />} />
+          <Route path="media-history" element={<RedirectWithSearch to="/media/history" />} />
+          <Route path="media-models" element={<RedirectWithSearch to="/media/models" />} />
           <Route path="wiki" element={<Navigate to="/wiki/overview" replace />} />
           <Route path="wiki/:tab" element={<Wiki />} />
           <Route path="agents" element={<Agents />} />
