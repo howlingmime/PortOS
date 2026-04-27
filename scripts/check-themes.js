@@ -47,6 +47,7 @@ const REQUIRED_TOKEN_VARS = [
   '--port-backdrop-filter',
   '--port-body-gradient',
   '--port-body-texture',
+  '--port-body-size',
   '--port-body-overlay-opacity',
   '--port-app-backdrop',
   '--port-sidebar-bg',

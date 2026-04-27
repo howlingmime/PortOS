@@ -124,7 +124,7 @@ body::before {
   pointer-events: none;
   background-image: var(--port-body-texture), var(--port-body-gradient);
   background-attachment: fixed;
-  background-size: 28px 28px, cover;
+  background-size: var(--port-body-size);
   opacity: var(--port-body-overlay-opacity);
 }
 
@@ -343,10 +343,6 @@ html[data-port-theme="black-ice-terminal"] :is(pre, code, textarea, input) {
 
 html[data-port-theme="black-ice-terminal"] aside nav [aria-current="page"] {
   border-left: 2px solid rgb(var(--port-accent));
-}
-
-html[data-port-theme="blueprint-ops"] body::before {
-  background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
 }
 
 html[data-port-theme="blueprint-ops"] :is(.bg-port-card, [class~="bg-port-card/50"]):is(.border, .rounded, .rounded-lg, .rounded-xl, .rounded-2xl) {
