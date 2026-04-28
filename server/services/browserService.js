@@ -18,6 +18,11 @@ const PM2_SETTLE_MS = 1500;
 const HEALTH_TIMEOUT_MS = 3000;
 const NAVIGATE_TIMEOUT_MS = 10000;
 const LOGS_TIMEOUT_MS = 5000;
+const CDP_DEFAULT_TIMEOUT_MS = 10000;
+const CDP_EVALUATE_TIMEOUT_MS = 60000;
+
+// Auth/login redirect detection across providers (Microsoft, Okta, generic)
+const AUTH_PATTERNS = ['login.microsoftonline.com', 'okta.com', 'login.live.com', 'Sign in'];
 
 const CONFIG_FILE = join(PATHS.data, 'browser-config.json');
 const ECOSYSTEM_FILE = join(PATHS.root, 'ecosystem.config.cjs');
@@ -166,13 +171,82 @@ export async function getRecentLogs(lines = 50) {
   return { stdout: stdout || '', stderr: stderr || '' };
 }
 
+// ---------- CDP shared helpers ----------
+
+// Bind-all addresses (0.0.0.0, ::) are not connectable — fall back to IPv4 loopback
+async function getCdpConnectHost() {
+  const config = await loadConfig();
+  const host = (config.cdpHost === '0.0.0.0' || config.cdpHost === '::') ? '127.0.0.1' : config.cdpHost;
+  return { host, port: config.cdpPort };
+}
+
+export async function cdpRequest(path, options = {}) {
+  const { host, port } = await getCdpConnectHost();
+  const url = `http://${host}:${port}${path}`;
+  const { timeout, ...rest } = options;
+  return fetchWithTimeout(url, rest, timeout || CDP_DEFAULT_TIMEOUT_MS);
+}
+
+// Returns raw CDP page objects (includes webSocketDebuggerUrl, unlike getOpenPages)
+export async function listCdpPages() {
+  const response = await cdpRequest('/json/list', { timeout: HEALTH_TIMEOUT_MS }).catch(() => null);
+  if (!response || !response.ok) return [];
+  return response.json();
+}
+
+export async function findOrOpenPage(targetUrl) {
+  const pages = await listCdpPages();
+  const existing = pages.find(p => p.url?.includes(new URL(targetUrl).hostname));
+  if (existing) return existing;
+  const response = await cdpRequest(`/json/new?${encodeURIComponent(targetUrl)}`, { method: 'PUT' });
+  if (!response.ok) return null;
+  return response.json();
+}
+
+export function isAuthPage(page) {
+  const url = page?.url || '';
+  const title = page?.title || '';
+  return AUTH_PATTERNS.some(p => url.includes(p) || title.includes(p));
+}
+
+export async function evaluateOnPage(page, expression, { timeout = CDP_EVALUATE_TIMEOUT_MS } = {}) {
+  const wsUrl = page?.webSocketDebuggerUrl;
+  if (!wsUrl) return null;
+
+  const { default: WebSocket } = await import('ws');
+
+  return new Promise((resolve) => {
+    const ws = new WebSocket(wsUrl);
+    const timer = setTimeout(() => { ws.close(); resolve(null); }, timeout);
+
+    ws.on('open', () => {
+      ws.send(JSON.stringify({
+        id: 1,
+        method: 'Runtime.evaluate',
+        params: { expression, returnByValue: true, awaitPromise: true }
+      }));
+    });
+
+    ws.on('message', (data) => {
+      const msg = safeJSONParse(data.toString(), null, { context: 'cdp-ws' });
+      if (!msg || msg.id !== 1) return;
+      clearTimeout(timer);
+      ws.close();
+      if (msg.error || msg.result?.exceptionDetails) return resolve(null);
+      resolve(msg.result?.result?.value ?? null);
+    });
+
+    ws.on('error', () => { clearTimeout(timer); ws.close(); resolve(null); });
+  });
+}
+
 // ---------- CDP navigation ----------
 
 export async function navigateToUrl(url) {
-  const config = await loadConfig();
-  const newTabUrl = `http://${config.cdpHost}:${config.cdpPort}/json/new?${encodeURIComponent(url)}`;
-
-  const response = await fetchWithTimeout(newTabUrl, { method: 'PUT' }, NAVIGATE_TIMEOUT_MS);
+  const response = await cdpRequest(`/json/new?${encodeURIComponent(url)}`, {
+    method: 'PUT',
+    timeout: NAVIGATE_TIMEOUT_MS
+  });
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
@@ -184,19 +258,10 @@ export async function navigateToUrl(url) {
   return { id: page.id, title: page.title || '(loading)', url: page.url, type: page.type };
 }
 
-// ---------- CDP page listing (connects to the debug endpoint) ----------
+// ---------- CDP page listing (UI-shaped subset) ----------
 
 export async function getOpenPages() {
-  const config = await loadConfig();
-  const listUrl = `http://${config.cdpHost}:${config.cdpPort}/json/list`;
-
-  const response = await fetchWithTimeout(listUrl, {}, HEALTH_TIMEOUT_MS).catch(() => null);
-
-  if (!response || !response.ok) {
-    return [];
-  }
-
-  const pages = await response.json();
+  const pages = await listCdpPages();
   return pages.map(p => ({
     id: p.id,
     title: p.title || '(untitled)',
@@ -208,11 +273,7 @@ export async function getOpenPages() {
 // ---------- CDP version info ----------
 
 export async function getCdpVersion() {
-  const config = await loadConfig();
-  const versionUrl = `http://${config.cdpHost}:${config.cdpPort}/json/version`;
-
-  const response = await fetchWithTimeout(versionUrl, {}, HEALTH_TIMEOUT_MS).catch(() => null);
-
+  const response = await cdpRequest('/json/version', { timeout: HEALTH_TIMEOUT_MS }).catch(() => null);
   if (!response || !response.ok) return null;
   return response.json();
 }
