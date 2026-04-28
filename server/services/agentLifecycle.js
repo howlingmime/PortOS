@@ -1183,18 +1183,18 @@ export async function cleanupAgentWorktree(agentId, success, { openPR = false, d
         }
 
         const cliName = prResult?.cli || 'gh';
-        const authHint = prResult?.ghAccount
-          ? ` (${cliName} authed as ${prResult.ghAccount} for ${prResult.ghOwner})`
-          : prResult?.ghOwner
-            ? ` (${cliName} on ${prResult.ghHost || prResult.ghOwner} — no account auto-pinned)`
+        const authHint = prResult?.account
+          ? ` (${cliName} authed as ${prResult.account} for ${prResult.owner})`
+          : prResult?.owner
+            ? ` (${cliName} on ${prResult.host || prResult.owner} — no account auto-pinned)`
             : '';
-        emitLog('error', `🌳 PR creation failed for ${worktreeBranch}${authHint}: ${reason}`, { agentId, branchName: worktreeBranch, cli: prResult?.cli, ghAccount: prResult?.ghAccount, ghOwner: prResult?.ghOwner, ghHost: prResult?.ghHost });
+        emitLog('error', `🌳 PR creation failed for ${worktreeBranch}${authHint}: ${reason}`, { agentId, branchName: worktreeBranch, cli: prResult?.cli, account: prResult?.account, owner: prResult?.owner, host: prResult?.host });
         warnings.push(`PR creation failed for branch ${worktreeBranch}: ${reason}. Worktree preserved for manual PR creation.`);
         return warnings;
       }
 
       const cliName = prResult.cli || 'gh';
-      emitLog('success', `🌳 Created PR: ${prResult.url} (${cliName}${prResult.ghAccount ? ` authed as ${prResult.ghAccount}` : ''})`, { agentId, branchName: worktreeBranch, cli: prResult.cli, ghAccount: prResult.ghAccount, ghOwner: prResult.ghOwner, ghHost: prResult.ghHost });
+      emitLog('success', `🌳 Created PR: ${prResult.url} (${cliName}${prResult.account ? ` authed as ${prResult.account}` : ''})`, { agentId, branchName: worktreeBranch, cli: prResult.cli, account: prResult.account, owner: prResult.owner, host: prResult.host });
 
       const result = await removeWorktree(agentId, sourceWorkspace, worktreeBranch, { merge: false }).catch(err => {
         emitLog('warn', `🌳 Worktree cleanup failed for ${agentId}: ${err.message}`, { agentId });

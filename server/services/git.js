@@ -443,7 +443,7 @@ export async function resolveForgeForRepo(dir) {
  * @param {string} options.body - PR/MR description
  * @param {string} options.base - Base branch (target)
  * @param {string} options.head - Head branch (source, must be pushed to remote)
- * @returns {Promise<{success: boolean, url?: string, error?: string, cli?: string, ghAccount?: string|null, ghOwner?: string|null, ghHost?: string|null}>}
+ * @returns {Promise<{success: boolean, url?: string, error?: string, cli?: string, account?: string|null, owner?: string|null, host?: string|null}>}
  */
 export async function createPR(dir, { title, body, base, head }) {
   const { cli, env, host, owner, account } = await resolveForgeForRepo(dir);
@@ -452,7 +452,7 @@ export async function createPR(dir, { title, body, base, head }) {
     ? ['mr', 'create', '--title', title, '--description', body || '', '--target-branch', base, '--source-branch', head]
     : ['pr', 'create', '--title', title, '--body', body || '', '--base', base, '--head', head];
 
-  const meta = { cli, ghAccount: account, ghOwner: owner, ghHost: host };
+  const meta = { cli, account, owner, host };
 
   return new Promise((resolve) => {
     const child = spawn(cli, args, { cwd: dir, env, shell: false, windowsHide: true });
