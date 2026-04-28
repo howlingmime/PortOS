@@ -415,14 +415,14 @@ export default function Layout() {
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className={`flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+          className={`flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-w-0 ${
             collapsed ? 'lg:justify-center lg:px-2' : 'justify-between'
           } text-gray-400 hover:text-white hover:bg-port-border/50`}
           title={collapsed ? item.label : undefined}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <Icon size={20} className="shrink-0" />
-            <span className={`whitespace-nowrap ${collapsed ? 'lg:hidden' : ''}`}>
+            <span className={`whitespace-nowrap min-w-0 truncate ${collapsed ? 'lg:hidden' : ''}`}>
               {item.label}
             </span>
           </div>
@@ -438,7 +438,7 @@ export default function Layout() {
           to={item.to}
           end={item.to === '/'}
           onClick={() => setMobileOpen(false)}
-          className={`flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+          className={`flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-w-0 ${
             collapsed ? 'lg:justify-center lg:px-2' : 'justify-between'
           } ${
             isActive(item.to)
@@ -447,7 +447,7 @@ export default function Layout() {
           }`}
           title={collapsed ? item.label : undefined}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="relative">
               <Icon size={20} className="shrink-0" />
               {/* Badge for collapsed state */}
@@ -457,7 +457,7 @@ export default function Layout() {
                 </span>
               )}
             </div>
-            <span className={`whitespace-nowrap ${collapsed ? 'lg:hidden' : ''}`}>
+            <span className={`whitespace-nowrap min-w-0 truncate ${collapsed ? 'lg:hidden' : ''}`}>
               {item.label}
             </span>
           </div>
@@ -496,15 +496,15 @@ export default function Layout() {
     }`;
 
     return (
-      <div key={item.label} className="mx-2">
-        <div className={`flex items-stretch ${collapsed ? 'lg:justify-center' : ''}`}>
+      <div key={item.label} className="mx-2 min-w-0">
+        <div className={`flex items-stretch min-w-0 ${collapsed ? 'lg:justify-center' : ''}`}>
           <button
             type="button"
             onClick={navigateToSection}
-            className={`flex-1 ${sectionRowClasses} ${collapsed ? 'lg:justify-center lg:px-2' : 'justify-between'}`}
+            className={`flex-1 min-w-0 ${sectionRowClasses} ${collapsed ? 'lg:justify-center lg:px-2' : 'justify-between'}`}
             title={collapsed ? item.label : undefined}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <div className="relative">
                 <Icon size={20} className="shrink-0" />
                 {item.showBadge && unreadCount > 0 && collapsed && (
@@ -513,7 +513,7 @@ export default function Layout() {
                   </span>
                 )}
               </div>
-              <span className={`whitespace-nowrap ${collapsed ? 'lg:hidden' : ''}`}>
+              <span className={`whitespace-nowrap min-w-0 truncate ${collapsed ? 'lg:hidden' : ''}`}>
                 {item.label}
               </span>
             </div>
@@ -540,7 +540,7 @@ export default function Layout() {
 
         {/* Children items */}
         {expandedSections[item.label] && !collapsed && (
-          <div className="ml-4 mt-1">
+          <div className="ml-4 mt-1 min-w-0">
             {item.children.map((child, childIndex) => {
               if (child.separator) {
                 return <div key={`child-sep-${childIndex}`} className="mx-3 my-1 border-t border-port-border" />;
@@ -556,11 +556,11 @@ export default function Layout() {
                     href={childHref}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-gray-500 hover:text-white hover:bg-port-border/50"
+                    className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-gray-500 hover:text-white hover:bg-port-border/50 min-w-0"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <ChildIcon size={16} />
-                      <span>{child.label}</span>
+                      <span className="min-w-0 truncate">{child.label}</span>
                     </div>
                     <ExternalLink size={12} className="text-gray-500" />
                   </a>
@@ -575,14 +575,14 @@ export default function Layout() {
                   to={child.to}
                   end={child.end}
                   onClick={() => setMobileOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors min-w-0 ${
                     childActive
                       ? 'bg-port-accent/10 text-port-accent'
                       : 'text-gray-500 hover:text-white hover:bg-port-border/50'
                   }`}
                 >
-                  <ChildIcon size={16} />
-                  <span>{child.label}</span>
+                  <ChildIcon size={16} className="shrink-0" />
+                  <span className="min-w-0 truncate">{child.label}</span>
                 </NavLink>
               );
             })}
@@ -664,7 +664,7 @@ export default function Layout() {
         </div>
 
         {/* Nav items */}
-        <nav className="flex-1 py-4 overflow-y-auto">
+        <nav className="flex-1 py-4 overflow-y-auto overflow-x-hidden min-w-0">
           {resolvedNavItems.map(renderNavItem)}
         </nav>
 
