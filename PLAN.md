@@ -134,12 +134,11 @@ Three high-value work items drawn from an inventory of the current app surface (
   - Promote action also sets `conversation.promoted = true` (already wired) so the conversation is exempt from 30-day auto-expiry once anything from it has been saved elsewhere.
   - Add `Ask` to the palette action whitelist (`server/routes/palette.js`) once the voice tool exists, so `⌘K` → "ask: …" can fire a prompt without leaving the current page.
 
-- [ ] **Voice CoS tool expansion** — tools now include the original domain set plus `ui_navigate`, `ui_list_interactables`, `ui_click`, `ui_fill`, `ui_select`, `ui_check` for accessibility-style page driving. Remaining candidates:
+- [ ] **Voice CoS tool expansion** — tools now include the original domain set plus `ui_navigate`, `ui_list_interactables`, `ui_click`, `ui_fill`, `ui_select`, `ui_check` for accessibility-style page driving, and `feeds_mark_read` (pairs with `feeds_digest` — fuzzy-matches an unread item by title or marks all read, optionally scoped to a feed). Remaining candidates:
   - `calendar_today` / `calendar_next` — surface today's Google Calendar events through the existing Google MCP integration
   - `meatspace_log_workout` — wrap `meatspaceHealth.js` workout/activity exports
   - `weather_now` — needs an external API choice (OpenWeather / Apple WeatherKit / NWS)
   - `timer_set` — set a voice-triggered reminder; likely reuses `agentActionExecutor.js` scheduled actions
-  - `feeds_mark_read` — pair with `feeds_digest` for "mark that one read"
 
 - [ ] **Voice agent — next power-ups** (follow-ons to the ui_* accessibility layer):
   - `ui_read` — extract visible page text (not just interactables) so "what does this say?" / "summarize this page" works without hand-navigation. Complements `ui_list_interactables`.

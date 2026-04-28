@@ -8,7 +8,7 @@ import { logNicotine, getNicotineSummary } from '../meatspaceNicotine.js';
 import { addBodyEntry } from '../meatspaceHealth.js';
 import { getGoals, updateGoalProgress, addProgressEntry } from '../identity.js';
 import { listProcesses, restartApp } from '../pm2.js';
-import { getItems, getFeeds } from '../feeds.js';
+import { getItems, getFeeds, markItemRead, markAllRead } from '../feeds.js';
 import { getUserTimezone, todayInTimezone, getLocalParts } from '../../lib/timezone.js';
 import * as journal from '../brainJournal.js';
 import { resolveNavCommand, normalizeLabel } from '../../lib/navManifest.js';
@@ -54,6 +54,7 @@ const TOOL_GROUPS = {
   pm2_status: 'system',
   pm2_restart: 'system',
   feeds_digest: 'feeds',
+  feeds_mark_read: 'feeds',
   daily_log_open: 'dailylog',
   daily_log_start_dictation: 'dailylog',
   daily_log_stop_dictation: 'dailylog',
@@ -89,7 +90,11 @@ const GROUP_INTENT = {
   meatspace: /\b(drink|drank|beer|wine|whiskey|shot|cocktail|cigarette|vape|pouch|nicotine|weigh|pound|kilo|kg|smoke|smoking|how am I|summary today|log (?:a|my) (?:drink|weight|nicotine))\b/i,
   goals: /\b(goals?|progress|objective)\b/i,
   system: /\b(restart|crash(?:ed)?|pm2|process|service|is.*(?:running|down|up)|status)\b/i,
-  feeds: /\b(feeds?|news|unread|article|rss|digest)\b/i,
+  // "mark.*read" / "mark.*unread" pairs feeds_mark_read with feeds_digest:
+  // after "what's in my feeds?" the user says "mark that one read" or "mark
+  // them all as read" — the bare word "read" alone is too broad (collides
+  // with "read my log"), so we require it follow "mark".
+  feeds: /\b(feeds?|news|unread|articles?|rss|digest|headlines?|mark\b[^.!?\n]{0,40}\bread)\b/i,
   // `daily ?logi?n?s?` absorbs whisper/Web-Speech transcription drift on
   // "daily log": variants like "daily logs" (plural), "daily login" (heard as
   // a familiar word), "daily logins" all gate the daily-log toolset on. The
@@ -623,6 +628,84 @@ const TOOLS = [
         summary: picks.length
           ? `${items.length} unread. Top ${picks.length}: ${picks.map((p) => `"${p.title}" (${p.feed})`).join('; ')}.`
           : 'No unread feed items.',
+      };
+    },
+  },
+
+  {
+    name: 'feeds_mark_read',
+    description:
+      'Mark RSS feed items as read. Use when the user says "mark that one read", "mark this read", "I read the second one", or "mark them all read". ' +
+      'Pass `query` with a distinctive phrase from the item\'s title (the LLM should reuse a title it just spoke from feeds_digest). ' +
+      'Pass `all: true` to mark every unread item read; combine with `feedQuery` to scope to a single feed (e.g. "mark all of Hacker News as read").',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Distinctive phrase from the article title to fuzzy-match against currently unread items.',
+        },
+        all: {
+          type: 'boolean',
+          description: 'Mark every unread item as read. When true, `query` is ignored.',
+        },
+        feedQuery: {
+          type: 'string',
+          description: 'Optional: when `all` is true, restrict to a single feed by fuzzy-matching its title.',
+        },
+      },
+    },
+    execute: async ({ query, all = false, feedQuery } = {}) => {
+      if (!all && (typeof query !== 'string' || !query.trim())) {
+        return { ok: false, summary: 'Tell me which item — say "mark all read" or quote a phrase from the title.' };
+      }
+
+      if (all) {
+        let feedId;
+        let feedTitle;
+        if (feedQuery && typeof feedQuery === 'string' && feedQuery.trim()) {
+          const feeds = await getFeeds();
+          const fq = feedQuery.trim().toLowerCase();
+          const feed = feeds.find((f) => (f.title || '').toLowerCase() === fq)
+            || feeds.find((f) => (f.title || '').toLowerCase().includes(fq));
+          if (!feed) {
+            return { ok: false, summary: `No feed matched "${feedQuery}".` };
+          }
+          feedId = feed.id;
+          feedTitle = feed.title;
+        }
+        const result = await markAllRead(feedId);
+        const scope = feedTitle ? ` from ${feedTitle}` : '';
+        return {
+          ok: true,
+          marked: result.marked,
+          summary: result.marked
+            ? `Marked ${result.marked} item${result.marked === 1 ? '' : 's'}${scope} as read.`
+            : `Nothing unread${scope}.`,
+        };
+      }
+
+      // Fuzzy-match a single item by title against currently unread.
+      const q = query.trim().toLowerCase();
+      const unread = await getItems({ unreadOnly: true, limit: 200 });
+      const exact = unread.find((i) => (i.title || '').toLowerCase() === q);
+      const match = exact
+        || unread.find((i) => (i.title || '').toLowerCase().includes(q))
+        || unread.find((i) => {
+          const tokens = q.split(/\s+/).filter((t) => t.length >= 3);
+          return tokens.length && tokens.every((t) => (i.title || '').toLowerCase().includes(t));
+        });
+      if (!match) {
+        return { ok: false, summary: `No unread item matched "${query}".` };
+      }
+      const result = await markItemRead(match.id);
+      if (result?.error) {
+        return { ok: false, summary: `Couldn't mark "${match.title}" — ${result.error}.` };
+      }
+      return {
+        ok: true,
+        title: match.title,
+        summary: `Marked "${match.title}" as read.`,
       };
     },
   },

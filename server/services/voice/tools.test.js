@@ -29,6 +29,8 @@ vi.mock('../pm2.js', () => ({
 vi.mock('../feeds.js', () => ({
   getItems: vi.fn(async () => []),
   getFeeds: vi.fn(async () => []),
+  markItemRead: vi.fn(async () => ({ updated: true })),
+  markAllRead: vi.fn(async () => ({ marked: 0 })),
 }));
 
 const { dispatchTool, getToolSpecs, getToolSpecsForIntent, classifyIntent } = await import('./tools.js');
@@ -197,5 +199,93 @@ describe('classifyIntent — brain regex expansions', () => {
   });
   it('does not match plain UI turns', () => {
     expect(classifyIntent('click the save button').has('brain')).toBe(false);
+  });
+});
+
+describe('classifyIntent — feeds regex covers mark-read phrasings', () => {
+  it('matches "what\'s in my feeds"', () => {
+    expect(classifyIntent("what's in my feeds today").has('feeds')).toBe(true);
+  });
+  it('matches "mark that one read"', () => {
+    expect(classifyIntent('mark that one read').has('feeds')).toBe(true);
+  });
+  it('matches "mark them all as read"', () => {
+    expect(classifyIntent('mark them all as read').has('feeds')).toBe(true);
+  });
+  it('does NOT match "read my daily log" (read alone is too broad)', () => {
+    expect(classifyIntent('read my daily log').has('feeds')).toBe(false);
+  });
+});
+
+describe('feeds_mark_read', () => {
+  it('returns ok:false when neither query nor all is provided', async () => {
+    const r = await dispatchTool('feeds_mark_read', {});
+    expect(r.ok).toBe(false);
+    expect(r.summary).toMatch(/which item|mark all/i);
+  });
+
+  it('marks all unread when all=true', async () => {
+    const feeds = await import('../feeds.js');
+    feeds.markAllRead.mockResolvedValueOnce({ marked: 7 });
+    const r = await dispatchTool('feeds_mark_read', { all: true });
+    expect(r.ok).toBe(true);
+    expect(r.marked).toBe(7);
+    expect(r.summary).toMatch(/Marked 7 items? as read/);
+    expect(feeds.markAllRead).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it('reports nothing-unread when markAll returns 0', async () => {
+    const feeds = await import('../feeds.js');
+    feeds.markAllRead.mockResolvedValueOnce({ marked: 0 });
+    const r = await dispatchTool('feeds_mark_read', { all: true });
+    expect(r.ok).toBe(true);
+    expect(r.summary).toMatch(/Nothing unread/);
+  });
+
+  it('scopes all=true to a feed when feedQuery matches', async () => {
+    const feeds = await import('../feeds.js');
+    feeds.getFeeds.mockResolvedValueOnce([
+      { id: 'f1', title: 'Hacker News' },
+      { id: 'f2', title: 'Daring Fireball' },
+    ]);
+    feeds.markAllRead.mockResolvedValueOnce({ marked: 3 });
+    const r = await dispatchTool('feeds_mark_read', { all: true, feedQuery: 'hacker' });
+    expect(r.ok).toBe(true);
+    expect(r.marked).toBe(3);
+    expect(feeds.markAllRead).toHaveBeenLastCalledWith('f1');
+    expect(r.summary).toMatch(/from Hacker News/);
+  });
+
+  it('returns ok:false when feedQuery does not match any feed', async () => {
+    const feeds = await import('../feeds.js');
+    feeds.getFeeds.mockResolvedValueOnce([{ id: 'f1', title: 'Hacker News' }]);
+    const r = await dispatchTool('feeds_mark_read', { all: true, feedQuery: 'nothing-like-that' });
+    expect(r.ok).toBe(false);
+    expect(r.summary).toMatch(/No feed matched/);
+  });
+
+  it('fuzzy-matches an unread item by title substring and marks it read', async () => {
+    const feeds = await import('../feeds.js');
+    feeds.getItems.mockResolvedValueOnce([
+      { id: 'i1', title: 'Why React is fast', read: false },
+      { id: 'i2', title: 'Tailwind v5 ships', read: false },
+    ]);
+    const r = await dispatchTool('feeds_mark_read', { query: 'tailwind' });
+    expect(r.ok).toBe(true);
+    expect(r.title).toBe('Tailwind v5 ships');
+    expect(feeds.markItemRead).toHaveBeenLastCalledWith('i2');
+  });
+
+  it('returns ok:false when no unread item matches query', async () => {
+    const feeds = await import('../feeds.js');
+    feeds.getItems.mockResolvedValueOnce([{ id: 'i1', title: 'Something else', read: false }]);
+    const r = await dispatchTool('feeds_mark_read', { query: 'nothing-like-that' });
+    expect(r.ok).toBe(false);
+    expect(r.summary).toMatch(/No unread item matched/);
+  });
+
+  it('rejects whitespace-only query without all', async () => {
+    const r = await dispatchTool('feeds_mark_read', { query: '   ' });
+    expect(r.ok).toBe(false);
   });
 });
