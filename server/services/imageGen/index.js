@@ -91,9 +91,20 @@ export async function generateAvatar({ name, characterClass, prompt }) {
 
 // Snapshot of any in-flight generation across all modes — lets the UI
 // rehydrate prompt + settings + progress + last frame after navigating away
-// during a render.
+// during a render. Each provider enforces its own single-job invariant
+// (cancel() relies on this — see the note there), so up to three jobs can
+// be in flight concurrently. Return the most-recently-started one based on
+// `createdAt`, falling back to provider order if timestamps are missing.
+// Callers wanting all of them can read individual providers via the
+// re-exports below.
 export async function getActiveJob() {
-  return local.getActiveJob() || external.getActiveJob() || codex.getActiveJob() || null;
+  const jobs = [local.getActiveJob(), external.getActiveJob(), codex.getActiveJob()].filter(Boolean);
+  if (!jobs.length) return null;
+  return jobs.sort((a, b) => {
+    const ta = a.createdAt ? Date.parse(a.createdAt) : 0;
+    const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
+    return tb - ta;
+  })[0];
 }
 
 // Try-each-provider SSE attach + cancel — the route only knows the jobId,

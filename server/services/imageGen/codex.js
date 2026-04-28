@@ -166,7 +166,7 @@ async function runCodex(job, jobId, bin, args, outputPath, filename, meta) {
 
   proc.on('error', (err) => {
     clearTimeout(timeoutTimer);
-    finalizeError(job, jobId, `Failed to spawn ${bin}: ${err.message}`);
+    finalizeError(job, jobId, proc, `Failed to spawn ${bin}: ${err.message}`);
   });
 
   proc.stdout.on('data', (chunk) => {
@@ -184,7 +184,11 @@ async function runCodex(job, jobId, bin, args, outputPath, filename, meta) {
 
   proc.on('close', async (code, signal) => {
     clearTimeout(timeoutTimer);
-    activeProcess = null;
+    // Don't clear activeProcess yet — the post-exit handler still does
+    // async work (harvest + copyFile + sidecar). Clearing the
+    // module-scoped guard up front would let a new generation start
+    // while we're still finalizing this one, then the in-flight
+    // finalizer could clobber the new job's activeJob snapshot.
     // EventEmitter doesn't await async listeners — without this try/catch,
     // a throw from harvestLatestImage / copyFile would surface as an
     // unhandled rejection (process-killing on Node ≥15) and the job would
@@ -193,10 +197,10 @@ async function runCodex(job, jobId, bin, args, outputPath, filename, meta) {
       if (code !== 0) {
         const reason = signal ? `Killed by signal ${signal}` : `Exit code ${code}`;
         const tail = stderrTail.trim().split('\n').slice(-6).join('\n');
-        return finalizeError(job, jobId, `Codex generation failed: ${reason}\n${tail}`);
+        return finalizeError(job, jobId, proc, `Codex generation failed: ${reason}\n${tail}`);
       }
       if (!sessionId) {
-        return finalizeError(job, jobId, 'Codex returned no session id — output format may have changed');
+        return finalizeError(job, jobId, proc, 'Codex returned no session id — output format may have changed');
       }
       // Codex writes the PNG asynchronously while it's wrapping up the turn.
       // Empirically the file is on disk by the time `codex exec` exits, but
@@ -204,7 +208,7 @@ async function runCodex(job, jobId, bin, args, outputPath, filename, meta) {
       const harvested = await harvestLatestImage(sessionId, 5000);
       if (!harvested) {
         return finalizeError(
-          job, jobId,
+          job, jobId, proc,
           'Codex returned no image — your Codex account may not allow image_gen, or the model declined. Check Settings → Image Gen → Enable Codex Imagegen.',
         );
       }
@@ -213,30 +217,37 @@ async function runCodex(job, jobId, bin, args, outputPath, filename, meta) {
       const sidecar = join(PATHS.images, `${jobId}.metadata.json`);
       await writeFile(sidecar, JSON.stringify(meta, null, 2)).catch(() => {});
       job.status = 'complete';
-      activeJob = null;
+      // Only clear if still ours — a userland cancel that started a
+      // newer job could have replaced these references while our
+      // harvest was running.
+      if (activeProcess === proc) activeProcess = null;
+      if (activeJob && activeJob.generationId === jobId) activeJob = null;
       console.log(`✅ Image generated [${jobId.slice(0, 8)}]: ${filename} (codex)`);
       const result = { filename, path: `/data/images/${filename}` };
       broadcastSse(job, { type: 'complete', result });
       imageGenEvents.emit('completed', { generationId: jobId, path: `/data/images/${filename}`, filename });
       closeJobAfterDelay(jobs, jobId);
     } catch (err) {
-      finalizeError(job, jobId, `Codex post-exit handler failed: ${err?.message || err}`);
+      finalizeError(job, jobId, proc, `Codex post-exit handler failed: ${err?.message || err}`);
     }
   });
 }
 
-const finalizeError = (job, jobId, reason) => {
+// `proc` is the child this finalize belongs to — pass it through so we
+// only clear module-scoped state when it still belongs to *this* job.
+// A late finalize from a cancelled or stale run must not wipe a newer
+// job that has already become active.
+const finalizeError = (job, jobId, proc, reason) => {
   // Idempotent — spawn failures fire 'error' AND a follow-up 'close', so
   // both paths reach finalizeError. Without this guard, listeners would
   // see duplicate 'failed' events.
   if (job.status === 'error' || job.status === 'complete') return;
-  // Clear activeProcess too. The 'close' handler does this for normal exits,
-  // but a spawn failure (ENOENT, EACCES) routes through 'error' before any
-  // 'close' may fire — without this, a single bad codexPath would
-  // permanently lock the provider into 409 BUSY for every later request.
-  activeProcess = null;
+  // Clear activeProcess only if it's still the proc we own. Without
+  // this, a single bad codexPath would permanently lock the provider
+  // into 409 BUSY (the 'close' handler also clears it on success path).
+  if (proc == null || activeProcess === proc) activeProcess = null;
   job.status = 'error';
-  activeJob = null;
+  if (activeJob && activeJob.generationId === jobId) activeJob = null;
   console.log(`❌ codex image generation failed [${jobId.slice(0, 8)}]: ${reason.split('\n')[0]}`);
   broadcastSse(job, { type: 'error', error: reason });
   imageGenEvents.emit('failed', { generationId: jobId, error: reason });
