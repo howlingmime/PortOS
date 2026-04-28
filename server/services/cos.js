@@ -31,6 +31,7 @@ import { ensureDir, formatDuration, safeJSONParse, PATHS } from '../lib/fileUtil
 import { sanitizeTaskMetadata, PIPELINE_BEHAVIOR_FLAGS, MAX_TOTAL_SPAWNS } from '../lib/validation.js';
 import { addNotification, NOTIFICATION_TYPES } from './notifications.js';
 import { recordDecision, DECISION_TYPES } from './decisionLog.js';
+import { isRecoveryTask } from './recoveryTasks.js';
 import { getUserTimezone, getLocalParts, nextLocalTime, todayInTimezone } from '../lib/timezone.js';
 import { PORTOS_UI_URL } from '../lib/ports.js';
 
@@ -981,7 +982,7 @@ async function queueEligibleImprovementTasks(state, cosTaskData) {
         existingTaskTypes.add(appId ? `app:${appId}:${analysisType}` : analysisType);
       }
     }
-    if (isActive && task.metadata?.app && !task.metadata?.isRecovery) {
+    if (isActive && task.metadata?.app && !isRecoveryTask(task)) {
       appsWithPendingImprovement.add(task.metadata.app);
     }
   }

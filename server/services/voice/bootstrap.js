@@ -69,9 +69,18 @@ export const runSetupScript = async (cfg) => {
   console.log(`🔧 voice: setup-voice (stt=${sttEngine}/${modelName}, tts=${cfg.tts.engine}, coreml=${env.INSTALL_COREML})`);
   // 10-minute cap — large models + slow network can legitimately take several
   // minutes, but a hung curl must not pin the HTTP request that triggered us.
-  const [cmd, args] = IS_WIN
-    ? ['pwsh', ['-ExecutionPolicy', 'Bypass', '-File', 'scripts\\setup-voice.ps1']]
-    : ['bash', ['scripts/setup-voice.sh']];
+  // On Windows prefer pwsh (PowerShell 7+) but fall back to the always-present
+  // Windows PowerShell when pwsh isn't installed.
+  let cmd;
+  let args;
+  if (IS_WIN) {
+    const psBin = (await which('pwsh')) ? 'pwsh' : 'powershell';
+    cmd = psBin;
+    args = ['-ExecutionPolicy', 'Bypass', '-File', 'scripts\\setup-voice.ps1'];
+  } else {
+    cmd = 'bash';
+    args = ['scripts/setup-voice.sh'];
+  }
   const { stdout, stderr } = await pexec(cmd, args, {
     cwd: PATHS.root,
     env,
