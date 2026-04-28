@@ -1,6 +1,7 @@
 // Piper TTS backend — spawn-per-request CLI: text on stdin, WAV on stdout.
 
 import { spawn } from 'child_process';
+import { randomUUID } from 'crypto';
 import { existsSync, readFileSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { delimiter, join } from 'path';
@@ -24,7 +25,7 @@ export const synthesizePiper = (text, cfg, signal) => {
   const lengthScale = String(1 / rate);
   // On Windows, piper.exe writes stdout in text mode which corrupts binary WAV
   // (CR+LF expansion). Use a temp file and read it back instead.
-  const tmpFile = IS_WIN ? join(tmpdir(), `piper-${Date.now()}.wav`) : null;
+  const tmpFile = IS_WIN ? join(tmpdir(), `piper-${process.pid}-${randomUUID()}.wav`) : null;
   const args = ['--model', voicePath, '--length_scale', lengthScale, '--output_file', tmpFile ?? '-'];
 
   // Multi-speaker voices (VCTK) need a speaker index. Prefer the per-session
