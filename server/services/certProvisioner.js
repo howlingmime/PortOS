@@ -24,6 +24,7 @@ import { promisify } from 'util';
 import { PATHS, atomicWrite } from '../lib/fileUtils.js';
 import { findTailscale } from '../lib/tailscale.js';
 import { getHttpsEnabledAtBoot } from '../lib/httpsState.js';
+import { PORTS } from '../lib/ports.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -39,9 +40,11 @@ async function tailscaleStatus(bin) {
 
 /**
  * Run `tailscale cert` for the local MagicDNS hostname. Returns a result
- * object describing what happened. Never throws — all known failure modes
- * surface as `{ ok: false, reason, message }` so the UI can render an
- * actionable toast.
+ * object describing what happened. Expected Tailscale/provisioning failure
+ * modes surface as `{ ok: false, reason, message }` so the UI can render an
+ * actionable toast, but unexpected filesystem or process errors (mkdir
+ * permission denied, atomic write failure, etc.) may still throw and bubble
+ * to the route's error middleware as a 500.
  */
 export async function provisionTailscaleCert() {
   const bin = findTailscale();
@@ -88,17 +91,22 @@ export async function provisionTailscaleCert() {
     `--cert-file=${CERT_PATH}`,
     `--key-file=${KEY_PATH}`,
     hostname
-  ], { timeout: 60_000 }).catch(err => ({ _err: err.stderr?.toString() || err.message }));
+  ], { timeout: 60_000 }).catch(err => {
+    const stderr = err.stderr?.toString().trim();
+    return { _err: stderr || err.message || 'unknown error' };
+  });
 
   if (certResult?._err) {
-    const stderr = certResult._err.trim();
+    const stderr = certResult._err;
+    const firstLine = stderr.split('\n')[0].trim() || 'unknown error';
+    const needsPeriod = !/[.!?]$/.test(firstLine);
     const httpsHint = /HTTPS.*not.*enabled|invalid request/i.test(stderr)
       ? ' Enable "HTTPS Certificates" at login.tailscale.com/admin/dns and retry.'
       : '';
     return {
       ok: false,
       reason: 'tailscale-cert-failed',
-      message: `tailscale cert failed: ${stderr.split('\n')[0]}.${httpsHint}`
+      message: `tailscale cert failed: ${firstLine}${needsPeriod ? '.' : ''}${httpsHint}`
     };
   }
 
@@ -129,8 +137,9 @@ export async function provisionTailscaleCert() {
 
   console.log(`🔒 Provisioned Tailscale cert for ${hostname} (new=${wroteNew}, restart=${requiresRestart})`);
 
+  const apiPort = Number(process.env.PORT) || PORTS.API;
   const restartHint = requiresRestart
-    ? ' Restart PortOS to enable HTTPS on :5555.'
+    ? ` Restart PortOS to enable HTTPS on :${apiPort}.`
     : '';
 
   return {
