@@ -1,5 +1,9 @@
 # Next Release
 
+## Changed
+
+- **Pin all `package.json` dependencies and overrides to exact versions.** Removed `^` ranges from every dep/override across root, `server/`, and `client/` `package.json` files (e.g. `kokoro-js: ^1.2.1` → `1.2.1`; overrides like `path-to-regexp`, `lodash`, `basic-ftp`, `follow-redirects`, `brace-expansion`, `socket.io-parser`, and the nested `minimatch@3 → brace-expansion`). Lockfiles refreshed with no resolved-version drift — a defensive pin so future installs can't pick up a freshly-published patch in the override graph without an explicit bump.
+
 ## Added
 
 - **One-click "Enable HTTPS" button on the Instances tab.** The Tailnet DNS & trusted HTTPS explainer used to instruct users to drop into a shell and run `npm run setup:cert`. New button on the same banner runs the same flow at runtime via a new `POST /api/instances/provision-cert` endpoint, which calls `tailscale cert` for the local MagicDNS hostname, writes `data/certs/{cert,key}.pem`, and updates `meta.json`. Failure modes (Tailscale not installed, not running, no MagicDNS hostname, HTTPS Certificates feature disabled in the tailnet admin) surface as toasts with actionable guidance. Because the HTTPS listener type is decided at server boot in `lib/tailscale-https.js`, the response includes `requiresRestart: true` whenever PortOS is currently running over HTTP — the UI then prompts the user to restart so the new cert actually takes effect; if HTTPS was already running, the existing `certRenewer` hot-swap path picks up the renewed cert without a restart. The button is disabled until MagicDNS is detected, mirroring what the underlying CLI requires. Files: `server/services/certProvisioner.js` (new), `server/routes/instances.js`, `client/src/services/apiSystem.js`, `client/src/pages/Instances.jsx`.
