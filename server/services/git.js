@@ -324,7 +324,84 @@ export async function checkout(dir, branchName) {
 }
 
 /**
+ * Parse the GitHub owner login from a remote URL.
+ * Returns null for non-github.com remotes or unparseable inputs.
+ * Examples:
+ *   git@github.com:atomantic/PortOS.git → 'atomantic'
+ *   https://github.com/atomantic/PortOS → 'atomantic'
+ */
+export function parseGitHubOwnerFromRemote(url) {
+  if (!url) return null;
+  const ssh = url.match(/^git@github\.com:([^/]+)\/[^/]+?(?:\.git)?$/);
+  if (ssh) return ssh[1];
+  const https = url.match(/^https?:\/\/github\.com\/([^/]+)\/[^/]+?(?:\.git)?$/);
+  if (https) return https[1];
+  return null;
+}
+
+/**
+ * Pick which logged-in gh account should auth against a repo owned by `ownerLogin`.
+ * Case-insensitive exact match; returns null if no logged-in account matches the owner.
+ */
+export function pickGhAccountForOwner(ownerLogin, availableAccounts) {
+  if (!ownerLogin || !availableAccounts?.length) return null;
+  const lower = ownerLogin.toLowerCase();
+  return availableAccounts.find(a => a.toLowerCase() === lower) || null;
+}
+
+function spawnGh(args, options = {}) {
+  return new Promise((resolve) => {
+    const child = spawn('gh', args, { shell: false, windowsHide: true, ...options });
+    let stdout = '', stderr = '';
+    child.stdout.on('data', (d) => { stdout += d.toString(); });
+    child.stderr.on('data', (d) => { stderr += d.toString(); });
+    child.on('close', (code) => resolve({ code, stdout, stderr }));
+    child.on('error', () => resolve({ code: -1, stdout: '', stderr: '' }));
+  });
+}
+
+async function listGhAccounts() {
+  const { stdout, stderr } = await spawnGh(['auth', 'status', '-h', 'github.com']);
+  // gh writes status to stderr in older versions, stdout in newer — search both.
+  const text = `${stdout}\n${stderr}`;
+  const accounts = [];
+  const re = /Logged in to github\.com account (\S+)/g;
+  let m;
+  while ((m = re.exec(text))) accounts.push(m[1]);
+  return accounts;
+}
+
+async function getGhTokenForAccount(login) {
+  const { code, stdout } = await spawnGh(['auth', 'token', '-u', login, '-h', 'github.com']);
+  return code === 0 ? stdout.trim() : null;
+}
+
+/**
+ * Resolve the right gh auth env for a given repo directory.
+ * Auto-detects the owner from `origin`, picks the matching logged-in gh account,
+ * and returns an env override pinning `GH_TOKEN` so gh doesn't depend on
+ * `~/.config/gh/hosts.yml`'s mutable `user:` field.
+ * Falls back to ambient env when no match is possible.
+ */
+export async function resolveGhEnvForRepo(dir) {
+  const remote = await execGitSafe(['remote', 'get-url', 'origin'], dir);
+  const owner = parseGitHubOwnerFromRemote(remote.stdout?.trim());
+  if (!owner) return { env: process.env, owner: null, account: null };
+
+  const accounts = await listGhAccounts();
+  const account = pickGhAccountForOwner(owner, accounts);
+  if (!account) return { env: process.env, owner, account: null };
+
+  const token = await getGhTokenForAccount(account);
+  if (!token) return { env: process.env, owner, account };
+
+  return { env: { ...process.env, GH_TOKEN: token }, owner, account };
+}
+
+/**
  * Create a pull request using the `gh` CLI.
+ * Auto-pins gh identity to the account whose login matches the repo's owner
+ * (so PR creation works correctly when multiple gh accounts are logged in).
  * Fails gracefully if `gh` is not installed.
  * @param {string} dir - Working directory (repo root)
  * @param {object} options - PR options
@@ -332,12 +409,14 @@ export async function checkout(dir, branchName) {
  * @param {string} options.body - PR description
  * @param {string} options.base - Base branch (target)
  * @param {string} options.head - Head branch (source)
- * @returns {Promise<{success: boolean, url?: string, error?: string}>}
+ * @returns {Promise<{success: boolean, url?: string, error?: string, ghAccount?: string|null, ghOwner?: string|null}>}
  */
 export async function createPR(dir, { title, body, base, head }) {
+  const { env, owner, account } = await resolveGhEnvForRepo(dir);
+
   return new Promise((resolve) => {
     const args = ['pr', 'create', '--title', title, '--body', body || '', '--base', base, '--head', head];
-    const child = spawn('gh', args, { cwd: dir, shell: false, windowsHide: true });
+    const child = spawn('gh', args, { cwd: dir, env, shell: false, windowsHide: true });
 
     let stdout = '';
     let stderr = '';
@@ -348,14 +427,14 @@ export async function createPR(dir, { title, body, base, head }) {
     child.on('close', (code) => {
       if (code === 0) {
         const url = stdout.trim();
-        resolve({ success: true, url });
+        resolve({ success: true, url, ghAccount: account, ghOwner: owner });
       } else {
-        resolve({ success: false, error: stderr || `gh exited with code ${code}` });
+        resolve({ success: false, error: stderr || `gh exited with code ${code}`, ghAccount: account, ghOwner: owner });
       }
     });
 
     child.on('error', (err) => {
-      resolve({ success: false, error: `gh not available: ${err.message}` });
+      resolve({ success: false, error: `gh not available: ${err.message}`, ghAccount: account, ghOwner: owner });
     });
   });
 }

@@ -966,6 +966,10 @@ async function queueEligibleImprovementTasks(state, cosTaskData) {
   // Also skip task types where a user-terminated blocked task exists (user intentionally killed it)
   const existingTasks = cosTaskData.tasks || [];
   const existingTaskTypes = new Set();
+  // Apps that already have *any* pending/in_progress improvement task. We cap each
+  // app at one queued improvement at a time to avoid a fan-out where multiple
+  // improvement types pile up faster than the per-app cooldown can drain them.
+  const appsWithPendingImprovement = new Set();
 
   for (const task of existingTasks) {
     const isActive = task.status === 'pending' || task.status === 'in_progress';
@@ -979,6 +983,9 @@ async function queueEligibleImprovementTasks(state, cosTaskData) {
         existingTaskTypes.add(appId ? `app:${appId}:${analysisType}` : analysisType);
       }
     }
+    if (isActive && task.metadata?.app && !task.metadata?.isRecovery) {
+      appsWithPendingImprovement.add(task.metadata.app);
+    }
   }
 
   let queued = 0;
@@ -986,6 +993,14 @@ async function queueEligibleImprovementTasks(state, cosTaskData) {
   // Queue eligible improvement tasks for all managed apps (including PortOS)
   const apps = await getActiveApps().catch(() => []);
   for (const app of apps) {
+    // One pending improvement per app at a time — sibling types must wait
+    // until the current task drains, otherwise they queue faster than they
+    // can run (per-project concurrency limit + cooldown after each completion).
+    if (appsWithPendingImprovement.has(app.id)) {
+      emitLog('debug', `App ${app.name} already has a pending improvement task — skipping queue`);
+      continue;
+    }
+
     // Check if app is on cooldown
     const onCooldown = await isAppOnCooldown(app.id, state.config.appReviewCooldownMs);
     if (onCooldown) continue;
@@ -1019,6 +1034,7 @@ async function queueEligibleImprovementTasks(state, cosTaskData) {
 
     emitLog('info', `Queued improvement task: ${nextType} for ${app.name}`, { taskId: newTask.id, appId: app.id });
     existingTaskTypes.add(taskKey);
+    appsWithPendingImprovement.add(app.id);
     queued++;
 
     // Only queue one task per app per evaluation to avoid flooding
@@ -2142,6 +2158,7 @@ export async function addTask(taskData, taskType = 'user', { raw = false } = {})
     if (taskData.model) metadata.model = taskData.model;
     if (taskData.provider) metadata.provider = taskData.provider;
     if (taskData.app) metadata.app = taskData.app;
+    if (taskData.isRecovery === true) metadata.isRecovery = true;
     if (taskData.createJiraTicket) metadata.createJiraTicket = true;
     // Boolean flags: persist both true and false so users can explicitly override defaults.
     // The string round-trip ('false' from TASKS.md) is handled by isTruthyMeta/isFalsyMeta.

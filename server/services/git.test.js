@@ -1,5 +1,54 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createPR, extractAgentSummary } from './git.js';
+import { createPR, extractAgentSummary, parseGitHubOwnerFromRemote, pickGhAccountForOwner } from './git.js';
+
+describe('parseGitHubOwnerFromRemote', () => {
+  it('parses SSH urls (with and without .git suffix)', () => {
+    expect(parseGitHubOwnerFromRemote('git@github.com:atomantic/PortOS.git')).toBe('atomantic');
+    expect(parseGitHubOwnerFromRemote('git@github.com:atomantic/PortOS')).toBe('atomantic');
+  });
+
+  it('parses HTTPS urls (with and without .git suffix)', () => {
+    expect(parseGitHubOwnerFromRemote('https://github.com/atomantic/PortOS.git')).toBe('atomantic');
+    expect(parseGitHubOwnerFromRemote('https://github.com/atomantic/PortOS')).toBe('atomantic');
+    expect(parseGitHubOwnerFromRemote('http://github.com/atomantic/PortOS')).toBe('atomantic');
+  });
+
+  it('returns null for non-github hosts', () => {
+    expect(parseGitHubOwnerFromRemote('git@gitlab.com:foo/bar.git')).toBeNull();
+    expect(parseGitHubOwnerFromRemote('https://bitbucket.org/foo/bar')).toBeNull();
+  });
+
+  it('returns null for empty or null input', () => {
+    expect(parseGitHubOwnerFromRemote('')).toBeNull();
+    expect(parseGitHubOwnerFromRemote(null)).toBeNull();
+    expect(parseGitHubOwnerFromRemote(undefined)).toBeNull();
+  });
+
+  it('returns null for malformed urls', () => {
+    expect(parseGitHubOwnerFromRemote('github.com:atomantic/PortOS')).toBeNull();
+    expect(parseGitHubOwnerFromRemote('git@github.com:noslash')).toBeNull();
+  });
+});
+
+describe('pickGhAccountForOwner', () => {
+  it('matches owner to account case-insensitively', () => {
+    expect(pickGhAccountForOwner('atomantic', ['atomantic', 'ClawedCode'])).toBe('atomantic');
+    expect(pickGhAccountForOwner('Atomantic', ['atomantic', 'ClawedCode'])).toBe('atomantic');
+    expect(pickGhAccountForOwner('clawedcode', ['atomantic', 'ClawedCode'])).toBe('ClawedCode');
+    expect(pickGhAccountForOwner('CLAWEDCODE', ['atomantic', 'ClawedCode'])).toBe('ClawedCode');
+  });
+
+  it('returns null when no account matches the owner', () => {
+    expect(pickGhAccountForOwner('someorg', ['atomantic', 'ClawedCode'])).toBeNull();
+  });
+
+  it('returns null with empty inputs', () => {
+    expect(pickGhAccountForOwner('atomantic', [])).toBeNull();
+    expect(pickGhAccountForOwner('atomantic', null)).toBeNull();
+    expect(pickGhAccountForOwner(null, ['atomantic'])).toBeNull();
+    expect(pickGhAccountForOwner('', ['atomantic'])).toBeNull();
+  });
+});
 
 describe('createPR', () => {
   beforeEach(() => {

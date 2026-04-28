@@ -25,6 +25,7 @@ import { detectConflicts } from './taskConflict.js';
 import { createWorktree, removeWorktree } from './worktreeManager.js';
 import * as jiraService from './jira.js';
 import * as git from './git.js';
+import { RECOVERY_TASK_PREFIX } from './recoveryTasks.js';
 import { analyzeAgentFailure, resolveFailedTaskUpdate } from './agentErrorAnalysis.js';
 import { createAgentRun, completeAgentRun, checkForTaskCommit } from './agentRunTracking.js';
 import { buildAgentPrompt, getAppWorkspace, getAppDataForTask, createJiraTicketForTask } from './agentPromptBuilder.js';
@@ -1181,12 +1182,17 @@ export async function cleanupAgentWorktree(agentId, success, { openPR = false, d
           return warnings;
         }
 
-        emitLog('error', `🌳 PR creation failed for ${worktreeBranch}: ${reason}`, { agentId, branchName: worktreeBranch });
+        const authHint = prResult?.ghAccount
+          ? ` (gh authed as ${prResult.ghAccount} for ${prResult.ghOwner})`
+          : prResult?.ghOwner
+            ? ` (no gh account matches owner ${prResult.ghOwner} — fell back to active user)`
+            : '';
+        emitLog('error', `🌳 PR creation failed for ${worktreeBranch}${authHint}: ${reason}`, { agentId, branchName: worktreeBranch, ghAccount: prResult?.ghAccount, ghOwner: prResult?.ghOwner });
         warnings.push(`PR creation failed for branch ${worktreeBranch}: ${reason}. Worktree preserved for manual PR creation.`);
         return warnings;
       }
 
-      emitLog('success', `🌳 Created PR: ${prResult.url}`, { agentId, branchName: worktreeBranch });
+      emitLog('success', `🌳 Created PR: ${prResult.url} (gh authed as ${prResult.ghAccount || 'active user'})`, { agentId, branchName: worktreeBranch, ghAccount: prResult.ghAccount, ghOwner: prResult.ghOwner });
 
       const result = await removeWorktree(agentId, sourceWorkspace, worktreeBranch, { merge: false }).catch(err => {
         emitLog('warn', `🌳 Worktree cleanup failed for ${agentId}: ${err.message}`, { agentId });
@@ -1237,9 +1243,10 @@ export async function spawnMergeRecoveryTask(cleanupWarnings, agentId, task, app
 
   if (isMergeFail) {
     addTask({
-      description: `[Recovery] Resolve merge conflict and clean up stale branch ${staleBranch} in ${appName}`,
+      description: `${RECOVERY_TASK_PREFIX} Resolve merge conflict and clean up stale branch ${staleBranch} in ${appName}`,
       priority: 'HIGH',
       app: appId,
+      isRecovery: true,
       context: `An agent failed to auto-merge branch "${staleBranch}" back to main in ${sourceWorkspace}. `
         + `Resolve this by: (1) checking if the branch's changes are already on main (superseded by other commits), `
         + `and if so, delete the branch with "git branch -D ${staleBranch}"; `
@@ -1254,9 +1261,10 @@ export async function spawnMergeRecoveryTask(cleanupWarnings, agentId, task, app
   } else {
     // PR creation failed — spawn an agent to investigate and retry
     addTask({
-      description: `[Recovery] Investigate and retry failed PR for branch ${staleBranch} in ${appName}`,
+      description: `${RECOVERY_TASK_PREFIX} Investigate and retry failed PR for branch ${staleBranch} in ${appName}`,
       priority: 'HIGH',
       app: appId,
+      isRecovery: true,
       context: `An agent pushed branch "${staleBranch}" to ${sourceWorkspace} but automated PR creation failed. `
         + `Investigate by: (1) checking if a PR already exists for this branch: "gh pr list --head ${staleBranch}"; `
         + `(2) if no PR exists, review the branch changes and create one: "gh pr create --head ${staleBranch} --base main --title '...' --body '...'"; `
