@@ -350,10 +350,17 @@ export function ImageGenTab() {
             onChange={(e) => {
               const v = e.target.checked;
               setCodexEnabled(v);
-              // If the user just disabled Codex while it was the active
-              // backend, fall back to external so saving doesn't leave the
-              // dispatcher pointing at a disabled provider.
-              if (!v && mode === 'codex') setMode('external');
+              // Disabling Codex while it's the active backend would leave
+              // the saved mode pointing at a disabled provider. Pick the
+              // best fallback: prefer local if Python is configured, else
+              // external if a URL is set, else external as a last resort
+              // (so the user lands on a non-broken default rather than
+              // sticking with codex or hopping to an unconfigured backend).
+              if (!v && mode === 'codex') {
+                const hasLocal = !!pythonPath?.trim();
+                const hasExternal = !!normalizeUrl(sdapiUrl);
+                setMode(hasLocal ? 'local' : (hasExternal ? 'external' : 'external'));
+              }
             }}
             className="rounded"
           />

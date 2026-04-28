@@ -94,9 +94,12 @@ export default function ImageGen() {
   const progress = externalProgress || localProgress;
   const progressPct = progress?.progress != null ? Math.round(progress.progress * 100) : null;
 
-  const refreshStatus = useCallback(() => {
+  // Status reflects the currently-selected backend, not the saved default —
+  // chip changes re-probe via the optional ?mode= override so the badge and
+  // notConnected gating stay aligned with what Generate would actually use.
+  const refreshStatus = useCallback((mode) => {
     setStatusLoading(true);
-    getImageGenStatus()
+    getImageGenStatus(mode)
       .then(setStatus)
       .catch(() => setStatus({ connected: false, reason: 'Status check failed' }))
       .finally(() => setStatusLoading(false));
@@ -106,15 +109,11 @@ export default function ImageGen() {
     listImageGallery().then(setGallery).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    refreshStatus();
-    listImageModels().then((m) => {
-      setModels(m);
-      if (m.length && !modelId) setModelId(m[0].id);
-    }).catch(() => {});
-    listLoras().then(setAvailableLoras).catch(() => {});
-    refreshGallery();
-    getSettings().then((s) => {
+  // Settings load — derives the chip strip and the initial selectedMode.
+  // Re-runnable so the Settings drawer can trigger a refresh on close
+  // without forcing a full page reload.
+  const reloadBackends = useCallback(() => {
+    return getSettings().then((s) => {
       const ig = s?.imageGen || {};
       const externalUrl = (ig.external?.sdapiUrl || ig.sdapiUrl || '').trim();
       const pyPath = (ig.local?.pythonPath || '').trim();
@@ -125,16 +124,27 @@ export default function ImageGen() {
       if (codexOn) backends.push({ id: 'codex', label: 'Codex', icon: Terminal });
       setAvailableBackends(backends);
       const saved = ig.mode || 'external';
-      // Pick the saved mode if viable; otherwise the first viable backend
-      // (so a freshly-configured setup with only one provider Just Works).
-      if (backends.find((b) => b.id === saved)) {
-        setSelectedMode(saved);
-      } else if (backends.length) {
-        setSelectedMode(backends[0].id);
-      } else {
-        setSelectedMode(saved);
-      }
+      // Prefer the saved default if viable. If the user just disabled the
+      // currently-selected backend, fall through to the first viable one
+      // (so a freshly-configured setup or a just-toggled provider Just
+      // Works without forcing a reload).
+      setSelectedMode((prev) => {
+        if (prev && backends.find((b) => b.id === prev)) return prev;
+        if (backends.find((b) => b.id === saved)) return saved;
+        if (backends.length) return backends[0].id;
+        return saved;
+      });
     }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    listImageModels().then((m) => {
+      setModels(m);
+      if (m.length && !modelId) setModelId(m[0].id);
+    }).catch(() => {});
+    listLoras().then(setAvailableLoras).catch(() => {});
+    refreshGallery();
+    reloadBackends();
     // Resume an in-flight job so the user can navigate away mid-render and
     // come back to the same prompt + settings + live preview frame.
     getActiveImageJob().then(({ activeJob }) => {
@@ -168,6 +178,25 @@ export default function ImageGen() {
     return () => eventSourceRef.current?.close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-probe status whenever the effective backend changes — flipping the
+  // chip from Local to Codex shouldn't leave the badge / notConnected
+  // gating reflecting the previous backend.
+  useEffect(() => {
+    if (!effectiveMode) return;
+    refreshStatus(effectiveMode);
+  }, [effectiveMode, refreshStatus]);
+
+  // When the user closes the Settings drawer, settings may have changed
+  // (e.g. they enabled Codex or configured a new external URL). Reload so
+  // the chip strip matches the new state without a page refresh.
+  const wasSettingsOpenRef = useRef(false);
+  useEffect(() => {
+    if (wasSettingsOpenRef.current && !settingsOpen) {
+      reloadBackends();
+    }
+    wasSettingsOpenRef.current = settingsOpen;
+  }, [settingsOpen, reloadBackends]);
 
   const currentModel = models.find((m) => m.id === modelId);
   const matchedResolution = RESOLUTIONS.find((r) => r.w === width && r.h === height);
@@ -377,7 +406,7 @@ export default function ImageGen() {
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={refreshStatus}
+            onClick={() => refreshStatus(effectiveMode)}
             disabled={statusLoading}
             className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-port-border/50 disabled:opacity-50"
             title="Refresh status"

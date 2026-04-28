@@ -114,7 +114,7 @@ export const getTailnetInfo = () => request('/instances/tailnet-suffix');
 export const provisionTailnetCert = () => request('/instances/provision-cert', { method: 'POST' });
 
 // Image Generation
-export const getImageGenStatus = () => request('/image-gen/status');
+export const getImageGenStatus = (mode) => request(`/image-gen/status${mode ? `?mode=${encodeURIComponent(mode)}` : ''}`);
 export const generateImage = (data) => request('/image-gen/generate', {
   method: 'POST',
   body: JSON.stringify(data)

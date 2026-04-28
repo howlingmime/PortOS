@@ -1101,11 +1101,28 @@ const TOOLS = [
           return { ok: false, summary: 'Codex Imagegen is disabled — enable it in Settings → Image Gen first.' };
         }
       }
+      // LLMs/tool callers often hand back numeric args as strings ("512").
+      // Coerce + bounds-check before forwarding — the route's Zod schema
+      // also gates these, but voice tool calls bypass the route, so an
+      // unvalidated string would propagate to providers that build
+      // payloads with raw width values (external SD API: "width": "512").
+      const normalizeDimension = (value, name) => {
+        if (value === undefined || value === null || value === '') return { ok: true, value: undefined };
+        const parsed = Number(value);
+        if (!Number.isInteger(parsed) || parsed < 64 || parsed > 2048) {
+          return { ok: false, summary: `${name} must be an integer between 64 and 2048` };
+        }
+        return { ok: true, value: parsed };
+      };
+      const w = normalizeDimension(width, 'width');
+      if (!w.ok) return w;
+      const h = normalizeDimension(height, 'height');
+      if (!h.ok) return h;
       const result = await imageGen.generateImage({
         prompt: prompt.trim(),
         negativePrompt: negativePrompt?.trim() || undefined,
-        width: width || undefined,
-        height: height || undefined,
+        width: w.value,
+        height: h.value,
         mode: requestedMode,
       });
       const usedMode = result?.mode || requestedMode || 'default';

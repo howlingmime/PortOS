@@ -490,4 +490,28 @@ describe("image_generate", () => {
     expect(r.path).toBe("/data/images/mock.png");
     expect(r.filename).toBe("mock.png");
   });
+
+  it("coerces stringified width/height to numbers before forwarding", async () => {
+    generateImageMock.mockClear();
+    const r = await dispatchTool("image_generate", { prompt: "a fox", width: "512", height: "768" });
+    expect(r.ok).toBe(true);
+    const args = generateImageMock.mock.calls[0][0];
+    expect(args.width).toBe(512);
+    expect(args.height).toBe(768);
+  });
+
+  it("rejects out-of-bounds width", async () => {
+    generateImageMock.mockClear();
+    const r = await dispatchTool("image_generate", { prompt: "a fox", width: 50000 });
+    expect(r.ok).toBe(false);
+    expect(r.summary).toMatch(/width must be an integer between 64 and 2048/);
+    expect(generateImageMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-integer height (e.g. floats)", async () => {
+    generateImageMock.mockClear();
+    const r = await dispatchTool("image_generate", { prompt: "a fox", height: "768.5" });
+    expect(r.ok).toBe(false);
+    expect(r.summary).toMatch(/height must be an integer between 64 and 2048/);
+  });
 });
