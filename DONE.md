@@ -6,6 +6,7 @@ Archive of completed work. For active roadmap, see [PLAN.md](./PLAN.md). For pro
 
 ## 2026-04-28
 
+- **Better Audit follow-up — bugs/perf/test quality** — Added `AbortSignal.timeout` to remaining fetch sites (`aiDetect.js`, `meatspacePostLlm.js`, `memoryEmbeddings.js` ×3, `telegramBridge.js`); fixed `httpClient.js` abort-listener leak via cleanup + `{ once: true }`; fixed `MessageDetail.jsx` iframe `load` listener leak via `{ once: true }`; parallelized `feeds.js` refresh with `Promise.allSettled` over `fetchAndParseFeed`; replaced vacuous `usage.test.js` typeof checks with real streak-calculation assertions; `cosRunnerClient.test.js` now uses `.rejects.toThrow` for capacity/spawn/kill/terminate paths; `subAgentSpawner.test.js` imports the real `selectModelForTask` instead of re-implementing it; added `loops.test.js`.
 - **Ask Yourself — slice (b)** — Voice (`ui_ask`) + per-turn promotions ("Save as Brain note" / "Create CoS task" / "Attach to Goal…") with auto-pin to survive 30-day expiry; palette whitelist for `⌘K` → `Ask Yourself`; ask-intent classifier gates the voice tool to RAG-shaped phrasing only; barge-in cancels upstream `askService` stream via `AbortSignal`. 17 new tests; suite 2785/2785 green.
 
 ## 2026-04-24

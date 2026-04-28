@@ -25,12 +25,9 @@ For project goals, see [GOALS.md](./GOALS.md). For completed work, see [DONE.md]
 - [ ] **[HIGH][DRY]** `server/services/socket.js:595-814` — extract `broadcastToSet` + `registerSubscriber` to collapse 6× duplicated subscriber/broadcast boilerplate (also fixes missing `shellService.unsubscribeSessionList` on disconnect).
 - [ ] **[HIGH][CODE]** `server/services/cos.js:3055` — remove `NODE_ENV !== 'test'` init guard (test-specific hack in prod).
 - [ ] **[CRITICAL][TESTS]** `server/services/cos.js` and `server/services/agentLifecycle.js` — add test files (covered in Next Up #3).
-- [ ] **[HIGH][TESTS]** Create test files for `server/services/loops.js`, `clinvar.js`, `telegramBridge.js`.
-- [ ] **[HIGH][TESTS-VACUOUS]** `server/services/usage.test.js` (asserts `typeof === 'number'`), `cosRunnerClient.test.js:68-75` (no-throw assertion), `subAgentSpawner.test.js:14-260` (re-implements `selectModelForTask` locally instead of importing).
+- [ ] **[HIGH][TESTS]** Create test files for `server/services/clinvar.js`, `telegramBridge.js`.
 - [ ] **[MEDIUM][CLIENT]** 8 client components redefine `formatBytes`/`formatTime`/`formatDuration`/`timeAgo`/`formatDate` locally; import from `client/src/utils/formatters.js`.
-- [ ] **[MEDIUM][BUGS]** Missing `AbortSignal` timeouts in `aiDetect.js:166`, `meatspacePostLlm.js:91`, `memoryEmbeddings.js:202,243`, `telegramBridge.js:102`.
-- [ ] **[MEDIUM][PERF]** `server/services/feeds.js:223-231` — sequential feed refresh; switch to concurrency-bounded `Promise.allSettled`. `feeds.js:234-248` — full-sort-then-paginate on every request.
-- [ ] **[MEDIUM][BUGS]** `server/lib/httpClient.js:38` — abort listener never removed; closure leak. `client/src/components/messages/MessageDetail.jsx:50` — iframe `'load'` listeners never removed; use `{ once: true }`.
+- [ ] **[MEDIUM][PERF]** `server/services/feeds.js:234-248` — full-sort-then-paginate on every request.
 - [ ] **[MEDIUM][CODE]** Various magic numbers in `cos.js:166,357`, `lmStudioManager.js:66`; brittle `err.message.includes`/`startsWith` checks in `visionTest.js:124` and `routes/voice.js:160`.
 
 ### Deferred Architecture (human-led planning)
@@ -38,10 +35,10 @@ For project goals, see [GOALS.md](./GOALS.md). For completed work, see [DONE.md]
 - `server/services/cos.js` (3057 lines) — split into cosTaskStore / cosTaskGenerator / cosJobScheduler / cosHealthMonitor.
 - `server/services/agentLifecycle.js` (1283 lines) — extract prepareAgentWorkspace / resolveProvider / processCompletion.
 - `server/services/identity.js` (1917 lines) — separate genomic markers + longevity + goals + todos.
-- `server/services/taskSchedule.js` (2201 lines) — extract prompt management to `taskPromptService.js`.
+- `server/services/taskSchedule.js` (2233 lines) — extract prompt management to `taskPromptService.js`.
 - `server/services/socket.js` — split into domain-specific socket modules.
 - `server/routes/apps.js` (1126 lines) — extract `npm install` orchestration to `appBuilder.js`.
-- `client/src/components/goals/GoalDetailPanel.jsx` (1141 lines) — god component.
+- `client/src/components/goals/GoalDetailPanel.jsx` (1252 lines) — god component.
 - `autofixer/ui.js` (972 lines) — inline HTML template needs extraction.
 - API contract — standardize error response shapes (`asyncHandler` + `ServerError` everywhere).
 
