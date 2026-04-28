@@ -2083,7 +2083,9 @@ export function getDefaultPrompt(taskType) {
 // Cache slashdo command bodies loaded from the bundled submodule
 const _slashdoCache = {};
 async function loadSlashdoCommandBody(commandName) {
-  if (_slashdoCache[commandName]) return _slashdoCache[commandName];
+  // hasOwn instead of truthy check so we don't re-fetch when the file is
+  // legitimately empty (cached '' would otherwise look the same as "not yet loaded").
+  if (Object.hasOwn(_slashdoCache, commandName)) return _slashdoCache[commandName];
   _slashdoCache[commandName] = await loadSlashdoFile(commandName, { stripFrontmatter: true }) || '';
   return _slashdoCache[commandName];
 }

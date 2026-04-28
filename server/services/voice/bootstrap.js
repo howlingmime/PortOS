@@ -18,7 +18,7 @@ export const WHISPER_APP = 'portos-whisper';
 
 export const which = async (bin) => {
   const res = await pexec(IS_WIN ? 'where' : 'which', [bin]).catch(() => null);
-  return res?.stdout.split(/\r?\n/)[0].trim() || null;
+  return res?.stdout?.split(/\r?\n/)[0]?.trim() || null;
 };
 
 export const verifyBinaries = async (cfg) => {

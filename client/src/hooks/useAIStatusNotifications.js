@@ -40,6 +40,13 @@ export function useAIStatusNotifications() {
 
     const showLoading = (event) => {
       const state = opsRef.current.get(event.id) || { silent: false };
+      // Once a toast is opened, the deferred slow-call timer is no longer needed —
+      // letting it fire later would re-show a stale start message and clobber
+      // the model:loading/model:loaded toast we just opened.
+      if (state.slowTimer) {
+        clearTimeout(state.slowTimer);
+        state.slowTimer = undefined;
+      }
       state.opened = true;
       opsRef.current.set(event.id, state);
       toast.loading(event.message, { id: event.id, icon: phaseIcon[event.phase] || '🤖' });
