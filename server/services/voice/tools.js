@@ -1032,6 +1032,12 @@ const TOOLS = [
       if (errorMsg) {
         return { ok: false, error: errorMsg, summary: `I couldn't answer that — ${errorMsg}` };
       }
+      // Barge-in: runAsk exits early on signal.aborted without emitting a `done`
+      // event, so the loop ends with only partial deltas. Surface that as a
+      // cancellation rather than a successful partial answer.
+      if (ctx.signal?.aborted) {
+        return { ok: false, error: 'aborted', summary: 'Cancelled before I could finish answering.' };
+      }
       const finalAnswer = (doneAnswer ?? deltas.join('')).trim();
       if (!finalAnswer) {
         return { ok: false, summary: 'I came up empty on that question.' };

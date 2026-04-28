@@ -369,6 +369,20 @@ describe('ui_ask', () => {
     expect(r.ok).toBe(false);
     expect(r.summary).toMatch(/empty/i);
   });
+
+  it('returns ok:false on barge-in abort even with partial deltas', async () => {
+    const askService = await import('../askService.js');
+    askService.runAsk.mockImplementationOnce(async function* () {
+      yield { type: 'delta', text: 'partial answer' };
+      // runAsk exits early on abort without emitting `done`
+    });
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const r = await dispatchTool('ui_ask', { question: 'cancel mid-stream' }, { signal: ctrl.signal });
+    expect(r.ok).toBe(false);
+    expect(r.error).toBe('aborted');
+    expect(r.summary).toMatch(/cancelled/i);
+  });
 });
 
 describe('classifyIntent — ask group', () => {
