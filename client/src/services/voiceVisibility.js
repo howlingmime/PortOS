@@ -11,6 +11,7 @@ export const readVoiceHidden = () => {
 };
 
 export const writeVoiceHidden = (hidden) => {
+  if (typeof window === 'undefined') return;
   window.localStorage.setItem(HIDDEN_KEY, hidden ? '1' : '0');
   window.dispatchEvent(new Event(VISIBILITY_EVENT));
 };

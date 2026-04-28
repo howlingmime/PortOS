@@ -65,6 +65,12 @@ export default function VoiceWidget() {
   const handleStartRef = useRef(null);
   const handleStopRef = useRef(null);
   const handleCancelRef = useRef(null);
+  // VoiceToggleButton fetches voice config independently, so it can show and
+  // dispatch ENGAGE_EVENT before this widget's own getVoiceConfig() resolves
+  // and `enabled` flips true. handleStart short-circuits while disabled, which
+  // would otherwise make the first sidebar click a no-op. Queue the engage
+  // here and replay it when `enabled` becomes true.
+  const pendingEngageRef = useRef(false);
   const [handsFree, setHandsFree] = useState(() => {
     if (typeof window === 'undefined') return true;
     const stored = window.localStorage.getItem(HANDS_FREE_KEY);
@@ -297,13 +303,17 @@ export default function VoiceWidget() {
   // disengage path so hiding the widget mid-utterance doesn't accidentally
   // ship a partial PTT recording to the LLM. Also drops queued TTS so the
   // bot stops speaking when the user explicitly disengages.
-  const handleCancel = useCallback(() => {
+  // Async + awaited teardown: voiceClient holds module-level stream/recorder
+  // state, so a synchronous cancel followed by a quick re-engage can have
+  // the in-flight stop tear down the *new* capture's tracks. Awaiting the
+  // teardown serializes engage/disengage and prevents that race.
+  const handleCancel = useCallback(async () => {
     if (useWebSpeech) {
       if (isWebSpeechCapturing()) stopWebSpeechCapture();
       setInterimTranscript('');
     } else {
-      if (isContinuous()) stopContinuous();
-      if (isCapturing()) stopCapture({ submit: false });
+      if (isContinuous()) await stopContinuous().catch(() => {});
+      if (isCapturing()) await stopCapture({ submit: false }).catch(() => {});
     }
     interrupt();
     setStage('idle');
@@ -402,26 +412,47 @@ export default function VoiceWidget() {
   // Disengage routes through handleCancel (not handleStop) so a PTT user who
   // hides the widget mid-recording doesn't have a partial utterance shipped
   // to the LLM by stopCapture's default `{ submit: true }` behavior.
+  // Engage uses a pending-flag fallback: if the click lands before this
+  // widget's own config fetch resolves (handleStart short-circuits while
+  // !enabled), we replay the engage in the effect below once enabled flips.
   useEffect(() => {
-    const onEngage = () => { handleStartRef.current?.(); };
-    const onDisengage = () => { handleCancelRef.current?.(); };
+    const onEngage = () => {
+      if (!enabled) {
+        pendingEngageRef.current = true;
+        return;
+      }
+      handleStartRef.current?.();
+    };
+    const onDisengage = () => {
+      pendingEngageRef.current = false;
+      handleCancelRef.current?.();
+    };
     window.addEventListener(ENGAGE_EVENT, onEngage);
     window.addEventListener(DISENGAGE_EVENT, onDisengage);
     return () => {
       window.removeEventListener(ENGAGE_EVENT, onEngage);
       window.removeEventListener(DISENGAGE_EVENT, onDisengage);
     };
-  }, []);
+  }, [enabled]);
 
-  const hideWidget = useCallback(() => {
-    if (isWebSpeechCapturing()) stopWebSpeechCapture();
-    if (isContinuous()) stopContinuous();
-    if (isCapturing()) stopCapture({ submit: false });
-    interrupt();
+  // Drain a queued engage once config has loaded and voice is actually on.
+  // Without this, a click on the sidebar toggle that beats getVoiceConfig()
+  // resolving would show the widget but leave the mic dormant.
+  useEffect(() => {
+    if (!enabled || !pendingEngageRef.current) return;
+    pendingEngageRef.current = false;
+    handleStartRef.current?.();
+  }, [enabled]);
+
+  // Reuse handleCancel for teardown so we don't duplicate the awaited stop
+  // logic — same race-with-re-engage concern applies if the user hides then
+  // immediately re-engages from the sidebar.
+  const hideWidget = useCallback(async () => {
+    await handleCancel();
     writeVoiceHidden(true);
     setHidden(true);
     toast('Voice widget hidden. Re-enable from the sidebar mic or Settings → Voice.');
-  }, []);
+  }, [handleCancel]);
 
   if (!enabled || hidden) return null;
 
