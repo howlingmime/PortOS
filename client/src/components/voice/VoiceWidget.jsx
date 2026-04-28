@@ -10,13 +10,19 @@ import { getVoiceConfig } from '../../services/apiVoice';
 import toast from '../ui/Toast';
 import { useVoiceUiSync, pushUiIndexAfterAction } from '../../hooks/useVoiceUiSync';
 import { doClick, doFill, doSelect, doSetCheckbox } from '../../services/uiInteract';
+import {
+  VISIBILITY_EVENT,
+  ENGAGE_EVENT,
+  DISENGAGE_EVENT,
+  readVoiceHidden,
+  writeVoiceHidden,
+  isVoiceHiddenStorageEvent,
+} from '../../services/voiceVisibility';
 
 // Peak below this (0..1) is usually whisper's [BLANK_AUDIO] territory.
 const QUIET_MIC_THRESHOLD = 0.02;
 
 const HANDS_FREE_KEY = 'portos.voice.handsFree';
-const HIDDEN_KEY = 'portos.voice.hidden';
-const VISIBILITY_EVENT = 'portos:voice:visibility';
 
 const STAGE = {
   idle: { icon: Mic, label: '', tone: 'text-gray-300' },
@@ -62,10 +68,7 @@ export default function VoiceWidget() {
     const stored = window.localStorage.getItem(HANDS_FREE_KEY);
     return stored === null ? true : stored === '1';
   });
-  const [hidden, setHidden] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return window.localStorage.getItem(HIDDEN_KEY) === '1';
-  });
+  const [hidden, setHidden] = useState(readVoiceHidden);
   const [level, setLevel] = useState(0);
   const scrollRef = useRef(null);
   const useWebSpeech = sttEngine === 'web-speech' && webSpeechSupported;
@@ -362,14 +365,27 @@ export default function VoiceWidget() {
   // Settings → Voice can toggle widget visibility without a reload. Listen for
   // the custom event and the storage event (covers other tabs).
   useEffect(() => {
-    const sync = () => {
-      setHidden(window.localStorage.getItem(HIDDEN_KEY) === '1');
-    };
+    const sync = () => setHidden(readVoiceHidden());
+    const onStorage = (e) => { if (isVoiceHiddenStorageEvent(e)) sync(); };
     window.addEventListener(VISIBILITY_EVENT, sync);
-    window.addEventListener('storage', sync);
+    window.addEventListener('storage', onStorage);
     return () => {
       window.removeEventListener(VISIBILITY_EVENT, sync);
-      window.removeEventListener('storage', sync);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  // Sidebar Voice toggle dispatches engage/disengage so engaging the widget
+  // also starts listening (and disengaging stops the mic) — without this the
+  // user would have to click the toggle, then click mic separately.
+  useEffect(() => {
+    const onEngage = () => { handleStartRef.current?.(); };
+    const onDisengage = () => { handleStopRef.current?.(); };
+    window.addEventListener(ENGAGE_EVENT, onEngage);
+    window.addEventListener(DISENGAGE_EVENT, onDisengage);
+    return () => {
+      window.removeEventListener(ENGAGE_EVENT, onEngage);
+      window.removeEventListener(DISENGAGE_EVENT, onDisengage);
     };
   }, []);
 
@@ -378,35 +394,37 @@ export default function VoiceWidget() {
     if (isContinuous()) stopContinuous();
     if (isCapturing()) stopCapture({ submit: false });
     interrupt();
-    window.localStorage.setItem(HIDDEN_KEY, '1');
-    window.dispatchEvent(new Event(VISIBILITY_EVENT));
+    writeVoiceHidden(true);
     setHidden(true);
-    toast('Voice widget hidden. Re-enable in Settings → Voice.');
+    toast('Voice widget hidden. Re-enable from the sidebar mic or Settings → Voice.');
   }, []);
 
   if (!enabled || hidden) return null;
 
   const { icon: Icon, label, tone } = STAGE[stage] || STAGE.idle;
   const capturing = ACTIVE_STAGES.has(stage) || isWebSpeechCapturing();
+  // Distinct violet ring + soft glow so the floating widget reads as
+  // "voice agent layer" instead of blending into whatever card it's covering.
+  const fabSurface = 'border-violet-500/50 shadow-[0_0_24px_-4px_rgba(168,85,247,0.55)]';
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
       {!expanded && (
         <div className="md:hidden flex items-center gap-2">
-          {capturing && <span className={`text-xs ${tone} bg-port-card/95 backdrop-blur border border-port-border rounded-full px-2 py-1`}>{label}</span>}
+          {capturing && <span className={`text-xs ${tone} bg-port-card/95 backdrop-blur border rounded-full px-2 py-1 ${fabSurface}`}>{label}</span>}
           <button
             onClick={hideWidget}
             title="Hide voice widget (restore in Settings → Voice)"
-            className="p-2 rounded-full bg-port-card border border-port-border text-gray-400 hover:text-white shadow-lg"
+            className={`p-2 rounded-full bg-port-card border text-gray-400 hover:text-white ${fabSurface}`}
           >
             <EyeOff size={14} />
           </button>
           <button
             onClick={() => { setExpanded(true); toggleCapture(); }}
-            className={`p-3 rounded-full shadow-lg transition-colors ${
+            className={`p-3 rounded-full border transition-colors ${fabSurface} ${
               capturing
-                ? 'bg-port-accent text-white animate-pulse'
-                : 'bg-port-card border border-port-border text-white'
+                ? 'bg-violet-500 text-white animate-pulse'
+                : 'bg-port-card text-white'
             }`}
             title="Open voice controls"
           >
@@ -416,7 +434,7 @@ export default function VoiceWidget() {
       )}
       <div className={`${expanded ? 'flex' : 'hidden'} md:flex flex-col items-end gap-2 w-96 max-w-[calc(100vw-2rem)]`}>
         {!collapsed && history.length > 0 && (
-          <div className="bg-port-card/95 backdrop-blur border border-port-border rounded-xl shadow-lg w-full flex flex-col">
+          <div className={`bg-port-card/95 backdrop-blur border rounded-xl w-full flex flex-col ${fabSurface}`}>
             <div className="flex items-center justify-between px-3 py-1.5 border-b border-port-border/50">
               <span className="text-xs text-gray-400">Conversation</span>
               <button
@@ -447,7 +465,7 @@ export default function VoiceWidget() {
         )}
         <form
           onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-          className="flex items-center gap-1 bg-port-card/95 backdrop-blur border border-port-border rounded-full pl-4 pr-1 py-1 shadow-lg w-full"
+          className={`flex items-center gap-1 bg-port-card/95 backdrop-blur border rounded-full pl-4 pr-1 py-1 w-full ${fabSurface}`}
         >
           <input
             type="text"
@@ -471,7 +489,7 @@ export default function VoiceWidget() {
             Dictating to Daily Log — say &quot;stop dictation&quot; to end
           </div>
         )}
-        <div className="flex items-center gap-2 bg-port-card/95 backdrop-blur border border-port-border rounded-full pl-3 pr-1 py-1 shadow-lg">
+        <div className={`flex items-center gap-2 bg-port-card/95 backdrop-blur border rounded-full pl-3 pr-1 py-1 ${fabSurface}`}>
           <span className={`text-xs ${tone}`}>{label}</span>
           {!useWebSpeech && handsFree && isContinuous() && (
             <span
@@ -516,8 +534,8 @@ export default function VoiceWidget() {
             onClick={toggleCapture}
             className={`p-3 rounded-full transition-colors ${
               capturing
-                ? 'bg-port-accent text-white animate-pulse'
-                : 'bg-port-border hover:bg-port-border/70 text-white'
+                ? 'bg-violet-500 text-white animate-pulse'
+                : 'bg-violet-500/20 hover:bg-violet-500/40 text-violet-200'
             }`}
             title={(() => {
               if (handsFree) {
