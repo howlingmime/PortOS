@@ -155,11 +155,20 @@ async function runCodex(job, jobId, bin, args, outputPath, filename, meta) {
     }
   }, CODEX_TIMEOUT_MS);
 
+  // Banner is roughly 12 lines / ~500 bytes — keep a small rolling
+  // buffer so a session-id line that gets split across chunk boundaries
+  // (Node streams can land each pipe write as its own 'data' event)
+  // still matches. Trim aggressively after a match to keep this tiny.
+  let bannerBuf = '';
+  const BANNER_BUF_MAX = 4 * 1024;
   const captureSession = (text) => {
     if (sessionId) return;
-    const m = text.match(SESSION_ID_RE);
+    bannerBuf += text;
+    if (bannerBuf.length > BANNER_BUF_MAX) bannerBuf = bannerBuf.slice(-BANNER_BUF_MAX);
+    const m = bannerBuf.match(SESSION_ID_RE);
     if (m) {
       sessionId = m[1];
+      bannerBuf = '';
       broadcastSse(job, { type: 'status', message: `Codex session ${sessionId.slice(0, 8)}…` });
     }
   };

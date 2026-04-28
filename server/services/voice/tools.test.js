@@ -34,10 +34,34 @@ vi.mock('../feeds.js', () => ({
 }));
 // imageGen dispatcher — tests pin the dispatch and let us assert what mode
 // the voice tool forwards. The settings mock controls the codex-enabled gate.
-const generateImageMock = vi.fn(async (params) => ({
-  filename: 'mock.png', path: '/data/images/mock.png', mode: params?.mode || 'external',
-}));
+// For async modes (local/codex) the mock also simulates the per-provider
+// 'completed' event the real providers emit on imageGenEvents — without
+// that, the tool's await would hang for 5 minutes.
 const codexEnabledRef = { value: false };
+
+// Hoisting note: vi.mock factories run before the module under test loads,
+// so we can't import imageGenEvents up here. Instead, do the import lazily
+// inside the mock factory using vi.importActual.
+let _imageGenEvents = null;
+const getEvents = async () => {
+  if (!_imageGenEvents) _imageGenEvents = (await vi.importActual('../imageGenEvents.js')).imageGenEvents;
+  return _imageGenEvents;
+};
+
+const generateImageMock = vi.fn(async (params) => {
+  const mode = params?.mode || 'external';
+  const generationId = `mock-${Math.random().toString(36).slice(2, 10)}`;
+  const result = { generationId, filename: 'mock.png', path: '/data/images/mock.png', mode };
+  if (mode === 'local' || mode === 'codex') {
+    // Fire the completion event after generateImage resolves so the tool
+    // has time to register its listener with the captured generationId.
+    setImmediate(async () => {
+      const events = await getEvents();
+      events.emit('completed', { generationId, path: result.path, filename: result.filename });
+    });
+  }
+  return result;
+});
 vi.mock('../imageGen/index.js', () => ({
   generateImage: (...args) => generateImageMock(...args),
   IMAGE_GEN_MODES: ['external', 'local', 'codex'],
@@ -513,5 +537,35 @@ describe("image_generate", () => {
     const r = await dispatchTool("image_generate", { prompt: "a fox", height: "768.5" });
     expect(r.ok).toBe(false);
     expect(r.summary).toMatch(/height must be an integer between 64 and 2048/);
+  });
+
+  // The tool returns synchronously for external (file is already on disk)
+  // but for local/codex it must await the imageGenEvents 'completed' event
+  // — otherwise the palette toast says "image generated" before the file
+  // actually exists.
+  it("waits for imageGenEvents 'completed' on async modes (local) before resolving", async () => {
+    generateImageMock.mockClear();
+    const r = await dispatchTool("image_generate", { prompt: "a fox", provider: "local" });
+    expect(r.ok).toBe(true);
+    expect(r.mode).toBe("local");
+    expect(r.summary).toMatch(/^Generated image \(local\)/);
+  });
+
+  it("returns ok:false when imageGenEvents emits 'failed' for async modes", async () => {
+    codexEnabledRef.value = true;
+    generateImageMock.mockClear();
+    // Override the default mock to emit 'failed' instead of 'completed'.
+    generateImageMock.mockImplementationOnce(async (params) => {
+      const generationId = `mockfail-${Math.random().toString(36).slice(2, 8)}`;
+      setImmediate(async () => {
+        const events = await getEvents();
+        events.emit('failed', { generationId, error: 'mock provider failure' });
+      });
+      return { generationId, filename: 'mock.png', path: '/data/images/mock.png', mode: params.mode };
+    });
+    const r = await dispatchTool("image_generate", { prompt: "a fox", provider: "codex" });
+    expect(r.ok).toBe(false);
+    expect(r.summary).toMatch(/mock provider failure/);
+    codexEnabledRef.value = false;
   });
 });
