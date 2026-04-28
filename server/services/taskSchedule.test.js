@@ -54,6 +54,13 @@ vi.mock('./eventScheduler.js', () => ({
   parseCronToNextRun: vi.fn()
 }))
 
+vi.mock('./cosState.js', () => ({
+  loadState: vi.fn().mockResolvedValue({ config: { improvementEnabled: true } }),
+  isImprovementEnabled: vi.fn((state) =>
+    state.config.improvementEnabled ?? (state.config.selfImprovementEnabled || state.config.appImprovementEnabled)
+  )
+}))
+
 import {
   INTERVAL_TYPES,
   SELF_IMPROVEMENT_TASK_TYPES,
@@ -70,8 +77,12 @@ import {
   deleteTemplateTask,
   getDefaultPrompt,
   getTaskPrompt,
-  resetExecutionHistory
+  resetExecutionHistory,
+  triggerOnDemandTask,
+  getScheduleStatus
 } from './taskSchedule.js'
+
+import { loadState } from './cosState.js'
 
 import { readJSONFile } from '../lib/fileUtils.js'
 import { isTaskTypeEnabledForApp, getAppTaskTypeInterval } from './apps.js'
@@ -487,6 +498,87 @@ describe('taskSchedule', () => {
       })
       const result = await resetExecutionHistory('reset-app-test', 'app-1')
       expect(result.success).toBe(true)
+    })
+  })
+
+  describe('triggerOnDemandTask', () => {
+    beforeEach(() => {
+      loadState.mockResolvedValue({ config: { improvementEnabled: true } })
+    })
+
+    it('should reject and not persist when master Improve is disabled', async () => {
+      mockSchedule({
+        tasks: { 'feature-ideas': { type: 'weekly', enabled: true } }
+      })
+      loadState.mockResolvedValue({ config: { improvementEnabled: false } })
+
+      const result = await triggerOnDemandTask('feature-ideas', 'critical-mass')
+
+      expect(result.error).toMatch(/improvement is disabled/i)
+      // Read schedule back: no on-demand request should have been written.
+      const schedule = await loadSchedule()
+      expect(schedule.onDemandRequests || []).toHaveLength(0)
+    })
+
+    it('should reject when the task type is disabled (cheaper check runs first)', async () => {
+      mockSchedule({
+        tasks: { 'feature-ideas': { type: 'weekly', enabled: false } }
+      })
+
+      const result = await triggerOnDemandTask('feature-ideas', 'critical-mass')
+
+      expect(result.error).toMatch(/'feature-ideas' is disabled/i)
+      // loadState should not have been called — task-type check short-circuits before loadState.
+      expect(loadState).not.toHaveBeenCalled()
+    })
+
+    it('should fall back to legacy split flags when improvementEnabled is undefined', async () => {
+      mockSchedule({
+        tasks: { 'feature-ideas': { type: 'weekly', enabled: true } }
+      })
+      loadState.mockResolvedValue({
+        config: { selfImprovementEnabled: false, appImprovementEnabled: false }
+      })
+
+      const result = await triggerOnDemandTask('feature-ideas', 'critical-mass')
+
+      expect(result.error).toMatch(/improvement is disabled/i)
+    })
+
+    it('should persist the request and emit event when improvement is enabled', async () => {
+      mockSchedule({
+        tasks: { 'feature-ideas': { type: 'weekly', enabled: true } }
+      })
+
+      const result = await triggerOnDemandTask('feature-ideas', 'critical-mass')
+
+      expect(result.error).toBeUndefined()
+      expect(result.taskType).toBe('feature-ideas')
+      expect(result.appId).toBe('critical-mass')
+      expect(result.id).toMatch(/^demand-/)
+    })
+  })
+
+  describe('getScheduleStatus', () => {
+    beforeEach(() => {
+      loadState.mockResolvedValue({ config: { improvementEnabled: true } })
+    })
+
+    it('should include improvementEnabled: true when master flag is on', async () => {
+      mockSchedule({ tasks: { 'security': { type: 'weekly', enabled: true } } })
+
+      const status = await getScheduleStatus()
+
+      expect(status.improvementEnabled).toBe(true)
+    })
+
+    it('should include improvementEnabled: false when master flag is off', async () => {
+      mockSchedule({ tasks: { 'security': { type: 'weekly', enabled: true } } })
+      loadState.mockResolvedValue({ config: { improvementEnabled: false } })
+
+      const status = await getScheduleStatus()
+
+      expect(status.improvementEnabled).toBe(false)
     })
   })
 })

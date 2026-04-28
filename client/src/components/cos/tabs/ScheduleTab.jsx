@@ -279,6 +279,11 @@ function GlobalConfigControls({ taskType, config, onUpdate, onTrigger, onReset, 
     }
   }, [showAppSelector]);
 
+  // Without this, an open dropdown survives a flip to disabled and pops back open when the master flag re-enables.
+  useEffect(() => {
+    if (improvementDisabled) setShowAppSelector(false);
+  }, [improvementDisabled]);
+
   const activeApps = apps?.filter(app => !app.archived) || [];
 
   const [cronEditing, setCronEditing] = useState(false);
@@ -524,16 +529,19 @@ function GlobalConfigControls({ taskType, config, onUpdate, onTrigger, onReset, 
       <div className="flex gap-2">
         {activeApps.length > 0 ? (
           <div className="relative" ref={appSelectorRef}>
-            <button
-              onClick={() => !improvementDisabled && setShowAppSelector(!showAppSelector)}
-              disabled={improvementDisabled}
-              className={triggerButtonClass(improvementDisabled)}
-              title={improvementDisabled ? IMPROVEMENT_DISABLED_TITLE : 'Run this task on a specific app'}
-            >
-              <Play size={14} />
-              Run on App
-              <ChevronDown size={12} className={`transition-transform ${showAppSelector ? 'rotate-180' : ''}`} />
-            </button>
+            {/* Tooltip on the wrapper, not the button: most browsers skip hover events on disabled controls. */}
+            <span title={improvementDisabled ? IMPROVEMENT_DISABLED_TITLE : 'Run this task on a specific app'} className="inline-block">
+              <button
+                onClick={() => !improvementDisabled && setShowAppSelector(!showAppSelector)}
+                disabled={improvementDisabled}
+                aria-disabled={improvementDisabled || undefined}
+                className={triggerButtonClass(improvementDisabled)}
+              >
+                <Play size={14} />
+                Run on App
+                <ChevronDown size={12} className={`transition-transform ${showAppSelector ? 'rotate-180' : ''}`} />
+              </button>
+            </span>
             {showAppSelector && !improvementDisabled && (
               <div className="absolute bottom-full left-0 mb-1 z-50 w-64 max-w-[calc(100vw-2rem)] max-h-64 overflow-y-auto bg-port-card border border-port-border rounded-lg shadow-lg">
                 <div className="p-2 border-b border-port-border">
@@ -558,15 +566,17 @@ function GlobalConfigControls({ taskType, config, onUpdate, onTrigger, onReset, 
             )}
           </div>
         ) : (
-          <button
-            onClick={() => onTrigger(taskType)}
-            disabled={improvementDisabled}
-            className={triggerButtonClass(improvementDisabled)}
-            title={improvementDisabled ? IMPROVEMENT_DISABLED_TITLE : 'Run this task immediately (bypasses schedule)'}
-          >
-            <Play size={14} />
-            Run Now
-          </button>
+          <span title={improvementDisabled ? IMPROVEMENT_DISABLED_TITLE : 'Run this task immediately (bypasses schedule)'} className="inline-block">
+            <button
+              onClick={() => onTrigger(taskType)}
+              disabled={improvementDisabled}
+              aria-disabled={improvementDisabled || undefined}
+              className={triggerButtonClass(improvementDisabled)}
+            >
+              <Play size={14} />
+              Run Now
+            </button>
+          </span>
         )}
         {config.type === 'once' && status.reason === 'once-completed' && (
           <button
