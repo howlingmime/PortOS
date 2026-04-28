@@ -1,16 +1,36 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createPR, extractAgentSummary, parseGitHubOwnerFromRemote, pickGhAccountForOwner } from './git.js';
+import { createPR, extractAgentSummary, parseGitHubOwnerFromRemote, pickGhAccountForOwner, parseGitRemote, detectForgeCli } from './git.js';
 
-describe('parseGitHubOwnerFromRemote', () => {
-  it('parses SSH urls (with and without .git suffix)', () => {
-    expect(parseGitHubOwnerFromRemote('git@github.com:atomantic/PortOS.git')).toBe('atomantic');
-    expect(parseGitHubOwnerFromRemote('git@github.com:atomantic/PortOS')).toBe('atomantic');
+describe('parseGitRemote', () => {
+  it('parses GitHub SSH urls', () => {
+    expect(parseGitRemote('git@github.com:atomantic/PortOS.git')).toEqual({ host: 'github.com', owner: 'atomantic' });
+    expect(parseGitRemote('git@github.com:atomantic/PortOS')).toEqual({ host: 'github.com', owner: 'atomantic' });
   });
 
-  it('parses HTTPS urls (with and without .git suffix)', () => {
-    expect(parseGitHubOwnerFromRemote('https://github.com/atomantic/PortOS.git')).toBe('atomantic');
+  it('parses GitHub HTTPS urls', () => {
+    expect(parseGitRemote('https://github.com/atomantic/PortOS.git')).toEqual({ host: 'github.com', owner: 'atomantic' });
+    expect(parseGitRemote('https://github.com/atomantic/PortOS')).toEqual({ host: 'github.com', owner: 'atomantic' });
+  });
+
+  it('parses GitLab SSH and HTTPS urls (including subgroup paths)', () => {
+    expect(parseGitRemote('git@gitlab.com:my-group/my-project.git')).toEqual({ host: 'gitlab.com', owner: 'my-group' });
+    expect(parseGitRemote('https://gitlab.com/my-group/sub/proj.git')).toEqual({ host: 'gitlab.com', owner: 'my-group' });
+    expect(parseGitRemote('git@gitlab.example.com:team/repo.git')).toEqual({ host: 'gitlab.example.com', owner: 'team' });
+  });
+
+  it('returns null for empty, null, or malformed input', () => {
+    expect(parseGitRemote('')).toBeNull();
+    expect(parseGitRemote(null)).toBeNull();
+    expect(parseGitRemote(undefined)).toBeNull();
+    expect(parseGitRemote('github.com:atomantic/PortOS')).toBeNull();
+    expect(parseGitRemote('git@github.com:noslash')).toBeNull();
+  });
+});
+
+describe('parseGitHubOwnerFromRemote (back-compat wrapper)', () => {
+  it('returns owner only for github.com hosts', () => {
+    expect(parseGitHubOwnerFromRemote('git@github.com:atomantic/PortOS.git')).toBe('atomantic');
     expect(parseGitHubOwnerFromRemote('https://github.com/atomantic/PortOS')).toBe('atomantic');
-    expect(parseGitHubOwnerFromRemote('http://github.com/atomantic/PortOS')).toBe('atomantic');
   });
 
   it('returns null for non-github hosts', () => {
@@ -18,15 +38,28 @@ describe('parseGitHubOwnerFromRemote', () => {
     expect(parseGitHubOwnerFromRemote('https://bitbucket.org/foo/bar')).toBeNull();
   });
 
-  it('returns null for empty or null input', () => {
+  it('returns null for empty or malformed input', () => {
     expect(parseGitHubOwnerFromRemote('')).toBeNull();
     expect(parseGitHubOwnerFromRemote(null)).toBeNull();
-    expect(parseGitHubOwnerFromRemote(undefined)).toBeNull();
+    expect(parseGitHubOwnerFromRemote('git@github.com:noslash')).toBeNull();
+  });
+});
+
+describe('detectForgeCli', () => {
+  it('routes github.com to gh', () => {
+    expect(detectForgeCli('github.com')).toBe('gh');
   });
 
-  it('returns null for malformed urls', () => {
-    expect(parseGitHubOwnerFromRemote('github.com:atomantic/PortOS')).toBeNull();
-    expect(parseGitHubOwnerFromRemote('git@github.com:noslash')).toBeNull();
+  it('routes gitlab.com and self-hosted gitlab to glab', () => {
+    expect(detectForgeCli('gitlab.com')).toBe('glab');
+    expect(detectForgeCli('gitlab.example.com')).toBe('glab');
+    expect(detectForgeCli('GitLab.Internal.Co')).toBe('glab');
+  });
+
+  it('defaults to gh for unknown or empty hosts', () => {
+    expect(detectForgeCli('bitbucket.org')).toBe('gh');
+    expect(detectForgeCli(null)).toBe('gh');
+    expect(detectForgeCli('')).toBe('gh');
   });
 });
 

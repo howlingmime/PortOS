@@ -324,23 +324,34 @@ export async function checkout(dir, branchName) {
 }
 
 /**
- * Parse the GitHub owner login from a remote URL.
- * Returns null for non-github.com remotes or unparseable inputs.
+ * Parse a git remote URL into `{ host, owner }`. Returns null for unparseable input.
  * Examples:
- *   git@github.com:atomantic/PortOS.git → 'atomantic'
- *   https://github.com/atomantic/PortOS → 'atomantic'
+ *   git@github.com:atomantic/PortOS.git    → { host: 'github.com', owner: 'atomantic' }
+ *   https://gitlab.com/group/sub/proj.git  → { host: 'gitlab.com', owner: 'group' }
+ *   git@gitlab.example.com:foo/bar.git     → { host: 'gitlab.example.com', owner: 'foo' }
  */
-export function parseGitHubOwnerFromRemote(url) {
+export function parseGitRemote(url) {
   if (!url) return null;
-  const ssh = url.match(/^git@github\.com:([^/]+)\/[^/]+?(?:\.git)?$/);
-  if (ssh) return ssh[1];
-  const https = url.match(/^https?:\/\/github\.com\/([^/]+)\/[^/]+?(?:\.git)?$/);
-  if (https) return https[1];
+  // SSH: git@HOST:OWNER/REPO[.git]   (REPO can contain '/' for GitLab subgroups,
+  //                                   but we only need the top-level owner here)
+  const ssh = url.match(/^git@([^:]+):([^/]+)\/.+?(?:\.git)?$/);
+  if (ssh) return { host: ssh[1], owner: ssh[2] };
+  // HTTPS: https://HOST/OWNER/REPO[.git]
+  const https = url.match(/^https?:\/\/([^/]+)\/([^/]+)\/.+?(?:\.git)?$/);
+  if (https) return { host: https[1], owner: https[2] };
   return null;
 }
 
 /**
- * Pick which logged-in gh account should auth against a repo owned by `ownerLogin`.
+ * Back-compat: returns just the owner login when the remote is on github.com.
+ */
+export function parseGitHubOwnerFromRemote(url) {
+  const parsed = parseGitRemote(url);
+  return parsed?.host === 'github.com' ? parsed.owner : null;
+}
+
+/**
+ * Pick which logged-in gh/glab account should auth against a repo owned by `ownerLogin`.
  * Case-insensitive exact match; returns null if no logged-in account matches the owner.
  */
 export function pickGhAccountForOwner(ownerLogin, availableAccounts) {
@@ -349,9 +360,22 @@ export function pickGhAccountForOwner(ownerLogin, availableAccounts) {
   return availableAccounts.find(a => a.toLowerCase() === lower) || null;
 }
 
-function spawnGh(args, options = {}) {
+/**
+ * Pick which forge CLI to use for a given remote host.
+ *   github.com         → 'gh'
+ *   gitlab.com / *gitlab* → 'glab'   (covers self-hosted GitLab like gitlab.example.com)
+ *   anything else      → 'gh'        (default; harmless when gh isn't authed for that host)
+ */
+export function detectForgeCli(host) {
+  if (!host) return 'gh';
+  if (host === 'github.com') return 'gh';
+  if (host === 'gitlab.com' || /(^|\.)gitlab\./i.test(host)) return 'glab';
+  return 'gh';
+}
+
+function spawnCli(cmd, args, options = {}) {
   return new Promise((resolve) => {
-    const child = spawn('gh', args, { shell: false, windowsHide: true, ...options });
+    const child = spawn(cmd, args, { shell: false, windowsHide: true, ...options });
     let stdout = '', stderr = '';
     child.stdout.on('data', (d) => { stdout += d.toString(); });
     child.stderr.on('data', (d) => { stderr += d.toString(); });
@@ -361,7 +385,7 @@ function spawnGh(args, options = {}) {
 }
 
 async function listGhAccounts() {
-  const { stdout, stderr } = await spawnGh(['auth', 'status', '-h', 'github.com']);
+  const { stdout, stderr } = await spawnCli('gh', ['auth', 'status', '-h', 'github.com']);
   // gh writes status to stderr in older versions, stdout in newer — search both.
   const text = `${stdout}\n${stderr}`;
   const accounts = [];
@@ -372,51 +396,66 @@ async function listGhAccounts() {
 }
 
 async function getGhTokenForAccount(login) {
-  const { code, stdout } = await spawnGh(['auth', 'token', '-u', login, '-h', 'github.com']);
+  const { code, stdout } = await spawnCli('gh', ['auth', 'token', '-u', login, '-h', 'github.com']);
   return code === 0 ? stdout.trim() : null;
 }
 
 /**
- * Resolve the right gh auth env for a given repo directory.
- * Auto-detects the owner from `origin`, picks the matching logged-in gh account,
- * and returns an env override pinning `GH_TOKEN` so gh doesn't depend on
- * `~/.config/gh/hosts.yml`'s mutable `user:` field.
+ * Resolve the forge CLI + auth env for a given repo directory.
+ * - For GitHub repos: auto-pins `GH_TOKEN` to the logged-in gh account whose login
+ *   matches the repo owner, so PR creation doesn't depend on `hosts.yml`'s mutable
+ *   `user:` field (avoids the multi-account "must be a collaborator" failure mode).
+ * - For GitLab repos: uses glab as-is. glab is single-user-per-host, so its keyring
+ *   already disambiguates by host without the mutable-active-user pitfall.
  * Falls back to ambient env when no match is possible.
  */
-export async function resolveGhEnvForRepo(dir) {
+export async function resolveForgeForRepo(dir) {
   const remote = await execGitSafe(['remote', 'get-url', 'origin'], dir);
-  const owner = parseGitHubOwnerFromRemote(remote.stdout?.trim());
-  if (!owner) return { env: process.env, owner: null, account: null };
+  const parsed = parseGitRemote(remote.stdout?.trim());
+  if (!parsed) {
+    return { cli: 'gh', env: process.env, host: null, owner: null, account: null };
+  }
+
+  const cli = detectForgeCli(parsed.host);
+
+  if (cli !== 'gh') {
+    return { cli, env: process.env, host: parsed.host, owner: parsed.owner, account: null };
+  }
 
   const accounts = await listGhAccounts();
-  const account = pickGhAccountForOwner(owner, accounts);
-  if (!account) return { env: process.env, owner, account: null };
+  const account = pickGhAccountForOwner(parsed.owner, accounts);
+  if (!account) return { cli, env: process.env, host: parsed.host, owner: parsed.owner, account: null };
 
   const token = await getGhTokenForAccount(account);
-  if (!token) return { env: process.env, owner, account };
+  if (!token) return { cli, env: process.env, host: parsed.host, owner: parsed.owner, account };
 
-  return { env: { ...process.env, GH_TOKEN: token }, owner, account };
+  return { cli, env: { ...process.env, GH_TOKEN: token }, host: parsed.host, owner: parsed.owner, account };
 }
 
 /**
- * Create a pull request using the `gh` CLI.
- * Auto-pins gh identity to the account whose login matches the repo's owner
- * (so PR creation works correctly when multiple gh accounts are logged in).
- * Fails gracefully if `gh` is not installed.
+ * Create a pull request (GitHub) or merge request (GitLab) using `gh` / `glab`.
+ * Forge is auto-detected from the repo's `origin` URL; gh identity is auto-pinned
+ * to the matching account when multiple gh accounts are logged in.
+ * Fails gracefully if the relevant CLI is not installed.
  * @param {string} dir - Working directory (repo root)
  * @param {object} options - PR options
- * @param {string} options.title - PR title
- * @param {string} options.body - PR description
+ * @param {string} options.title - PR/MR title
+ * @param {string} options.body - PR/MR description
  * @param {string} options.base - Base branch (target)
- * @param {string} options.head - Head branch (source)
- * @returns {Promise<{success: boolean, url?: string, error?: string, ghAccount?: string|null, ghOwner?: string|null}>}
+ * @param {string} options.head - Head branch (source, must be pushed to remote)
+ * @returns {Promise<{success: boolean, url?: string, error?: string, cli?: string, ghAccount?: string|null, ghOwner?: string|null, ghHost?: string|null}>}
  */
 export async function createPR(dir, { title, body, base, head }) {
-  const { env, owner, account } = await resolveGhEnvForRepo(dir);
+  const { cli, env, host, owner, account } = await resolveForgeForRepo(dir);
+
+  const args = cli === 'glab'
+    ? ['mr', 'create', '--title', title, '--description', body || '', '--target-branch', base, '--source-branch', head]
+    : ['pr', 'create', '--title', title, '--body', body || '', '--base', base, '--head', head];
+
+  const meta = { cli, ghAccount: account, ghOwner: owner, ghHost: host };
 
   return new Promise((resolve) => {
-    const args = ['pr', 'create', '--title', title, '--body', body || '', '--base', base, '--head', head];
-    const child = spawn('gh', args, { cwd: dir, env, shell: false, windowsHide: true });
+    const child = spawn(cli, args, { cwd: dir, env, shell: false, windowsHide: true });
 
     let stdout = '';
     let stderr = '';
@@ -426,15 +465,18 @@ export async function createPR(dir, { title, body, base, head }) {
 
     child.on('close', (code) => {
       if (code === 0) {
-        const url = stdout.trim();
-        resolve({ success: true, url, ghAccount: account, ghOwner: owner });
+        // Both gh and glab print the resulting URL on stdout (gh: just the URL;
+        // glab: a couple lines ending in the URL — extract the last http(s)-looking line).
+        const urlMatch = stdout.trim().match(/(https?:\/\/\S+)\s*$/);
+        const url = urlMatch ? urlMatch[1] : stdout.trim();
+        resolve({ success: true, url, ...meta });
       } else {
-        resolve({ success: false, error: stderr || `gh exited with code ${code}`, ghAccount: account, ghOwner: owner });
+        resolve({ success: false, error: stderr || `${cli} exited with code ${code}`, ...meta });
       }
     });
 
     child.on('error', (err) => {
-      resolve({ success: false, error: `gh not available: ${err.message}`, ghAccount: account, ghOwner: owner });
+      resolve({ success: false, error: `${cli} not available: ${err.message}`, ...meta });
     });
   });
 }

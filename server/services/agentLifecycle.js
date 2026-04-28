@@ -1182,17 +1182,19 @@ export async function cleanupAgentWorktree(agentId, success, { openPR = false, d
           return warnings;
         }
 
+        const cliName = prResult?.cli || 'gh';
         const authHint = prResult?.ghAccount
-          ? ` (gh authed as ${prResult.ghAccount} for ${prResult.ghOwner})`
+          ? ` (${cliName} authed as ${prResult.ghAccount} for ${prResult.ghOwner})`
           : prResult?.ghOwner
-            ? ` (no gh account matches owner ${prResult.ghOwner} — fell back to active user)`
+            ? ` (${cliName} on ${prResult.ghHost || prResult.ghOwner} — no account auto-pinned)`
             : '';
-        emitLog('error', `🌳 PR creation failed for ${worktreeBranch}${authHint}: ${reason}`, { agentId, branchName: worktreeBranch, ghAccount: prResult?.ghAccount, ghOwner: prResult?.ghOwner });
+        emitLog('error', `🌳 PR creation failed for ${worktreeBranch}${authHint}: ${reason}`, { agentId, branchName: worktreeBranch, cli: prResult?.cli, ghAccount: prResult?.ghAccount, ghOwner: prResult?.ghOwner, ghHost: prResult?.ghHost });
         warnings.push(`PR creation failed for branch ${worktreeBranch}: ${reason}. Worktree preserved for manual PR creation.`);
         return warnings;
       }
 
-      emitLog('success', `🌳 Created PR: ${prResult.url} (gh authed as ${prResult.ghAccount || 'active user'})`, { agentId, branchName: worktreeBranch, ghAccount: prResult.ghAccount, ghOwner: prResult.ghOwner });
+      const cliName = prResult.cli || 'gh';
+      emitLog('success', `🌳 Created PR: ${prResult.url} (${cliName}${prResult.ghAccount ? ` authed as ${prResult.ghAccount}` : ''})`, { agentId, branchName: worktreeBranch, cli: prResult.cli, ghAccount: prResult.ghAccount, ghOwner: prResult.ghOwner, ghHost: prResult.ghHost });
 
       const result = await removeWorktree(agentId, sourceWorkspace, worktreeBranch, { merge: false }).catch(err => {
         emitLog('warn', `🌳 Worktree cleanup failed for ${agentId}: ${err.message}`, { agentId });
