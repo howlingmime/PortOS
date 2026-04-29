@@ -381,6 +381,9 @@ export default function VoiceWidget() {
 
   // Hotkey toggles listening (press once to start, press again to send).
   // Ignored while focus is on an input/textarea so typing isn't hijacked.
+  // If the widget is currently hidden, the hotkey also un-hides it so the
+  // FAB/sidebar mic icon reflect the live mic state — otherwise the user
+  // hears no audio cue and has no UI to confirm the mic is open.
   useEffect(() => {
     if (!enabled) return;
     const isTypingTarget = (el) => {
@@ -392,11 +395,14 @@ export default function VoiceWidget() {
       if (e.code !== hotkey || e.repeat) return;
       if (isTypingTarget(document.activeElement)) return;
       e.preventDefault();
+      // writeVoiceHidden dispatches VISIBILITY_EVENT, which the listener
+      // below syncs into local `hidden` — no explicit setHidden needed.
+      if (hidden) writeVoiceHidden(false);
       toggleCapture();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [enabled, hotkey, toggleCapture]);
+  }, [enabled, hotkey, hidden, toggleCapture]);
 
   // Settings → Voice can toggle widget visibility without a reload. Listen for
   // the custom event and the storage event (covers other tabs).

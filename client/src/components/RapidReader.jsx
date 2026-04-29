@@ -98,19 +98,27 @@ export default function RapidReader({
   }, [playing, idx, total, current, delayFor, onComplete]);
 
   // Keyboard controls — only active when this component is mounted.
+  // Registered in the capture phase so we run before bubble-phase window
+  // listeners (notably VoiceWidget's hotkey, which also claims Space). When
+  // we handle a key we call stopImmediatePropagation so the voice agent
+  // doesn't toggle its mic on the same press.
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target?.tagName === 'INPUT' || e.target?.tagName === 'TEXTAREA') return;
-      if (e.key === ' ') { e.preventDefault(); setPlaying((p) => !p); }
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+      if (e.key === ' ') setPlaying((p) => !p);
       else if (e.key === 'ArrowLeft') setIdx((i) => Math.max(0, i - 1));
       else if (e.key === 'ArrowRight') setIdx((i) => Math.min(total - 1, i + 1));
       else if (e.key === 'r' || e.key === 'R') { setIdx(0); setPlaying(true); }
       else if (e.key === '+' || e.key === '=') setWpm((w) => Math.min(1200, w + 25));
       else if (e.key === '-' || e.key === '_') setWpm((w) => Math.max(100, w - 25));
       else if (e.key === 'Escape' && onClose) onClose();
+      else return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [total, onClose]);
 
   const restart = () => { setIdx(0); setPlaying(true); };
