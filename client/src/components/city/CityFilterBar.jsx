@@ -3,7 +3,12 @@ import { STATUS_FILTERS } from '../../utils/cityFilter';
 
 export default function CityFilterBar({ filter, onChange, matchCount, onJumpToFirst }) {
   const inputRef = useRef(null);
+  const filterRef = useRef(filter);
+  const onChangeRef = useRef(onChange);
   const [open, setOpen] = useState(Boolean(filter.search));
+
+  filterRef.current = filter;
+  onChangeRef.current = onChange;
 
   useEffect(() => {
     const onKey = (e) => {
@@ -16,14 +21,15 @@ export default function CityFilterBar({ filter, onChange, matchCount, onJumpToFi
         return;
       }
       if (e.key === 'Escape') {
-        if (filter.search) onChange({ ...filter, search: '' });
+        const current = filterRef.current;
+        if (current?.search) onChangeRef.current({ ...current, search: '' });
         setOpen(false);
         inputRef.current?.blur();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [filter, onChange]);
+  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();

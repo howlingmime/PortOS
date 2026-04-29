@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as api from '../services/api';
 import socket from '../services/socket';
 
-const healthSignature = (h) =>
-  `${h?.overallHealth}|${h?.system?.cpu?.usagePercent}|${h?.system?.memory?.usagePercent}|${h?.system?.disk?.usagePercent}|${h?.warnings?.length ?? 0}`;
+const healthSignature = (h) => {
+  const warnings = (h?.warnings || []).map(w => `${w.type}:${w.message}`).join(';');
+  return `${h?.overallHealth}|${h?.system?.cpu?.usagePercent}|${h?.system?.memory?.usagePercent}|${h?.system?.disk?.usagePercent}|${warnings}`;
+};
 
 export const useCityData = () => {
   const [apps, setApps] = useState([]);
@@ -57,6 +59,11 @@ export const useCityData = () => {
     });
   }, []);
 
+  const fetchNotifs = useCallback(async () => {
+    const counts = await api.getNotificationCounts().catch(() => null);
+    if (counts) setNotificationCounts(counts);
+  }, []);
+
   const agentMap = useMemo(() => {
     const map = new Map();
     const allAgents = [...(cosAgents || [])];
@@ -79,7 +86,10 @@ export const useCityData = () => {
   useEffect(() => {
     fetchAll();
 
-    const subscribe = () => socket.emit('cos:subscribe');
+    const subscribe = () => {
+      socket.emit('cos:subscribe');
+      socket.emit('notifications:subscribe');
+    };
     if (socket.connected) subscribe();
     socket.on('connect', subscribe);
 
@@ -112,6 +122,16 @@ export const useCityData = () => {
     };
     socket.on('cos:status', handleCosStatus);
 
+    const handleNotifCount = (count) => {
+      setNotificationCounts(prev => prev?.unread === count ? prev : { ...prev, unread: count });
+    };
+    const handleNotifChanged = () => fetchNotifs();
+    socket.on('notifications:count', handleNotifCount);
+    socket.on('notifications:added', handleNotifChanged);
+    socket.on('notifications:updated', handleNotifChanged);
+    socket.on('notifications:removed', handleNotifChanged);
+    socket.on('notifications:cleared', () => setNotificationCounts({ total: 0, unread: 0 }));
+
     pollRef.current = setInterval(async () => {
       const agents = await api.getRunningAgents().catch(() => []);
       setRunningAgents(agents);
@@ -121,6 +141,7 @@ export const useCityData = () => {
 
     return () => {
       socket.emit('cos:unsubscribe');
+      socket.emit('notifications:unsubscribe');
       socket.off('connect', subscribe);
       socket.off('apps:changed', handleAppsChanged);
       socket.off('cos:agent:spawned', handleAgentSpawned);
@@ -128,10 +149,15 @@ export const useCityData = () => {
       socket.off('cos:agent:completed', handleAgentCompleted);
       socket.off('cos:log', handleCosLog);
       socket.off('cos:status', handleCosStatus);
+      socket.off('notifications:count', handleNotifCount);
+      socket.off('notifications:added', handleNotifChanged);
+      socket.off('notifications:updated', handleNotifChanged);
+      socket.off('notifications:removed', handleNotifChanged);
+      socket.off('notifications:cleared');
       clearInterval(pollRef.current);
       clearInterval(healthPollRef.current);
     };
-  }, [fetchAll, fetchApps, fetchHealth]);
+  }, [fetchAll, fetchApps, fetchHealth, fetchNotifs]);
 
   return {
     apps,
