@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCityData } from '../hooks/useCityData';
 import useCityAudio from '../hooks/useCityAudio';
@@ -9,14 +9,21 @@ import CityHud from '../components/city/CityHud';
 import CityScanlines from '../components/city/CityScanlines';
 import { CitySettingsProvider, useCitySettingsContext } from '../components/city/CitySettingsContext';
 import CitySettingsPanel from '../components/city/CitySettingsPanel';
+import { computeFilterResult } from '../components/city/CityFilterBar';
 
 function CyberCityInner() {
-  const { apps, cosAgents, cosStatus, eventLogs, agentMap, reviewCounts, instances, loading, connected } = useCityData();
+  const { apps, cosAgents, cosStatus, eventLogs, agentMap, reviewCounts, instances, systemHealth, notificationCounts, loading, connected } = useCityData();
   const { settings, updateSetting } = useCitySettingsContext();
   const { playSfx } = useCityAudio(settings);
   const navigate = useNavigate();
   const location = useLocation();
   const [productivityData, setProductivityData] = useState(null);
+  const [filter, setFilter] = useState({ status: 'all', search: '' });
+
+  const filterResult = useMemo(
+    () => computeFilterResult({ apps, agentMap, status: filter.status, search: filter.search }),
+    [apps, agentMap, filter.status, filter.search]
+  );
 
   const showSettings = location.pathname === '/city/settings';
 
@@ -44,6 +51,13 @@ function CyberCityInner() {
       navigate('/apps');
     }
   }, [navigate]);
+
+  // Submit (Enter) on the search bar jumps to the first match's app page —
+  // the closest thing to a focus-camera-on-match without rebuilding the layout.
+  const handleJumpToFirst = useCallback(() => {
+    const first = filterResult.matches[0];
+    if (first?.id) navigate(`/apps/${first.id}`);
+  }, [filterResult.matches, navigate]);
 
   if (loading) {
     return (
@@ -74,6 +88,7 @@ function CyberCityInner() {
         settings={settings}
         playSfx={playSfx}
         keysRef={keysRef}
+        dimmedAppIds={filterResult.dimmed}
       />
       <CityHud
         cosStatus={cosStatus}
@@ -85,6 +100,12 @@ function CyberCityInner() {
         reviewCounts={reviewCounts}
         instances={instances}
         productivityData={productivityData}
+        systemHealth={systemHealth}
+        notificationCounts={notificationCounts}
+        filter={filter}
+        onFilterChange={setFilter}
+        onJumpToFirst={handleJumpToFirst}
+        matchCount={filterResult.matches.length}
         onToggleExploration={handleToggleExploration}
         explorationMode={settings?.explorationMode}
       />

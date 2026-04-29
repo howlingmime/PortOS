@@ -10,8 +10,11 @@ export const useCityData = () => {
   const [eventLogs, setEventLogs] = useState([]);
   const [reviewCounts, setReviewCounts] = useState({ total: 0, alert: 0, todo: 0, briefing: 0, cos: 0 });
   const [instances, setInstances] = useState({ self: null, peers: [], syncStatus: null });
+  const [systemHealth, setSystemHealth] = useState(null);
+  const [notificationCounts, setNotificationCounts] = useState({ total: 0, unread: 0 });
   const [loading, setLoading] = useState(true);
   const pollRef = useRef(null);
+  const healthPollRef = useRef(null);
 
   const fetchApps = useCallback(async () => {
     const data = await api.getApps().catch(() => []);
@@ -20,13 +23,15 @@ export const useCityData = () => {
   }, []);
 
   const fetchAll = useCallback(async () => {
-    const [appsData, agents, cosAgentsData, status, reviewData, instanceData] = await Promise.all([
+    const [appsData, agents, cosAgentsData, status, reviewData, instanceData, health, notifs] = await Promise.all([
       api.getApps().catch(() => []),
       api.getRunningAgents().catch(() => []),
       api.getCosAgents().catch(() => []),
       api.getCosStatus().catch(() => ({ running: false })),
       api.getReviewCounts().catch(() => ({ total: 0, alert: 0, todo: 0, briefing: 0, cos: 0 })),
       api.getInstances().catch(() => ({ self: null, peers: [], syncStatus: null })),
+      api.getSystemHealth().catch(() => null),
+      api.getNotificationCounts().catch(() => ({ total: 0, unread: 0 })),
     ]);
 
     setApps(appsData);
@@ -35,7 +40,14 @@ export const useCityData = () => {
     setCosStatus(status);
     setReviewCounts(reviewData);
     setInstances(instanceData);
+    setSystemHealth(health);
+    setNotificationCounts(notifs);
     setLoading(false);
+  }, []);
+
+  const fetchHealth = useCallback(async () => {
+    const health = await api.getSystemHealth().catch(() => null);
+    if (health) setSystemHealth(health);
   }, []);
 
   const agentMap = useMemo(() => {
@@ -98,6 +110,10 @@ export const useCityData = () => {
       setRunningAgents(agents);
     }, 10000);
 
+    // System health refresh: every 15s. CPU/memory shift fast enough to matter
+    // for the operational HUD but not so fast that we want a per-second poll.
+    healthPollRef.current = setInterval(fetchHealth, 15000);
+
     return () => {
       socket.emit('cos:unsubscribe');
       socket.off('connect', subscribe);
@@ -108,8 +124,9 @@ export const useCityData = () => {
       socket.off('cos:log', handleCosLog);
       socket.off('cos:status', handleCosStatus);
       clearInterval(pollRef.current);
+      clearInterval(healthPollRef.current);
     };
-  }, [fetchAll, fetchApps]);
+  }, [fetchAll, fetchApps, fetchHealth]);
 
   return {
     apps,
@@ -120,6 +137,8 @@ export const useCityData = () => {
     agentMap,
     reviewCounts,
     instances,
+    systemHealth,
+    notificationCounts,
     loading,
     connected: socket.connected,
   };

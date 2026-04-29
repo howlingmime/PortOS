@@ -267,7 +267,7 @@ function NeonEdgeStrip({ position, height, color, delay }) {
   );
 }
 
-export default function Building({ app, position, agentCount, onClick, playSfx, neonBrightness = 1.2, isProximity = false }) {
+export default function Building({ app, position, agentCount, onClick, playSfx, neonBrightness = 1.2, isProximity = false, dimmed = false }) {
   const meshRef = useRef();
   const glowRef = useRef();
   const haloRef = useRef();
@@ -279,6 +279,10 @@ export default function Building({ app, position, agentCount, onClick, playSfx, 
   const isOnline = app.overallStatus === 'online' && !app.archived;
   const isStopped = app.overallStatus === 'stopped' && !app.archived;
   const { width, depth } = BUILDING_PARAMS;
+  // Single multiplier applied to every opacity in the building when the search
+  // / status filter doesn't match this app. Faded enough to recede visually
+  // without disappearing — the user keeps spatial context.
+  const dimMul = dimmed ? 0.25 : 1;
 
   // Name hash for seeded randomness
   const seed = useMemo(() => {
@@ -314,17 +318,18 @@ export default function Building({ app, position, agentCount, onClick, playSfx, 
         ? Math.sin(t * 3.5 + seed) * 0.2 * nb
         : 0;
     const hoverBoost = hovered ? 0.4 * nb : 0;
-    meshRef.current.material.emissiveIntensity = baseIntensity + pulse + hoverBoost;
+    meshRef.current.material.emissiveIntensity = (baseIntensity + pulse + hoverBoost) * dimMul;
 
     if (glowRef.current) {
-      glowRef.current.material.opacity = 0.35 + (isOnline ? Math.sin(t * 1.5) * 0.12 : 0) + (hovered ? 0.25 : 0);
+      glowRef.current.material.opacity = (0.35 + (isOnline ? Math.sin(t * 1.5) * 0.12 : 0) + (hovered ? 0.25 : 0)) * dimMul;
     }
 
     // Glow halo wireframe pulse
     if (haloRef.current) {
-      haloRef.current.material.opacity = hovered
+      const haloBase = hovered
         ? 0.15 + Math.sin(t * 8) * 0.1
         : 0.05 + Math.sin(t * 1.5 + seed) * 0.03;
+      haloRef.current.material.opacity = haloBase * dimMul;
     }
   });
 
@@ -342,10 +347,10 @@ export default function Building({ app, position, agentCount, onClick, playSfx, 
         <meshStandardMaterial
           color={CITY_COLORS.buildingBody}
           emissive={edgeColor}
-          emissiveIntensity={0.35 * neonBrightness}
+          emissiveIntensity={0.35 * neonBrightness * dimMul}
           map={windowTexture}
           transparent
-          opacity={app.archived ? 0.6 : 0.95}
+          opacity={(app.archived ? 0.6 : 0.95) * dimMul}
         />
       </mesh>
 
@@ -354,7 +359,7 @@ export default function Building({ app, position, agentCount, onClick, playSfx, 
         <lineBasicMaterial
           color={edgeColor}
           transparent
-          opacity={app.archived ? 0.5 : 0.9}
+          opacity={(app.archived ? 0.5 : 0.9) * dimMul}
         />
       </lineSegments>
 
