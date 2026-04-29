@@ -18,7 +18,18 @@ function CyberCityInner() {
   const navigate = useNavigate();
   const location = useLocation();
   const [productivityData, setProductivityData] = useState(null);
-  const [filter, setFilter] = useState({ status: 'all', search: '' });
+  const [filter, setFilter] = useState(() => {
+    const raw = sessionStorage.getItem('cybercity.filter');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.status === 'string') return parsed;
+    }
+    return { status: 'all', search: '' };
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('cybercity.filter', JSON.stringify(filter));
+  }, [filter]);
 
   const filterResult = useMemo(
     () => computeFilterResult({ apps, agentMap, status: filter.status, search: filter.search }),

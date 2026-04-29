@@ -16,7 +16,7 @@ export const useCityData = () => {
   const [reviewCounts, setReviewCounts] = useState({ total: 0, alert: 0, todo: 0, briefing: 0, cos: 0 });
   const [instances, setInstances] = useState({ self: null, peers: [], syncStatus: null });
   const [systemHealth, setSystemHealth] = useState(null);
-  const [notificationCounts, setNotificationCounts] = useState({ total: 0, unread: 0 });
+  const [notificationCounts, setNotificationCounts] = useState({ unread: 0 });
   const [loading, setLoading] = useState(true);
   const pollRef = useRef(null);
   const healthPollRef = useRef(null);
@@ -29,7 +29,10 @@ export const useCityData = () => {
   }, []);
 
   const fetchAll = useCallback(async () => {
-    const [appsData, agents, cosAgentsData, status, reviewData, instanceData, health, notifs] = await Promise.all([
+    // /notifications/count returns the lightweight { count } payload — the HUD
+    // and Attention pane only need unread, and notifications:count socket
+    // events keep it fresh after this initial fetch.
+    const [appsData, agents, cosAgentsData, status, reviewData, instanceData, health, notif] = await Promise.all([
       api.getApps().catch(() => []),
       api.getRunningAgents().catch(() => []),
       api.getCosAgents().catch(() => []),
@@ -37,7 +40,7 @@ export const useCityData = () => {
       api.getReviewCounts().catch(() => ({ total: 0, alert: 0, todo: 0, briefing: 0, cos: 0 })),
       api.getInstances().catch(() => ({ self: null, peers: [], syncStatus: null })),
       api.getSystemHealth().catch(() => null),
-      api.getNotificationCounts().catch(() => ({ total: 0, unread: 0 })),
+      api.getNotificationCount().catch(() => ({ count: 0 })),
     ]);
 
     setApps(appsData);
@@ -47,7 +50,7 @@ export const useCityData = () => {
     setReviewCounts(reviewData);
     setInstances(instanceData);
     setSystemHealth(health);
-    setNotificationCounts(notifs);
+    setNotificationCounts({ unread: notif?.count ?? 0 });
     setLoading(false);
   }, []);
 
@@ -58,11 +61,6 @@ export const useCityData = () => {
       if (prev && healthSignature(prev) === healthSignature(health)) return prev;
       return health;
     });
-  }, []);
-
-  const fetchNotifs = useCallback(async () => {
-    const counts = await api.getNotificationCounts().catch(() => null);
-    if (counts) setNotificationCounts(counts);
   }, []);
 
   const agentMap = useMemo(() => {
@@ -124,15 +122,14 @@ export const useCityData = () => {
     };
     socket.on('cos:status', handleCosStatus);
 
+    // notifications:count fires after every add/update/remove on the server,
+    // so we don't need to listen to those individually or refetch — count is
+    // the only field the city UI surfaces.
     const handleNotifCount = (count) => {
-      setNotificationCounts(prev => prev?.unread === count ? prev : { ...prev, unread: count });
+      setNotificationCounts(prev => prev?.unread === count ? prev : { unread: count });
     };
-    const handleNotifChanged = () => fetchNotifs();
-    const handleNotifCleared = () => setNotificationCounts({ total: 0, unread: 0 });
+    const handleNotifCleared = () => setNotificationCounts({ unread: 0 });
     socket.on('notifications:count', handleNotifCount);
-    socket.on('notifications:added', handleNotifChanged);
-    socket.on('notifications:updated', handleNotifChanged);
-    socket.on('notifications:removed', handleNotifChanged);
     socket.on('notifications:cleared', handleNotifCleared);
 
     pollRef.current = setInterval(async () => {
@@ -156,14 +153,11 @@ export const useCityData = () => {
       socket.off('cos:log', handleCosLog);
       socket.off('cos:status', handleCosStatus);
       socket.off('notifications:count', handleNotifCount);
-      socket.off('notifications:added', handleNotifChanged);
-      socket.off('notifications:updated', handleNotifChanged);
-      socket.off('notifications:removed', handleNotifChanged);
       socket.off('notifications:cleared', handleNotifCleared);
       clearInterval(pollRef.current);
       clearInterval(healthPollRef.current);
     };
-  }, [fetchAll, fetchApps, fetchHealth, fetchNotifs]);
+  }, [fetchAll, fetchApps, fetchHealth]);
 
   return {
     apps,
