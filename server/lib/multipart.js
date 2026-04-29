@@ -264,6 +264,11 @@ function streamMultipart(req, boundary, fileFieldName, maxSize, fileFilter, next
 
   const tick = () => {
     if (done) return;
+    // Defer while a file flush is in flight: state is still STATE_BODY but
+    // writeStream has been nulled by endPart. Re-entering tick (e.g. from
+    // req.on('end')) would crash on writeStream.write. The endPart callback
+    // re-invokes tick once state has advanced.
+    if (pendingFlush > 0) return;
 
     while (true) {
       if (state === STATE_PREAMBLE) {
@@ -325,10 +330,18 @@ function streamMultipart(req, boundary, fileFieldName, maxSize, fileFilter, next
         // Found end of part. Emit everything before the boundary, then advance.
         if (!writePartChunk(buf.slice(0, idx))) return;
         buf = buf.slice(idx + PART_DELIM.length);
-        // endPart may be async (file flush) — pause the request, resume after.
+        // Transition state SYNCHRONOUSLY before endPart's async ws.end() runs.
+        // endPart sets writeStream = null synchronously, but its file-flush
+        // callback (which used to set this state) may not fire before
+        // req.on('end') re-enters tick. Without this sync transition, tick
+        // would re-process buf (which now contains the NEXT part) as if we
+        // were still inside the previous part's body and crash on
+        // writeStream.write(chunk) with writeStream === null.
+        state = STATE_AFTER_BOUNDARY;
+        // endPart may still be async (file flush) — pause the request,
+        // resume after the flush completes.
         req.pause();
         endPart(() => {
-          state = STATE_AFTER_BOUNDARY;
           req.resume();
           tick(); // process anything already buffered
         });
