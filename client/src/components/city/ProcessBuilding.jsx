@@ -83,6 +83,7 @@ export default function ProcessBuilding({ process, pm2Status, position, seed, di
         position={[0, height * 0.7, depth / 2 + 0.02]}
         fontSize={0.1}
         color={color}
+        fillOpacity={dimMul}
         anchorX="center"
         anchorY="middle"
         font={PIXEL_FONT_URL}
@@ -94,13 +95,13 @@ export default function ProcessBuilding({ process, pm2Status, position, seed, di
       {/* Blinking tip light */}
       <mesh ref={blinkRef} position={[0, height + 0.12, 0]}>
         <sphereGeometry args={[0.03, 6, 6]} />
-        <meshBasicMaterial color={color} transparent opacity={0.8} />
+        <meshBasicMaterial color={color} transparent opacity={0.8 * dimMul} />
       </mesh>
 
       {/* Base glow circle */}
       <mesh ref={glowRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
         <circleGeometry args={[0.6, 16]} />
-        <meshBasicMaterial color={color} transparent opacity={0.15} side={THREE.DoubleSide} />
+        <meshBasicMaterial color={color} transparent opacity={0.15 * dimMul} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );

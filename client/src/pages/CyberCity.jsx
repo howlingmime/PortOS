@@ -34,7 +34,13 @@ function CyberCityInner() {
   });
 
   useEffect(() => {
-    sessionStorage.setItem('cybercity.filter', JSON.stringify(filter));
+    // setItem can throw (Safari private mode, storage quota); ignore — this
+    // is a UX nicety, not load-bearing state.
+    try {
+      sessionStorage.setItem('cybercity.filter', JSON.stringify(filter));
+    } catch {
+      // intentionally swallow
+    }
   }, [filter]);
 
   const filterResult = useMemo(
