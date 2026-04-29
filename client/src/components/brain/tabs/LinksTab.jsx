@@ -14,7 +14,8 @@ import {
   Check,
   AlertCircle,
   FolderOpen,
-  Tag
+  Tag,
+  ShieldCheck
 } from 'lucide-react';
 import toast from '../../ui/Toast';
 import { timeAgo } from '../../../utils/formatters';
@@ -46,6 +47,7 @@ export default function LinksTab({ onRefresh }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
+  const [scanningId, setScanningId] = useState(null);
   const inputRef = useRef(null);
 
   const fetchLinks = useCallback(async () => {
@@ -187,6 +189,19 @@ export default function LinksTab({ onRefresh }) {
     await api.openBrainLinkFolder(linkId).catch(err => {
       toast.error(err.message || 'Failed to open folder');
     });
+  };
+
+  const handleScan = async (linkId) => {
+    setScanningId(linkId);
+    const result = await api.scanBrainLink(linkId).catch(err => {
+      toast.error(err.message || 'Failed to start scan');
+      return null;
+    });
+    setScanningId(null);
+
+    if (result) {
+      toast.success('Malware scan queued — track progress in CoS Tasks');
+    }
   };
 
   if (loading) {
@@ -488,6 +503,19 @@ export default function LinksTab({ onRefresh }) {
                         >
                           <RefreshCw size={12} />
                           Pull
+                        </button>
+                        <button
+                          onClick={() => handleScan(link.id)}
+                          disabled={scanningId === link.id}
+                          className="flex items-center gap-1 px-2 py-1 text-xs rounded border border-port-border text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Read-only malware/risk scan via /do:scan (writes report to ~/.claude/scans/)"
+                        >
+                          {scanningId === link.id ? (
+                            <RefreshCw size={12} className="animate-spin" />
+                          ) : (
+                            <ShieldCheck size={12} />
+                          )}
+                          Scan
                         </button>
                       </>
                     )}
