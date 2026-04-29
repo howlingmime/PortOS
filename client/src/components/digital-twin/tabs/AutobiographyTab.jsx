@@ -1,22 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  BookOpen,
+import {BookOpen,
   PenLine,
   Clock,
   ChevronDown,
   ChevronUp,
   Trash2,
   Save,
-  RefreshCw,
   Send,
   Settings,
   SkipForward,
   X,
   Sparkles,
   Link2,
-  MessageCircle
-} from 'lucide-react';
+  MessageCircle} from 'lucide-react';
 import BrailleSpinner from '../../BrailleSpinner';
 import * as api from '../../../services/api';
 import toast from '../../ui/Toast';

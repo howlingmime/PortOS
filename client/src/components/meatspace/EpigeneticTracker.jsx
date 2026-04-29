@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import toast from '../ui/Toast';
-import {
-  Plus, RefreshCw, Trash2, ChevronDown, ChevronRight,
-  Activity, Pill, Heart, CheckCircle, Calendar, FlameKindling
-} from 'lucide-react';
+import {Plus, Trash2, ChevronDown, ChevronRight,
+  Activity, Pill, Heart, CheckCircle, Calendar, FlameKindling} from 'lucide-react';
 import BrailleSpinner from '../BrailleSpinner';
 import * as api from '../../services/api';
 

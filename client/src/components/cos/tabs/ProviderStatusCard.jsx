@@ -89,7 +89,7 @@ export default function ProviderStatusCard() {
     return (
       <div className="bg-port-card border border-port-border rounded-lg p-4">
         <div className="flex items-center gap-2 text-gray-500">
-          <BrailleSpinner text="Loading" />
+          <BrailleSpinner />
           <span className="text-sm">Loading provider status...</span>
         </div>
       </div>

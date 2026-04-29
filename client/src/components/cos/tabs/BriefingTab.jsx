@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import * as api from '../../../services/api';
 import { RapidReaderTrigger } from '../../RapidReader';
+import BrailleSpinner from '../../BrailleSpinner';
 
 const SECTION_ICONS = {
   'Task Queue': CheckCircle,
@@ -201,7 +202,7 @@ export default function BriefingTab() {
   if (loading && !currentBriefing) {
     return (
       <div className="flex items-center justify-center py-12">
-        <RefreshCw className="w-6 h-6 animate-spin text-port-accent" />
+        <BrailleSpinner text="Loading" />
       </div>
     );
   }

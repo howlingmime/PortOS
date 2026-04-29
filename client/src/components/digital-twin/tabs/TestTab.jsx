@@ -1,20 +1,17 @@
 import { useState, useEffect } from 'react';
-import {
-  Play,
+import {Play,
   CheckCircle,
   XCircle,
   AlertCircle,
   Clock,
   ChevronDown,
   ChevronRight,
-  RefreshCw,
   History,
   Wand2,
   ThumbsUp,
   ThumbsDown,
   Minus,
-  TrendingUp
-} from 'lucide-react';
+  TrendingUp} from 'lucide-react';
 import BrailleSpinner from '../../BrailleSpinner';
 import * as api from '../../../services/api';
 import toast from '../../ui/Toast';

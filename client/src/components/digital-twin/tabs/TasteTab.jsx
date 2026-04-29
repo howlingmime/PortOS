@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Palette,
+import {Palette,
   Film,
   Music,
   Building,
@@ -11,7 +10,6 @@ import {
   ArrowLeft,
   Send,
   SkipForward,
-  RefreshCw,
   Check,
   Sparkles,
   RotateCcw,
@@ -21,8 +19,7 @@ import {
   Telescope,
   ThumbsUp,
   ThumbsDown,
-  Minus
-} from 'lucide-react';
+  Minus} from 'lucide-react';
 import BrailleSpinner from '../../BrailleSpinner';
 import * as api from '../../../services/api';
 import toast from '../../ui/Toast';

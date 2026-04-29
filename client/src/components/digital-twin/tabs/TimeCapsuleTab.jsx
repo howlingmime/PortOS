@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Archive,
+import {Archive,
   Plus,
   Trash2,
   Eye,
   GitCompare,
-  RefreshCw,
   Calendar,
   FileText,
   Target,
@@ -14,8 +12,7 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronUp,
-  X
-} from 'lucide-react';
+  X} from 'lucide-react';
 import BrailleSpinner from '../../BrailleSpinner';
 import * as api from '../../../services/api';
 import toast from '../../ui/Toast';

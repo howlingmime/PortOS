@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import toast from '../../ui/Toast';
-import {
-  Upload, Download, RefreshCw, Trash2, Search, Dna, AlertTriangle, Save
-} from 'lucide-react';
+import {Upload, Download, Trash2, Search, Dna, AlertTriangle, Save} from 'lucide-react';
 import BrailleSpinner from '../../BrailleSpinner';
 // Native ZIP parser — replaces fflate's unzipSync/strFromU8
 async function parseZipText(arrayBuffer, ext = '.txt') {
@@ -371,7 +369,7 @@ export default function GenomeTab() {
         >
           {uploading ? (
             <div className="space-y-3">
-              <BrailleSpinner text="Loading" />
+              <BrailleSpinner />
               <p className="text-gray-400">Parsing genome data...</p>
             </div>
           ) : (
@@ -706,7 +704,7 @@ export default function GenomeTab() {
         {/* Sync progress */}
         {clinvarProgress && (
           <div className="flex items-center gap-2 p-3 rounded bg-purple-500/10 border border-purple-500/20 text-sm text-purple-300">
-            <BrailleSpinner text="Loading" />
+            <BrailleSpinner />
             {clinvarProgress}
           </div>
         )}

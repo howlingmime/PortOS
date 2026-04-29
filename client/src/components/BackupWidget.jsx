@@ -1,7 +1,6 @@
 import { useState, memo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  HardDrive,
+import {HardDrive,
   ChevronDown,
   ChevronRight,
   RefreshCw,
@@ -10,9 +9,7 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Clock,
-  Loader2
-} from 'lucide-react';
+  Clock} from 'lucide-react';
 import BrailleSpinner from './BrailleSpinner';
 import toast from './ui/Toast';
 import * as api from '../services/api';
@@ -210,7 +207,8 @@ function SnapshotList() {
   if (loading) {
     return (
       <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-        <BrailleSpinner text="Loading" /></div>
+        <BrailleSpinner text="Loading snapshots..." />
+      </div>
     );
   }
 

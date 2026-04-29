@@ -1,15 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as api from '../../../services/api';
-import {
-  RefreshCw,
-  Play,
+import {Play,
   Calendar,
   ChevronDown,
   ChevronRight,
   AlertCircle,
   CheckCircle,
-  Clock
-} from 'lucide-react';
+  Clock} from 'lucide-react';
 import BrailleSpinner from '../../BrailleSpinner';
 import toast from '../../ui/Toast';
 

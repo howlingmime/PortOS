@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { RefreshCw } from 'lucide-react';
 import * as api from '../../../services/api';
 import { MEMORY_TYPES, MEMORY_TYPE_COLORS } from '../constants';
 import { buildGraph } from '../../../lib/graphSimulation';

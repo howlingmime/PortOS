@@ -1,18 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  Sparkles,
+import {Sparkles,
   ChevronRight,
   Check,
   Send,
   SkipForward,
-  RefreshCw,
   ArrowLeft,
   FileText,
   PenTool,
   Eye,
-  Save
-} from 'lucide-react';
+  Save} from 'lucide-react';
 import BrailleSpinner from '../../BrailleSpinner';
 import * as api from '../../../services/api';
 import toast from '../../ui/Toast';

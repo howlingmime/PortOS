@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { RefreshCw, Search, AlertTriangle, Zap } from 'lucide-react';
+import {Search, AlertTriangle, Zap} from 'lucide-react';
 import toast from '../../ui/Toast';
 import * as api from '../../../services/api';
 import { BRAIN_TYPE_HEX, DESTINATIONS } from '../constants';

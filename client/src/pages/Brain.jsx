@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as api from '../services/api';
-import { Brain as BrainIcon, RefreshCw } from 'lucide-react';
+import {Brain as BrainIcon} from 'lucide-react';
 import BrailleSpinner from '../components/BrailleSpinner';
 
 import { TABS } from '../components/brain/constants';

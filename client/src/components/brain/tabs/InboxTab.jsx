@@ -279,7 +279,7 @@ export default function InboxTab({ onRefresh, settings }) {
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-white flex-1">{entry.capturedText}</p>
                   <div className="flex items-center gap-2">
-                    <BrailleSpinner text="Loading" />
+                    <BrailleSpinner />
                     <span className="text-xs text-gray-500 whitespace-nowrap">
                       {timeAgo(entry.capturedAt)}
                     </span>

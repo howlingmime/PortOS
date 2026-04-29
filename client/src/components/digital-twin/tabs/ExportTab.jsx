@@ -1,16 +1,13 @@
 import { useState, useEffect } from 'react';
-import {
-  Download,
+import {Download,
   Copy,
   Check,
   FileText,
   Code,
   FileJson,
   Files,
-  RefreshCw,
   Eye,
-  BookOpen
-} from 'lucide-react';
+  BookOpen} from 'lucide-react';
 import BrailleSpinner from '../../BrailleSpinner';
 import * as api from '../../../services/api';
 import toast from '../../ui/Toast';

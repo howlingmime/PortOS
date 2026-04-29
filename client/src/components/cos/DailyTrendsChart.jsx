@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { TrendingUp, TrendingDown, Minus, Activity, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
+import {TrendingUp, TrendingDown, Minus, Activity, ChevronDown, ChevronRight} from 'lucide-react';
 import * as api from '../../services/api';
 import BrailleSpinner from '../BrailleSpinner';
 

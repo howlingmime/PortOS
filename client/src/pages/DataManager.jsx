@@ -97,7 +97,8 @@ function CategoryRow({ cat, maxSize, onExpand, expanded, detail, onArchive, onPu
             </div>
           ) : (
             <div className="p-3 flex items-center gap-2 text-xs text-gray-500">
-              <BrailleSpinner text="Loading" /></div>
+              <BrailleSpinner text="Loading" />
+      </div>
           )}
         </div>
       )}

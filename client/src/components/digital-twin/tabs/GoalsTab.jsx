@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Target, Plus, Trash2, Check, ChevronDown, ChevronUp,
+import {Target, Plus, Trash2, Check, ChevronDown, ChevronUp,
   Heart, DollarSign, Lightbulb, Users, Flame,
-  Clock, AlertTriangle, Activity, RefreshCw, Milestone
-} from 'lucide-react';
+  Clock, AlertTriangle, Activity, Milestone} from 'lucide-react';
 import BrailleSpinner from '../../BrailleSpinner';
 import * as api from '../../../services/api';
 

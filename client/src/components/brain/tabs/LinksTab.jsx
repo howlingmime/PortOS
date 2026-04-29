@@ -440,7 +440,7 @@ export default function LinksTab({ onRefresh }) {
                     {/* Clone status */}
                     <span className={`flex items-center gap-1 text-xs ${CLONE_STATUS_STYLES[link.cloneStatus]}`}>
                       {link.cloneStatus === 'cloned' && <Check size={12} />}
-                      {link.cloneStatus === 'cloning' && <BrailleSpinner text="Loading" />}
+                      {link.cloneStatus === 'cloning' && <BrailleSpinner />}
                       {link.cloneStatus === 'pending' && <Download size={12} />}
                       {link.cloneStatus === 'failed' && <AlertCircle size={12} />}
                       {link.cloneStatus === 'cloned' && 'Cloned'}

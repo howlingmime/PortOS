@@ -1,15 +1,12 @@
 import { useState, useEffect } from 'react';
 import * as api from '../../../services/api';
-import {
-  Settings,
-  RefreshCw,
+import {Settings,
   Save,
   Zap,
   Clock,
   Calendar,
   TrendingUp,
-  CheckCircle
-} from 'lucide-react';
+  CheckCircle} from 'lucide-react';
 import BrailleSpinner from '../../BrailleSpinner';
 import toast from '../../ui/Toast';
 

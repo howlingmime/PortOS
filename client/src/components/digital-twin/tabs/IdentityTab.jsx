@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Fingerprint, Dna, Clock, Activity, Palette, Target,
-  ChevronRight, RefreshCw, Sun, Moon, Coffee, Zap,
+import {Fingerprint, Dna, Clock, Activity, Palette, Target,
+  ChevronRight, Sun, Moon, Coffee, Zap,
   Heart, DollarSign, Lightbulb, Users, Flame, Link2,
-  AlertTriangle, CheckCircle, Info
-} from 'lucide-react';
+  AlertTriangle, CheckCircle, Info} from 'lucide-react';
 import BrailleSpinner from '../../BrailleSpinner';
 import * as api from '../../../services/api';
 

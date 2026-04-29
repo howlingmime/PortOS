@@ -230,7 +230,8 @@ export default function CharacterSheet() {
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400">
-        <BrailleSpinner text="Loading" /></div>
+        <BrailleSpinner text="Loading" />
+      </div>
     );
   }
 
@@ -308,7 +309,7 @@ export default function CharacterSheet() {
                 </button>
                 {generatingAvatar && !diffusionProgress?.currentImage && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                    <BrailleSpinner text="Loading" />
+                    <BrailleSpinner />
                   </div>
                 )}
               </div>

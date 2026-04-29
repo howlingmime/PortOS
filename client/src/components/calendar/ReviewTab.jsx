@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Check, X, ChevronLeft, ChevronRight, Clock, Target, AlertTriangle, RefreshCw } from 'lucide-react';
+import {Check, X, ChevronLeft, ChevronRight, Clock, Target, AlertTriangle} from 'lucide-react';
 import toast from '../ui/Toast';
 import * as api from '../../services/api';
 import { formatDurationMin, formatTimeOfDay } from '../../utils/formatters';
