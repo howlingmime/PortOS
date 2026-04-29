@@ -5,7 +5,6 @@ export default function CityFilterBar({ filter, onChange, matchCount, onJumpToFi
   const inputRef = useRef(null);
   const [open, setOpen] = useState(Boolean(filter.search));
 
-  // Press '/' to open search and focus input. Esc clears the query.
   useEffect(() => {
     const onKey = (e) => {
       const tag = e.target?.tagName;
@@ -35,7 +34,6 @@ export default function CityFilterBar({ filter, onChange, matchCount, onJumpToFi
 
   return (
     <div className="pointer-events-auto bg-black/85 backdrop-blur-sm border border-cyan-500/30 rounded-lg px-2 py-2 flex items-center gap-2 flex-wrap">
-      {/* Status chips */}
       <div className="flex items-center gap-1">
         {STATUS_FILTERS.map(f => {
           const active = filter.status === f.id;
@@ -59,7 +57,6 @@ export default function CityFilterBar({ filter, onChange, matchCount, onJumpToFi
 
       <div className="w-px h-5 bg-cyan-500/20" />
 
-      {/* Search */}
       {!open ? (
         <button
           type="button"

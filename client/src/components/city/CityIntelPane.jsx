@@ -39,7 +39,6 @@ function buildAttentionItems({ apps, cosAgents, reviewCounts, instances, systemH
     });
   });
 
-  // 2. System health warnings (memory/cpu/disk/database)
   if (systemHealth?.warnings?.length) {
     systemHealth.warnings.forEach((w, i) => {
       const sev = systemHealth.overallHealth === 'critical' ? 'critical' : 'warning';
@@ -54,7 +53,6 @@ function buildAttentionItems({ apps, cosAgents, reviewCounts, instances, systemH
     });
   }
 
-  // 3. Pending reviews / alerts
   if (reviewCounts?.alert > 0) {
     items.push({
       id: 'review-alerts',
@@ -76,7 +74,6 @@ function buildAttentionItems({ apps, cosAgents, reviewCounts, instances, systemH
     });
   }
 
-  // 4. Federation: peers offline / sync degraded
   const peers = instances?.peers || [];
   const offlinePeers = peers.filter(p => p.status !== 'online');
   if (offlinePeers.length > 0) {
@@ -90,7 +87,6 @@ function buildAttentionItems({ apps, cosAgents, reviewCounts, instances, systemH
     });
   }
 
-  // 5. Agents with error state
   const erroredAgents = (cosAgents || []).filter(a =>
     a.status === 'failed' || a.state === 'error' || a.error
   );
@@ -105,7 +101,6 @@ function buildAttentionItems({ apps, cosAgents, reviewCounts, instances, systemH
     });
   });
 
-  // 6. Unread notifications (informational, not critical)
   const unread = notificationCounts?.unread ?? 0;
   if (unread > 0) {
     items.push({
@@ -118,7 +113,6 @@ function buildAttentionItems({ apps, cosAgents, reviewCounts, instances, systemH
     });
   }
 
-  // Sort by severity, preserving insertion order within a severity
   return items.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
 }
 
