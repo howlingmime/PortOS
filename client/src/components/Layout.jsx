@@ -123,6 +123,7 @@ const navItems = [
       { to: '/brain/links', label: 'Links', icon: Link2 },
       { to: '/brain/memory', label: 'Memory', icon: Database },
       { to: '/brain/notes', label: 'Notes', icon: FileText },
+      { to: '/rapid-reader', label: 'Rapid Reader', icon: Zap },
       { to: '/brain/trust', label: 'Trust', icon: Shield }
     ]
   },

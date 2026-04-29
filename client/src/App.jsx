@@ -72,6 +72,7 @@ const Review = lazyWithReload(() => import('./pages/Review'));
 const Loops = lazyWithReload(() => import('./pages/Loops'));
 const CharacterSheet = lazyWithReload(() => import('./pages/CharacterSheet'));
 const Wiki = lazyWithReload(() => import('./pages/Wiki'));
+const RapidReaderPage = lazyWithReload(() => import('./pages/RapidReader'));
 
 // Loading fallback for lazy-loaded pages
 const PageLoader = () => (
@@ -190,6 +191,7 @@ export default function App() {
           <Route path="media-models" element={<RedirectWithSearch to="/media/models" />} />
           <Route path="wiki" element={<Navigate to="/wiki/overview" replace />} />
           <Route path="wiki/:tab" element={<Wiki />} />
+          <Route path="rapid-reader" element={<RapidReaderPage />} />
           <Route path="agents" element={<Agents />} />
           <Route path="agents/:agentId" element={<Agents />} />
           <Route path="agents/:agentId/:tab" element={<Agents />} />

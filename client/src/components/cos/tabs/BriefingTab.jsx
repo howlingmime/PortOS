@@ -13,6 +13,7 @@ import {
   GitBranch
 } from 'lucide-react';
 import * as api from '../../../services/api';
+import { RapidReaderTrigger } from '../../RapidReader';
 
 const SECTION_ICONS = {
   'Task Queue': CheckCircle,
@@ -29,6 +30,23 @@ const getSectionIcon = (title) => {
     if (title.includes(key)) return Icon;
   }
   return ChevronRight;
+};
+
+// Flatten markdown into plain prose suitable for word-by-word reading.
+// Drop heading/bullet/code markers but keep the surrounding text intact.
+const stripMarkdown = (md) => {
+  if (!md) return '';
+  return md
+    .split('\n')
+    .map((line) => line
+      .replace(/^#{1,6}\s+/, '')
+      .replace(/^\s*[-*]\s+/, '')
+      .replace(/^\s*\d+\.\s+/, '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/`([^`]+)`/g, '$1'))
+    .filter((line) => line.trim())
+    .join('. ')
+    .replace(/\.{2,}/g, '.');
 };
 
 const parseBriefingMarkdown = (content) => {
@@ -216,13 +234,22 @@ export default function BriefingTab() {
             </select>
           )}
         </div>
-        <button
-          onClick={loadData}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-port-card border border-port-border hover:border-port-accent/50 text-gray-300 rounded-lg transition-colors"
-        >
-          <RefreshCw size={14} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {currentBriefing?.content && (
+            <RapidReaderTrigger
+              text={stripMarkdown(currentBriefing.content)}
+              title={`Briefing — ${currentBriefing.date}`}
+              label="Rapid Read"
+            />
+          )}
+          <button
+            onClick={loadData}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-port-card border border-port-border hover:border-port-accent/50 text-gray-300 rounded-lg transition-colors"
+          >
+            <RefreshCw size={14} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {!parsed ? (
