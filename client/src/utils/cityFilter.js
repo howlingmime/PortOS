@@ -8,7 +8,7 @@ export const STATUS_FILTERS = [
     match: (app) => {
       if (app.archived) return false;
       const pm2 = app.pm2Status || {};
-      return Object.values(pm2).some(s => s?.status === 'errored');
+      return Object.values(pm2).some(s => s?.status === 'errored' || s?.status === 'error');
     },
   },
   {

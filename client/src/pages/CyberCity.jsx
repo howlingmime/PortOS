@@ -19,10 +19,16 @@ function CyberCityInner() {
   const location = useLocation();
   const [productivityData, setProductivityData] = useState(null);
   const [filter, setFilter] = useState(() => {
-    const raw = sessionStorage.getItem('cybercity.filter');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed.status === 'string') return parsed;
+    // try/catch is necessary because sessionStorage values are external state
+    // a corrupted/older-schema entry would throw and crash the page render.
+    try {
+      const raw = sessionStorage.getItem('cybercity.filter');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.status === 'string') return parsed;
+      }
+    } catch {
+      // fall through to default
     }
     return { status: 'all', search: '' };
   });

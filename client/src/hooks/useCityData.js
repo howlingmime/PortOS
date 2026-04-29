@@ -39,7 +39,7 @@ export const useCityData = () => {
       api.getCosStatus().catch(() => ({ running: false })),
       api.getReviewCounts().catch(() => ({ total: 0, alert: 0, todo: 0, briefing: 0, cos: 0 })),
       api.getInstances().catch(() => ({ self: null, peers: [], syncStatus: null })),
-      api.getSystemHealth().catch(() => null),
+      api.getSystemHealth({ silent: true }).catch(() => null),
       api.getNotificationCount().catch(() => ({ count: 0 })),
     ]);
 
@@ -55,7 +55,7 @@ export const useCityData = () => {
   }, []);
 
   const fetchHealth = useCallback(async () => {
-    const health = await api.getSystemHealth().catch(() => null);
+    const health = await api.getSystemHealth({ silent: true }).catch(() => null);
     if (!health) return;
     setSystemHealth(prev => {
       if (prev && healthSignature(prev) === healthSignature(health)) return prev;

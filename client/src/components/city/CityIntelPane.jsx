@@ -26,7 +26,7 @@ function buildAttentionItems({ apps, cosAgents, reviewCounts, instances, systemH
     }
     const pm2 = app.pm2Status || {};
     Object.entries(pm2).forEach(([procName, s]) => {
-      if (s?.status === 'errored') {
+      if (s?.status === 'errored' || s?.status === 'error') {
         items.push({
           id: `proc-err-${app.id}-${procName}`,
           severity: 'critical',
