@@ -1,43 +1,55 @@
+import MicroGlyph from './micrographics/MicroGlyph';
+
 const statusConfig = {
   online: {
     badge: 'bg-port-success/15 text-port-success',
     dot: 'bg-port-success',
     text: 'Online',
-    pulse: true
+    pulse: true,
+    glyph: { variant: 'pulse-dot', state: 'success', animated: true },
   },
   stopped: {
     badge: 'bg-port-warning/15 text-port-warning',
     dot: 'bg-port-warning',
     text: 'Stopped',
-    pulse: false
+    pulse: false,
+    glyph: { variant: 'bracket-pair', state: 'warn', animated: false },
   },
   not_started: {
     badge: 'bg-gray-500/20 text-gray-400',
     dot: 'bg-gray-500',
     text: 'Offline',
-    pulse: false
+    pulse: false,
+    glyph: { variant: 'reticle', state: 'idle', animated: false },
   },
   not_found: {
     badge: 'bg-gray-500/20 text-gray-400',
     dot: 'bg-gray-500',
     text: 'Not Found',
-    pulse: false
+    pulse: false,
+    glyph: { variant: 'reticle', state: 'idle', animated: false },
   },
   error: {
     badge: 'bg-port-error/15 text-port-error',
     dot: 'bg-port-error',
     text: 'Error',
-    pulse: false
+    pulse: false,
+    glyph: { variant: 'warning-tri', state: 'error', animated: true },
   },
   unknown: {
     badge: 'bg-gray-600/20 text-gray-400',
     dot: 'bg-gray-600',
     text: 'Unknown',
-    pulse: false
-  }
+    pulse: false,
+    glyph: { variant: 'reticle', state: 'idle', animated: false },
+  },
 };
 
-export default function StatusBadge({ status, size = 'md' }) {
+// `glyph` is opt-in. Pass `glyph` (boolean true) for the state-appropriate
+// micrographic, or pass a variant string ('orbit', 'signal', etc.) to override.
+// Default behavior (no prop) is unchanged: existing callers keep their
+// pulsing dot.
+export default function StatusBadge({ status, size = 'md', glyph = false }) {
   const config = statusConfig[status] || statusConfig.unknown;
 
   const sizeClasses = {
@@ -46,14 +58,37 @@ export default function StatusBadge({ status, size = 'md' }) {
     lg: 'text-base px-3 py-1.5'
   };
 
+  const glyphSize = size === 'lg' ? 14 : size === 'sm' ? 10 : 12;
+
+  // Resolve glyph spec — boolean true uses the per-status default; a
+  // string lets the caller pick a specific variant; an object takes
+  // precedence over everything for fine control.
+  let glyphSpec = null;
+  if (glyph === true) {
+    glyphSpec = config.glyph;
+  } else if (typeof glyph === 'string') {
+    glyphSpec = { ...config.glyph, variant: glyph };
+  } else if (glyph && typeof glyph === 'object') {
+    glyphSpec = { ...config.glyph, ...glyph };
+  }
+
   return (
     <span
       role="status"
       aria-label={`Status: ${config.text}`}
       className={`inline-flex items-center gap-1.5 rounded-full font-medium ${config.badge} ${sizeClasses[size]}`}
     >
-      {config.pulse && (
-        <span className={`w-2 h-2 rounded-full ${config.dot} animate-pulse-soft`} aria-hidden="true" />
+      {glyphSpec ? (
+        <MicroGlyph
+          variant={glyphSpec.variant}
+          state={glyphSpec.state}
+          animated={glyphSpec.animated}
+          size={glyphSize}
+        />
+      ) : (
+        config.pulse && (
+          <span className={`w-2 h-2 rounded-full ${config.dot} animate-pulse-soft`} aria-hidden="true" />
+        )
       )}
       {config.text}
     </span>
