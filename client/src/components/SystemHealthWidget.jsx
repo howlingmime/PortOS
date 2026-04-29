@@ -34,6 +34,34 @@ const SystemHealthWidget = memo(function SystemHealthWidget() {
     loadData();
   }, []);
 
+  // Decorative chrome that reflects real state — top row reads as a HUD
+  // readout (memory/cpu/proc/apps/disk), rows below fade so the eye
+  // doesn't read it as a chart. Computed before the early returns below
+  // so React's hook count stays stable across renders.
+  const memPct = health?.system?.memory?.usagePercent;
+  const cpuPct = health?.system?.cpu?.usagePercent;
+  const diskPct = health?.system?.disk?.usagePercent;
+  const procOnline = health?.processes?.online;
+  const procTotal = health?.processes?.total;
+  const appOnline = health?.apps?.online;
+  const appTotal = health?.apps?.total;
+  const matrixIntensity = useMemo(() => {
+    const cells = new Array(25).fill(0.18);
+    const norm = (pct) => Math.max(0.18, Math.min(1, (pct ?? 0) / 100));
+    cells[0] = norm(memPct);
+    cells[1] = norm(cpuPct);
+    cells[2] = procTotal ? Math.max(0.25, procOnline / procTotal) : 0.25;
+    cells[3] = appTotal ? Math.max(0.25, appOnline / appTotal) : 0.25;
+    cells[4] = norm(diskPct);
+    for (let row = 1; row < 5; row++) {
+      const decay = 1 - row * 0.18;
+      for (let col = 0; col < 5; col++) {
+        cells[row * 5 + col] = Math.max(0.18, cells[col] * decay);
+      }
+    }
+    return cells;
+  }, [memPct, cpuPct, diskPct, procOnline, procTotal, appOnline, appTotal]);
+
   // Don't render while loading
   if (loading) {
     return null;
@@ -62,33 +90,6 @@ const SystemHealthWidget = memo(function SystemHealthWidget() {
 
   const healthStyle = getHealthStyle();
   const HealthIcon = healthStyle.icon;
-
-  // Decorative chrome that reflects real state — top row reads as a HUD
-  // readout (memory/cpu/proc/apps/disk), rows below fade so the eye
-  // doesn't read it as a chart.
-  const memPct = system?.memory?.usagePercent;
-  const cpuPct = system?.cpu?.usagePercent;
-  const diskPct = system?.disk?.usagePercent;
-  const procOnline = processes?.online;
-  const procTotal = processes?.total;
-  const appOnline = apps?.online;
-  const appTotal = apps?.total;
-  const matrixIntensity = useMemo(() => {
-    const cells = new Array(25).fill(0.18);
-    const norm = (pct) => Math.max(0.18, Math.min(1, (pct ?? 0) / 100));
-    cells[0] = norm(memPct);
-    cells[1] = norm(cpuPct);
-    cells[2] = procTotal ? Math.max(0.25, procOnline / procTotal) : 0.25;
-    cells[3] = appTotal ? Math.max(0.25, appOnline / appTotal) : 0.25;
-    cells[4] = norm(diskPct);
-    for (let row = 1; row < 5; row++) {
-      const decay = 1 - row * 0.18;
-      for (let col = 0; col < 5; col++) {
-        cells[row * 5 + col] = Math.max(0.18, cells[col] * decay);
-      }
-    }
-    return cells;
-  }, [memPct, cpuPct, diskPct, procOnline, procTotal, appOnline, appTotal]);
 
   // Get color for usage percentage
   const getUsageColor = (percent) => {
