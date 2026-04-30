@@ -539,18 +539,23 @@ export function parsePullRequestUrl(url) {
 /**
  * Request a Copilot code review on a GitHub PR. The reviewer login MUST include
  * the `[bot]` suffix or GitHub returns 422 "must be a collaborator". GitLab has
- * no equivalent — this is a GitHub-only no-op there.
+ * no equivalent — this is a GitHub-only no-op there, signaled with
+ * `{ success: true, skipped: true }` so callers can treat it as a successful
+ * non-event rather than a real failure (avoiding spurious warnings/notifications
+ * on GitLab MRs).
  *
  * @param {string} dir - Working directory used to resolve gh auth
  * @param {string} prUrl - PR URL returned by createPR
- * @returns {Promise<{success: boolean, error?: string}>}
+ * @returns {Promise<{success: boolean, skipped?: boolean, error?: string}>}
  */
 export async function requestCopilotReview(dir, prUrl) {
   const parsed = parsePullRequestUrl(prUrl);
   if (!parsed) return { success: false, error: `unparseable PR URL: ${prUrl}` };
 
   const { cli, env } = await resolveForgeForRepo(dir);
-  if (cli !== 'gh') return { success: false, error: `Copilot reviewer is GitHub-only (got ${cli})` };
+  // Non-GitHub forges have no Copilot reviewer to request — treat as a successful skip
+  // so cleanupAgentWorktree doesn't emit a warning for every GitLab MR.
+  if (cli !== 'gh') return { success: true, skipped: true };
 
   const args = [
     'api',

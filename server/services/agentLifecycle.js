@@ -1194,7 +1194,10 @@ export async function cleanupAgentWorktree(agentId, success, { openPR = false, r
 
       if (shouldRequestCopilot) {
         const reviewResult = await git.requestCopilotReview(worktreePath, prResult.url).catch(err => ({ success: false, error: err.message }));
-        if (reviewResult.success) {
+        if (reviewResult.success && reviewResult.skipped) {
+          // Non-GitHub forge (e.g. GitLab MR) — Copilot reviewer doesn't exist there. Log info, no warning.
+          emitLog('info', `🤖 Skipping Copilot review request for ${prResult.url} (non-GitHub forge)`, { agentId, prUrl: prResult.url });
+        } else if (reviewResult.success) {
           emitLog('success', `🤖 Requested Copilot review on ${prResult.url}`, { agentId, prUrl: prResult.url });
         } else {
           emitLog('warn', `🤖 Failed to request Copilot review on ${prResult.url}: ${reviewResult.error}`, { agentId, prUrl: prResult.url });

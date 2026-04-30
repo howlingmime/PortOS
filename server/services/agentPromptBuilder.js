@@ -310,7 +310,9 @@ ${skillSection ? `## Task-Type Skill Guidelines\n\n${skillSection}\n` : ''}${too
 1. Analyze the task requirements carefully
 2. Make necessary changes to complete the task
 3. Test your changes when possible
-4. Commit and push your changes (see Git Hygiene below)
+4. ${worktreeInfo && willOpenPR
+  ? 'Commit your changes (see Git Hygiene below) — do NOT push, the system handles that on exit'
+  : 'Commit and push your changes (see Git Hygiene below)'}
 5. Provide a summary of what was done
 
 ## Guidelines

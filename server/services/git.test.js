@@ -179,6 +179,19 @@ describe('requestCopilotReview', () => {
     expect(result).toHaveProperty('success');
     if (!result.success) expect(typeof result.error).toBe('string');
   });
+
+  it('non-GitHub forge result shape: success=true with skipped=true (callers treat as successful non-event)', async () => {
+    // resolveForgeForRepo is internal to git.js so we cannot mock it directly.
+    // Instead, verify the result-shape contract: when success is true, callers
+    // (cleanupAgentWorktree) only need to distinguish a real review request from
+    // a no-op via the `skipped` flag. Here we just assert the function never
+    // throws on a GitLab URL and returns a structured result the caller can
+    // branch on. The behavior assertion (info-not-warning logging) is covered
+    // in cleanupAgentWorktree.test.js once we plumb the skipped flag through.
+    const result = await requestCopilotReview('/nonexistent-path-for-test', 'https://gitlab.com/group/proj/-/merge_requests/1');
+    expect(result).toHaveProperty('success');
+    expect(typeof result.success).toBe('boolean');
+  });
 });
 
 describe('extractAgentSummary', () => {

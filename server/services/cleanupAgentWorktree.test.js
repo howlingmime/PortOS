@@ -429,6 +429,20 @@ describe('cleanupAgentWorktree - openPR path', () => {
     expect(warnings.some(w => w.includes('Copilot review request failed'))).toBe(true);
     expect(removeWorktree).toHaveBeenCalled();
   });
+
+  it('should NOT record a warning when Copilot review is skipped on a non-GitHub forge', async () => {
+    // Regression: GitLab MRs would previously emit a Copilot review request failure
+    // warning since the helper returned { success: false, error: '...GitHub-only' }.
+    // The new contract: { success: true, skipped: true } → no warning, info-level log.
+    git.push.mockResolvedValue(undefined);
+    git.createPR.mockResolvedValue({ success: true, url: 'https://gitlab.com/group/proj/-/merge_requests/11' });
+    git.requestCopilotReview.mockResolvedValue({ success: true, skipped: true });
+
+    const warnings = await cleanupAgentWorktree('agent-1', true, { openPR: true, requestCopilotReview: true, description: 'Test' });
+
+    expect(warnings.some(w => w.includes('Copilot review'))).toBe(false);
+    expect(removeWorktree).toHaveBeenCalled();
+  });
 });
 
 describe('spawnMergeRecoveryTask', () => {
