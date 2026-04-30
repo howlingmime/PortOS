@@ -172,6 +172,18 @@ describe('parsePullRequestUrl', () => {
     expect(parsePullRequestUrl('https://github.com/owner/repo/extra/pull/1')).toBeNull();
     expect(parsePullRequestUrl('https://github.com/owner/repo/extra/more/pull/1')).toBeNull();
   });
+
+  it('rejects non-http(s) protocols, empty hosts, and explicit ports', () => {
+    // file:// has an empty host — would yield host="" and route gh to nowhere.
+    expect(parsePullRequestUrl('file:///atomantic/PortOS/pull/1')).toBeNull();
+    // Other non-web schemes are never valid PR URLs.
+    expect(parsePullRequestUrl('ftp://github.com/atomantic/PortOS/pull/1')).toBeNull();
+    expect(parsePullRequestUrl('javascript:alert(1)')).toBeNull();
+    // Custom ports get silently dropped by `parsed.hostname`; reject so we
+    // don't target the wrong server.
+    expect(parsePullRequestUrl('https://github.com:8443/atomantic/PortOS/pull/1')).toBeNull();
+    expect(parsePullRequestUrl('http://gitlab.example.com:9000/group/proj/-/merge_requests/1')).toBeNull();
+  });
 });
 
 describe('requestCopilotReview', () => {

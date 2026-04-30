@@ -496,9 +496,21 @@ export function parsePullRequestUrl(url) {
   // request handlers, not URL validation helpers).
   try { parsed = new URL(url); } catch { return null; }
 
-  // Use hostname (no port) — `gh api --hostname` expects a bare hostname and
-  // chokes on host:port. We don't currently support custom-port forges, but if
-  // we ever do, the port should be plumbed through a separate field.
+  // Only forge web URLs are valid input — reject file://, ftp://, javascript:,
+  // etc., which can otherwise sneak through to downstream `gh api --hostname`
+  // or `glab` calls with a misleading or empty host.
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+
+  // `new URL` accepts `https:///path` and `http://:8080/...` — both yield an
+  // empty hostname. Reject those: a host-less PR URL is meaningless.
+  if (!parsed.hostname) return null;
+
+  // Reject explicit ports (`https://github.com:8443/...`). We use
+  // `parsed.hostname` below (not `host`), so a custom port would be silently
+  // dropped and route the request to the wrong server. Custom-port forges
+  // aren't supported until the port is plumbed through a separate field.
+  if (parsed.port) return null;
+
   const host = parsed.hostname;
   const segments = parsed.pathname.split('/').filter(Boolean);
 
