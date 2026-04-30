@@ -28,7 +28,13 @@ vi.mock('../lib/fileUtils.js', () => ({
   PATHS: { images: '/mock/images' },
 }));
 
-vi.mock('fs', () => ({ existsSync: vi.fn(() => true) }));
+vi.mock('fs', () => ({
+  existsSync: vi.fn(() => true),
+  // statSync gates resolveGalleryImage onto regular-file checks — the route
+  // rejects directories, so the mock has to look like a file for the
+  // gallery-image plumbing tests to pass.
+  statSync: vi.fn(() => ({ isFile: () => true })),
+}));
 vi.mock('fs/promises', () => ({ unlink: vi.fn(async () => {}) }));
 
 import * as videoGenService from '../services/videoGen/local.js';
@@ -112,6 +118,36 @@ describe('videoGen routes', () => {
       expect(videoGenService.generateVideo).toHaveBeenCalledWith(expect.objectContaining({
         prompt: 'a cat',
       }));
+    });
+
+    it('forwards lastImageFile + mode for FFLF', async () => {
+      videoGenService.generateVideo.mockResolvedValue({ jobId: 'j3', filename: 'j3.mp4' });
+      const r = await request(app).post('/api/video-gen/').send({
+        prompt: 'morph between two scenes',
+        sourceImageFile: 'first.png',
+        lastImageFile: 'last.png',
+        mode: 'fflf',
+      });
+      expect(r.status).toBe(200);
+      // Locks in the new request-field plumbing: lastImageFile becomes
+      // lastImagePath resolved under PATHS.images, and the mode hint flows
+      // through to the service. existsSync + PATHS.images are mocked so the
+      // resolver returns deterministic paths.
+      expect(videoGenService.generateVideo).toHaveBeenCalledWith(expect.objectContaining({
+        prompt: 'morph between two scenes',
+        sourceImagePath: '/mock/images/first.png',
+        lastImagePath: '/mock/images/last.png',
+        mode: 'fflf',
+      }));
+    });
+
+    it('rejects an unknown mode value', async () => {
+      const r = await request(app).post('/api/video-gen/').send({
+        prompt: 'a cat',
+        mode: 'bogus',
+      });
+      expect(r.status).toBe(400);
+      expect(r.body.error).toMatch(/mode/i);
     });
   });
 

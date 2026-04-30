@@ -119,12 +119,13 @@ const generateThumbnail = async (videoPath, jobId) => {
 export const loadHistory = () => readJSONFile(HISTORY_FILE, []);
 export const saveHistory = (h) => atomicWrite(HISTORY_FILE, h);
 
-const buildArgs = ({ pythonPath, modelId, model, prompt, negativePrompt, width, height, numFrames, fps, steps, guidance, seed, tiling, disableAudio, sourceImagePath, outputPath }) => {
+const buildArgs = ({ pythonPath, modelId, model, prompt, negativePrompt, width, height, numFrames, fps, steps, guidance, seed, tiling, disableAudio, sourceImagePath, lastImagePath, mode, outputPath }) => {
   if (IS_WIN) {
     const scriptPath = join(PATHS.root, 'scripts', 'generate_win.py');
     const args = [scriptPath, '--model', modelId, '--prompt', prompt, '--height', String(height), '--width', String(width), '--num-frames', String(numFrames), '--fps', String(fps), '--steps', String(steps), '--guidance', String(guidance), '--seed', String(seed), '--output', outputPath];
     if (negativePrompt) args.push('--negative-prompt', negativePrompt);
     if (sourceImagePath) args.push('--image', sourceImagePath);
+    if (lastImagePath) args.push('--last-image', lastImagePath);
     return { bin: pythonPath, args };
   }
   const args = [
@@ -145,10 +146,24 @@ const buildArgs = ({ pythonPath, modelId, model, prompt, negativePrompt, width, 
   if (negativePrompt) args.push('--negative-prompt', negativePrompt);
   if (disableAudio) args.push('--no-audio');
   if (sourceImagePath) args.push('--image', sourceImagePath);
+  // mlx_video.generate_av exposes only single-image conditioning at a chosen
+  // frame index (--image-frame-idx). True FFLF (two keyframes) requires the
+  // wrapper script to support multi-frame conditioning. We only opt into the
+  // last-frame-as-end-frame fallback when the caller explicitly asked for
+  // FFLF and supplied ONLY a last image (no source) — gating on `mode`
+  // matches the comment and avoids accidentally triggering the fallback for
+  // an i2v request that happened to send a `lastImagePath`.
+  if (mode === 'fflf' && lastImagePath && !sourceImagePath) {
+    args.push('--image', lastImagePath, '--image-frame-idx', String(Math.max(0, numFrames - 1)));
+  } else if (mode === 'fflf' && lastImagePath && sourceImagePath) {
+    // Both frames provided. mlx_video CLI can't currently consume both —
+    // log so the user knows their last image is advisory.
+    console.log(`⚠️ FFLF requested but mlx_video CLI only supports single-frame conditioning — last image ignored`);
+  }
   return { bin: pythonPath, args };
 };
 
-export async function generateVideo({ pythonPath, prompt, negativePrompt = '', modelId = defaultVideoModelId(), width = 768, height = 512, numFrames = 121, fps = 24, steps, guidanceScale, seed, tiling = 'auto', disableAudio = false, sourceImagePath = null, uploadedTempPath = null }) {
+export async function generateVideo({ pythonPath, prompt, negativePrompt = '', modelId = defaultVideoModelId(), width = 768, height = 512, numFrames = 121, fps = 24, steps, guidanceScale, seed, tiling = 'auto', disableAudio = false, sourceImagePath = null, uploadedTempPath = null, lastImagePath = null, mode = null }) {
   if (!pythonPath) throw new ServerError('Python path not configured — set it in Settings > Image Gen', { status: 400, code: 'VIDEO_GEN_NOT_CONFIGURED' });
   if (!prompt?.trim()) throw new ServerError('Prompt is required', { status: 400, code: 'VALIDATION_ERROR' });
   // Enforce the single-activeProcess invariant — without this a double-submit
@@ -176,32 +191,42 @@ export async function generateVideo({ pythonPath, prompt, negativePrompt = '', m
   // exact dimensions (it doesn't auto-pad), and pixie-forge learned the
   // hard way that letting the model upscale a portrait reference makes
   // garbled output.
-  let resolvedSourceImage = sourceImagePath;
-  let resizedTempPath = null;
-  if (resolvedSourceImage) {
-    const ffmpeg = await findFfmpeg();
-    if (ffmpeg) {
-      const resizedPath = join(tmpdir(), `resized-${jobId}.png`);
-      const resizeResult = await execFileAsync(ffmpeg, [
-        '-i', resolvedSourceImage,
-        '-vf', `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h}`,
-        '-update', '1', '-frames:v', '1',
-        '-y', resizedPath,
-      ], { timeout: 10000 }).catch((err) => ({ error: err }));
-      if (resizeResult.error) {
-        console.log(`⚠️ Failed to resize source image, using original: ${resizeResult.error.message}`);
-      } else {
-        resolvedSourceImage = resizedPath;
-        resizedTempPath = resizedPath;
-      }
+  //
+  // Skip the last-image resize when buildArgs / the Python child won't
+  // actually consume it:
+  //  - On macOS/mlx_video the FFLF fallback only triggers in `fflf` mode
+  //    AND when no source image is also provided (single conditioning frame
+  //    only). Anything else is a no-op, so resizing is wasted ffmpeg work.
+  //  - On Windows we forward --last-image to generate_win.py so it can log
+  //    status, but the diffusers pipeline only reads --image — the script
+  //    never opens the last-frame file, so no resize is needed there either.
+  const lastImageWillBeUsed = !!lastImagePath && !IS_WIN && mode === 'fflf' && !sourceImagePath;
+  const ffmpeg = (sourceImagePath || lastImageWillBeUsed) ? await findFfmpeg() : null;
+  const resizeImage = async (srcPath, tag) => {
+    if (!srcPath || !ffmpeg) return { resolved: srcPath, tempPath: null };
+    const resizedPath = join(tmpdir(), `resized-${tag}-${jobId}.png`);
+    const resizeResult = await execFileAsync(ffmpeg, [
+      '-i', srcPath,
+      '-vf', `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h}`,
+      '-update', '1', '-frames:v', '1',
+      '-y', resizedPath,
+    ], { timeout: 10000 }).catch((err) => ({ error: err }));
+    if (resizeResult.error) {
+      console.log(`⚠️ Failed to resize ${tag} image, using original: ${resizeResult.error.message}`);
+      return { resolved: srcPath, tempPath: null };
     }
-  }
+    return { resolved: resizedPath, tempPath: resizedPath };
+  };
+  const { resolved: resolvedSourceImage, tempPath: resizedSrcTempPath } = await resizeImage(sourceImagePath, 'src');
+  const { resolved: resolvedLastImage, tempPath: resizedLastTempPath } = lastImageWillBeUsed
+    ? await resizeImage(lastImagePath, 'last')
+    : { resolved: lastImagePath, tempPath: null };
 
-  const meta = { id: jobId, prompt, negativePrompt, modelId, seed: actualSeed, width: w, height: h, numFrames: parsedNumFrames, fps: parsedFps, filename, createdAt: new Date().toISOString() };
+  const meta = { id: jobId, prompt, negativePrompt, modelId, seed: actualSeed, width: w, height: h, numFrames: parsedNumFrames, fps: parsedFps, filename, createdAt: new Date().toISOString(), mode: mode || (sourceImagePath ? 'image' : 'text') };
   const job = { ...meta, clients: [], status: 'running' };
   jobs.set(jobId, job);
 
-  const { bin, args } = buildArgs({ pythonPath, modelId, model, prompt, negativePrompt, width: w, height: h, numFrames: parsedNumFrames, fps: parsedFps, steps: actualSteps, guidance: actualGuidance, seed: actualSeed, tiling, disableAudio, sourceImagePath: resolvedSourceImage, outputPath });
+  const { bin, args } = buildArgs({ pythonPath, modelId, model, prompt, negativePrompt, width: w, height: h, numFrames: parsedNumFrames, fps: parsedFps, steps: actualSteps, guidance: actualGuidance, seed: actualSeed, tiling, disableAudio, sourceImagePath: resolvedSourceImage, lastImagePath: resolvedLastImage, mode, outputPath });
 
   console.log(`🎬 Generating video [${jobId.slice(0, 8)}]: ${modelId} ${w}x${h} frames=${parsedNumFrames} steps=${actualSteps}`);
   videoGenEvents.emit('started', { generationId: jobId, totalSteps: actualSteps, ...meta });
@@ -223,7 +248,12 @@ export async function generateVideo({ pythonPath, prompt, negativePrompt = '', m
     broadcastSse(job, { type: 'error', error: reason });
     videoGenEvents.emit('failed', { generationId: jobId, error: reason });
     activeProcess = null;
-    if (resizedTempPath) unlink(resizedTempPath).catch(() => {});
+    // Spawn failed, so proc.on('close') will never fire — clean up every
+    // temp file we own here, including the multipart upload, otherwise
+    // ENOENT/permission errors leak files in os.tmpdir().
+    if (resizedSrcTempPath) unlink(resizedSrcTempPath).catch(() => {});
+    if (resizedLastTempPath) unlink(resizedLastTempPath).catch(() => {});
+    if (uploadedTempPath) unlink(uploadedTempPath).catch(() => {});
     closeJobAfterDelay(jobs, jobId);
   });
 
@@ -273,10 +303,11 @@ export async function generateVideo({ pythonPath, prompt, negativePrompt = '', m
 
   proc.on('close', async (code, signal) => {
     activeProcess = null;
-    // Cleanup the resized temp image if we made one. Track via a flag rather
+    // Cleanup the resized temp images if we made them. Track via flags rather
     // than a path-prefix check — tmpdir() can return a symlinked path
     // (macOS /var → /private/var) so startsWith() can silently miss.
-    if (resizedTempPath) await unlink(resizedTempPath).catch(() => {});
+    if (resizedSrcTempPath) await unlink(resizedSrcTempPath).catch(() => {});
+    if (resizedLastTempPath) await unlink(resizedLastTempPath).catch(() => {});
     // Cleanup the original multipart upload temp file too — without this,
     // every i2v request leaves a file in os.tmpdir() forever.
     if (uploadedTempPath) await unlink(uploadedTempPath).catch(() => {});

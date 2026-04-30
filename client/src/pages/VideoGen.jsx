@@ -5,6 +5,21 @@
  * Accepts a source image either via direct upload or via the
  * `?sourceImageFile=` query param so the Image Gen page can pipe a generation
  * straight into video.
+ *
+ * Modes (UI state, also forwarded to the backend as `mode`):
+ *   - text:   pure text-to-video
+ *   - image:  image-to-video (one source image, current I2V behavior)
+ *   - fflf:   first frame + last frame (two images — backend support is
+ *             experimental; mlx_video only supports a single conditioning
+ *             frame, so when both are provided the last is ignored)
+ *   - extend: pick a previous render → its last frame becomes the source
+ *             image for a new image-to-video generation
+ *
+ * Batch queue: client-side serial executor. The form's "Add to queue" button
+ * appends a job to the queue (preserving the current params). When no job is
+ * actively generating, the head of the queue is dequeued and submitted via
+ * the same generate path as the inline button — so SSE progress, history
+ * refresh, and error handling are all reused.
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -16,13 +31,15 @@ import MediaLightbox from '../components/media/MediaLightbox';
 import { normalizeVideo } from '../components/media/normalize';
 import {
   Film, Sparkles, Settings as SettingsIcon, RefreshCw, AlertTriangle,
-  Dice5, X, Upload
+  Dice5, X, Upload, Type, Image as ImageIcon, GitBranch, ListPlus,
 } from 'lucide-react';
 import toast from '../components/ui/Toast';
 import BrailleSpinner from '../components/BrailleSpinner';
+import BatchQueuePanel from '../components/media/BatchQueuePanel';
 import {
   getVideoGenStatus, generateVideo, cancelVideoGen,
   listVideoHistory, deleteVideoHistoryItem, setVideoHidden, extractLastFrame,
+  listImageGallery,
 } from '../services/api';
 import { randomSeed, safeParseJSON } from '../lib/genUtils';
 
@@ -44,6 +61,18 @@ const TILING_OPTIONS = [
   { value: 'temporal', label: 'Temporal only' },
 ];
 
+const MODES = [
+  { id: 'text',   label: 'Text',   icon: Type,       desc: 'Text-to-video' },
+  { id: 'image',  label: 'Image',  icon: ImageIcon,  desc: 'Image-to-video (start frame)' },
+  { id: 'fflf',   label: 'FFLF',   icon: GitBranch,  desc: 'First frame + last frame' },
+  { id: 'extend', label: 'Extend', icon: Film,       desc: 'Continue from a prior render' },
+];
+
+const newQueueId = () =>
+  (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
 export default function VideoGen() {
   const [searchParams, setSearchParams] = useSearchParams();
   const incomingSourceImage = searchParams.get('sourceImageFile');
@@ -57,6 +86,7 @@ export default function VideoGen() {
   const [statusLoading, setStatusLoading] = useState(true);
   const [models, setModels] = useState([]);
 
+  const [mode, setMode] = useState(incomingSourceImage ? 'image' : 'text');
   const [prompt, setPrompt] = useState(incomingPrompt || '');
   const [negativePrompt, setNegativePrompt] = useState(incomingNegativePrompt || '');
   const [modelId, setModelId] = useState('');
@@ -71,13 +101,20 @@ export default function VideoGen() {
   const [disableAudio, setDisableAudio] = useState(false);
   const [sourceImageFile, setSourceImageFile] = useState(incomingSourceImage || null);
   const [sourceImageUpload, setSourceImageUpload] = useState(null);
+  const [lastImageFile, setLastImageFile] = useState(null);
+  const [extendFromVideoId, setExtendFromVideoId] = useState('');
+  const [extendingFrame, setExtendingFrame] = useState(false);
+
+  // Image gallery for the FFLF end-frame picker (gallery only — no upload
+  // for the second image so the multipart parser stays single-file).
+  const [imageGallery, setImageGallery] = useState([]);
+
   // Re-sync when ImageGen pipes a new image via ?sourceImageFile=...
-  // React Router doesn't remount on query-string-only navigation, so the
-  // initial useState capture would otherwise stick.
   useEffect(() => {
     if (incomingSourceImage) {
       setSourceImageFile(incomingSourceImage);
       setSourceImageUpload(null);
+      setMode((m) => (m === 'text' ? 'image' : m));
     }
   }, [incomingSourceImage]);
   useEffect(() => {
@@ -86,6 +123,7 @@ export default function VideoGen() {
   useEffect(() => {
     if (incomingNegativePrompt) setNegativePrompt(incomingNegativePrompt);
   }, [incomingNegativePrompt]);
+
   const [history, setHistory] = useState([]);
   const [preview, setPreview] = useState(null);
   const [showHidden, setShowHidden] = useState(false);
@@ -95,6 +133,7 @@ export default function VideoGen() {
     listVideoHistory().then((items) => setHistory(Array.isArray(items) ? items : [])).catch(() => {});
   }, []);
   useEffect(() => { refreshHistory(); }, [refreshHistory]);
+  useEffect(() => { listImageGallery().then(setImageGallery).catch(() => {}); }, []);
 
   const { visibleHistory, hiddenHistory } = useMemo(() => ({
     visibleHistory: history.filter((v) => !v.hidden),
@@ -116,12 +155,11 @@ export default function VideoGen() {
     if (result) toast.success(nextHidden ? 'Video hidden' : 'Video unhidden');
   };
   const handleContinueHistory = async (item) => {
-    try {
-      const { filename } = await extractLastFrame(item.id);
-      navigate(`/media/video?sourceImageFile=${encodeURIComponent(filename)}`);
-    } catch (err) {
+    const { filename } = await extractLastFrame(item.id).catch((err) => {
       toast.error(err.message || 'Failed to extract last frame');
-    }
+      return {};
+    });
+    if (filename) navigate(`/media/video?sourceImageFile=${encodeURIComponent(filename)}`);
   };
 
   const [generating, setGenerating] = useState(false);
@@ -130,6 +168,22 @@ export default function VideoGen() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const eventSourceRef = useRef(null);
+  // Hold the reject() of the in-flight runGeneration Promise so cancel can
+  // settle it. Without this, handleCancel() closes the EventSource but the
+  // outstanding Promise dangles forever — and the queue worker's .finally()
+  // never runs, leaving runningQueueId stuck and freezing further dequeue.
+  const runRejectRef = useRef(null);
+  // Per-run abort token. Bumped at the start of each runGeneration() and
+  // again on cancel; runGeneration captures the value at start and bails
+  // when the token has moved on (e.g. POST resolves after cancel).
+  const runTokenRef = useRef(0);
+
+  // Batch queue. Each item snapshots the params at enqueue time so the user
+  // can keep editing the form while jobs are in flight without affecting the
+  // queued ones. The active generation is held in `generating`/`progress`;
+  // `runningQueueId` (if set) marks which queued item it represents.
+  const [queue, setQueue] = useState([]);
+  const [runningQueueId, setRunningQueueId] = useState(null);
 
   const refreshStatus = useCallback(() => {
     setStatusLoading(true);
@@ -137,8 +191,6 @@ export default function VideoGen() {
       .then((s) => {
         setStatus(s);
         setModels(s.models || []);
-        // Functional update so a stale `modelId` closure can't reset the
-        // user's selected model on a refresh — only set when no choice yet.
         if (s.defaultModel) setModelId((prev) => prev || s.defaultModel);
       })
       .catch(() => setStatus({ connected: false, reason: 'Status check failed' }))
@@ -160,7 +212,6 @@ export default function VideoGen() {
     const r = RESOLUTIONS.find((r) => r.label === e.target.value);
     if (r) { setWidth(r.w); setHeight(r.h); }
   };
-
   const handleRandomSeed = () => setSeed(randomSeed());
 
   const clearSourceImage = () => {
@@ -172,38 +223,136 @@ export default function VideoGen() {
       setSearchParams(next, { replace: true });
     }
   };
+  const clearLastImage = () => setLastImageFile(null);
 
-  const handleGenerate = async (e) => {
-    e?.preventDefault?.();
-    if (!prompt.trim() || generating) return;
+  // Switching mode resets the now-irrelevant fields so a stale choice from
+  // a prior mode can't sneak into the next generation. (Prompt/seed/etc.
+  // carry over because they apply to all modes.)
+  const handleModeChange = (next) => {
+    setMode(next);
+    if (next === 'text') {
+      clearSourceImage();
+      setLastImageFile(null);
+      setExtendFromVideoId('');
+    } else if (next === 'image') {
+      setLastImageFile(null);
+      setExtendFromVideoId('');
+    } else if (next === 'fflf') {
+      setExtendFromVideoId('');
+    } else if (next === 'extend') {
+      setLastImageFile(null);
+      // Drop any source image carried over from a prior mode — extend will
+      // populate sourceImageFile fresh from the picked video's last frame
+      // via handleExtendPick. Without this, switching from image/fflf into
+      // extend leaves a stale source that gets silently submitted alongside
+      // an empty extendFromVideoId.
+      clearSourceImage();
+    }
+  };
+
+  // Extend mode: the user picks a prior video; we extract its last frame
+  // (lazily — only when picked, since extraction shells out to ffmpeg) and
+  // use that as the source image for image-to-video.
+  //
+  // The pick token guards against a slow-then-fast race: if the user picks
+  // video A, then quickly switches to video B, A's extract response could
+  // arrive after B's and overwrite sourceImageFile with the wrong frame.
+  // Capture the token at request time and only apply the result when it
+  // still matches the latest pick.
+  const extendPickTokenRef = useRef(0);
+  const handleExtendPick = async (videoId) => {
+    // Bumping the token cancels any in-flight extract from a prior pick:
+    // the awaited promise still resolves, but the result-application block
+    // sees the mismatch and bails. Clearing the spinner here too means a
+    // fast-clear (`videoId === ''`) doesn't strand the "Extracting…" UI
+    // when an earlier extract is mid-flight.
+    const token = ++extendPickTokenRef.current;
+    setExtendFromVideoId(videoId);
+    if (!videoId) {
+      clearSourceImage();
+      setExtendingFrame(false);
+      return;
+    }
+    setExtendingFrame(true);
+    const res = await extractLastFrame(videoId).catch((err) => {
+      toast.error(err.message || 'Failed to extract last frame');
+      return null;
+    });
+    // Stale completion: a newer pick (or clear) is now authoritative. Do
+    // nothing — the newer call already set/will set the spinner correctly,
+    // and the clear-path above resets it on empty pick. Touching it from
+    // the stale request could prematurely hide "Extracting…" while the
+    // current pick (B) is still in flight after a fast pick A → pick B.
+    if (token !== extendPickTokenRef.current) return;
+    setExtendingFrame(false);
+    if (res?.filename) {
+      setSourceImageFile(res.filename);
+      setSourceImageUpload(null);
+    }
+  };
+
+  // Snapshot the current form into a generate-payload. Used both by the
+  // inline Generate button and by enqueue, so the two paths stay in lockstep.
+  const buildGeneratePayload = () => ({
+    prompt: prompt.trim(),
+    negativePrompt: negativePrompt.trim() || '',
+    modelId,
+    width, height,
+    numFrames,
+    fps,
+    steps: steps || '',
+    guidanceScale: guidanceScale || '',
+    seed: seed || '',
+    tiling,
+    disableAudio: disableAudio ? 'true' : 'false',
+    mode,
+    sourceImageFile: (mode === 'image' || mode === 'fflf' || mode === 'extend') ? (sourceImageFile || '') : '',
+    sourceImage: (mode === 'image' || mode === 'fflf') ? (sourceImageUpload || '') : '',
+    lastImageFile: mode === 'fflf' ? (lastImageFile || '') : '',
+  });
+
+  // Run a single payload through the SSE pipeline. Returns a promise that
+  // resolves when the job completes (or rejects on error / cancel). Shared
+  // by the inline submit and the queue worker.
+  //
+  // Per-run abort token: the user can press Cancel during the brief window
+  // between generateVideo() POST and its `.then()` resolving with a jobId.
+  // Without a guard, the late `.then()` would still open an EventSource and
+  // start applying SSE updates for a job the UI considers cancelled, AND
+  // could clobber a queue item that's already advanced. handleCancel bumps
+  // runTokenRef; runGeneration captures the token at start and ignores the
+  // POST response (and any SSE messages) when the token no longer matches.
+  const runGeneration = (payload) => new Promise((resolve, reject) => {
     setGenerating(true);
     setProgress({ progress: 0 });
     setStatusMsg('Starting...');
     setResult(null);
     setError(null);
 
-    try {
-      const data = await generateVideo({
-        prompt: prompt.trim(),
-        negativePrompt: negativePrompt.trim() || '',
-        modelId,
-        width, height,
-        numFrames,
-        fps,
-        steps: steps || '',
-        guidanceScale: guidanceScale || '',
-        seed: seed || '',
-        tiling,
-        disableAudio: disableAudio ? 'true' : 'false',
-        sourceImageFile: sourceImageFile || '',
-        sourceImage: sourceImageUpload || '',
-      });
+    const myToken = ++runTokenRef.current;
+    const isCurrent = () => myToken === runTokenRef.current;
 
+    // Wrap settle so the cancel ref is cleared exactly once when the Promise
+    // transitions to a final state — guarantees the queue worker's .finally()
+    // always runs and stale rejects can't fire after a successful complete.
+    const settleResolve = (value) => { runRejectRef.current = null; resolve(value); };
+    const settleReject = (err) => { runRejectRef.current = null; reject(err); };
+    runRejectRef.current = settleReject;
+
+    generateVideo(payload).then((data) => {
+      // The user cancelled while we were waiting for the POST to return —
+      // don't open an EventSource at all, and don't touch any state. The
+      // earlier handleCancel() already settled the Promise via runRejectRef.
+      if (!isCurrent()) return;
       const jobId = data.jobId || data.generationId;
       const es = new EventSource(`/api/video-gen/${jobId}/events`);
       eventSourceRef.current = es;
 
       es.onmessage = (ev) => {
+        // A cancel that landed after the EventSource opened would have closed
+        // it, but a stray buffered message could still fire — bail before
+        // touching component state for a run we no longer own.
+        if (!isCurrent()) { es.close(); return; }
         const msg = safeParseJSON(ev.data);
         if (!msg) return;
         if (msg.type === 'status') setStatusMsg(msg.message);
@@ -219,34 +368,148 @@ export default function VideoGen() {
           es.close();
           toast.success('Video generated');
           refreshHistory();
+          settleResolve(msg.result);
         }
         if (msg.type === 'error') {
           setError(msg.error);
           setGenerating(false);
           es.close();
           toast.error(msg.error);
+          settleReject(new Error(msg.error));
         }
       };
       es.onerror = () => {
+        if (!isCurrent()) { es.close(); return; }
         setError('Lost connection to server');
         setGenerating(false);
         es.close();
+        settleReject(new Error('Lost connection to server'));
       };
-    } catch (err) {
+    }).catch((err) => {
+      if (!isCurrent()) return;
       setError(err.message || 'Video generation failed');
       setGenerating(false);
       toast.error(err.message || 'Video generation failed');
-    }
+      settleReject(err);
+    });
+  });
+
+  // In Extend mode the source image is populated asynchronously after the
+  // user picks a prior video — until that extraction lands, sourceImageFile
+  // is empty and the request would silently fall back to T2V while still
+  // sending mode='extend'. Block submit/enqueue until the extend frame is
+  // actually ready (and unblocks the disabled state on the buttons too).
+  const extendModeBlocked = mode === 'extend'
+    && (extendingFrame || !extendFromVideoId || !sourceImageFile);
+
+  const handleGenerate = async (e) => {
+    e?.preventDefault?.();
+    // Mirror the inline submit-button's disabled rules: blank prompt,
+    // already generating, backend disconnected, or extend mode not ready.
+    // Without these guards the user could press Enter in the prompt
+    // textarea and fire a request the disabled button would otherwise
+    // have prevented.
+    if (!prompt.trim() || generating || (status && status.connected === false) || extendModeBlocked) return;
+    await runGeneration(buildGeneratePayload()).catch(() => {});
   };
 
+  const handleEnqueue = () => {
+    if (!prompt.trim() || (status && status.connected === false) || extendModeBlocked) return;
+    const payload = buildGeneratePayload();
+    // Strip the File blob for snapshot — re-using a File across multiple
+    // queued submissions is fine, but we need a stable JSON-ish summary
+    // for the queue UI display. Hold the File in `_blob` separately.
+    const { sourceImage, ...summary } = payload;
+    setQueue((q) => [...q, {
+      id: newQueueId(),
+      status: 'pending',
+      params: summary,
+      _blob: sourceImage instanceof File ? sourceImage : null,
+      enqueuedAt: Date.now(),
+    }]);
+    toast.success('Added to queue');
+  };
+
+  const removeFromQueue = (id) => {
+    setQueue((q) => q.filter((item) => item.id !== id || item.status === 'running'));
+  };
+  // Drops both successful and errored items — the panel surfaces this as
+  // "Clear finished" so the label matches the behavior.
+  const clearFinishedQueue = () => {
+    setQueue((q) => q.filter((item) => item.status !== 'complete' && item.status !== 'error'));
+  };
+
+  // Queue worker — pumps the head of the queue when nothing's running.
+  // Runs as an effect so it picks up any newly-enqueued item even while
+  // the user is interacting with the form.
+  //
+  // BUSY backoff: the server's `cancel()` keeps `activeProcess` set until
+  // the SIGKILL'd child actually exits (up to ~8s), so a freshly-cancelled
+  // item leaving the running slot here will often hit a 409 VIDEO_GEN_BUSY
+  // when the worker tries to dispatch the next pending item. Treat that as
+  // "not yet" (return the item to pending) instead of marking it errored.
+  useEffect(() => {
+    if (generating || runningQueueId) return;
+    const next = queue.find((item) => item.status === 'pending');
+    if (!next) return;
+    setRunningQueueId(next.id);
+    setQueue((q) => q.map((item) => item.id === next.id ? { ...item, status: 'running', startedAt: Date.now() } : item));
+    const payload = { ...next.params };
+    if (next._blob) payload.sourceImage = next._blob;
+    let busyRetry = false;
+    let busyRetryTimer = null;
+    runGeneration(payload).then((res) => {
+      setQueue((q) => q.map((item) => item.id === next.id ? { ...item, status: 'complete', result: res } : item));
+    }).catch((err) => {
+      const isBusy = /already in progress|VIDEO_GEN_BUSY|409/i.test(err?.message || '');
+      if (isBusy) {
+        // Bounce the item back to pending after a short delay so the worker
+        // re-tries once the server's previous child has finished cleaning up.
+        busyRetry = true;
+        setQueue((q) => q.map((item) => item.id === next.id ? { ...item, status: 'pending', startedAt: undefined } : item));
+        busyRetryTimer = setTimeout(() => setRunningQueueId((curr) => (curr === next.id ? null : curr)), 1500);
+        return;
+      }
+      setQueue((q) => q.map((item) => item.id === next.id ? { ...item, status: 'error', error: err.message } : item));
+    }).finally(() => {
+      // For the BUSY branch the timeout above releases the slot — releasing
+      // it here too would let the worker immediately re-fire and hit the
+      // same 409 before the server's old child has exited.
+      if (!busyRetry) setRunningQueueId(null);
+    });
+    // Effect cleanup: cancel a pending BUSY-retry setTimeout when the
+    // component unmounts (or before this effect re-runs). Without this, an
+    // unmount during the 1.5s BUSY backoff would fire setRunningQueueId on
+    // a torn-down component (React warning + leaked state).
+    return () => { if (busyRetryTimer) clearTimeout(busyRetryTimer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queue, generating, runningQueueId]);
+
   const handleCancel = async () => {
+    // Bump the run token FIRST so any late `.then()` from the in-flight
+    // generateVideo() POST sees a stale token and bails before opening an
+    // EventSource for a job we've already declared cancelled.
+    runTokenRef.current += 1;
     eventSourceRef.current?.close();
     await cancelVideoGen().catch(() => {});
     setGenerating(false);
     setStatusMsg('Cancelled');
+    // Settle the in-flight runGeneration Promise so the queue worker's
+    // .finally() releases runningQueueId and the next pending item can run.
+    // Without this the Promise would dangle and the worker would stay parked.
+    if (runRejectRef.current) {
+      const reject = runRejectRef.current;
+      runRejectRef.current = null;
+      reject(new Error('Cancelled'));
+    }
+    if (runningQueueId) {
+      setQueue((q) => q.map((item) => item.id === runningQueueId ? { ...item, status: 'error', error: 'Cancelled' } : item));
+      setRunningQueueId(null);
+    }
   };
 
   const notConnected = status && status.connected === false;
+  const canEnqueue = prompt.trim() && !notConnected && !extendModeBlocked;
 
   return (
     <div className="space-y-6">
@@ -290,6 +553,35 @@ export default function VideoGen() {
         </div>
       </div>
 
+      {/* Mode switch — segmented control above the form. Sets state that
+          both the form rendering and the submit payload react to.
+          Implemented as plain toggle buttons with `aria-pressed` rather than
+          WAI-ARIA Tabs, since the mode-specific inputs aren't structured as
+          tabpanels and we don't implement roving-tabindex/arrow-key focus. */}
+      <div className="bg-port-card border border-port-border rounded-xl p-1.5 flex flex-wrap gap-1" role="group" aria-label="Video generation mode">
+        {MODES.map(({ id, label, icon: Icon, desc }) => {
+          const active = mode === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => handleModeChange(id)}
+              disabled={generating}
+              className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+                active
+                  ? 'bg-port-accent text-white shadow'
+                  : 'text-gray-400 hover:text-white hover:bg-port-border/40'
+              }`}
+              title={desc}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <form onSubmit={handleGenerate} className="grid grid-cols-1 lg:grid-cols-[1fr,1.2fr] gap-6">
         <div className="bg-port-card border border-port-border rounded-xl p-5 space-y-4">
           <div>
@@ -316,34 +608,105 @@ export default function VideoGen() {
             />
           </div>
 
-          {/* Source image (image-to-video) */}
-          <div className="border border-port-border/50 rounded-lg p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-400">Source Image (optional, image-to-video)</span>
-              {(sourceImageFile || sourceImageUpload) && (
-                <button type="button" onClick={clearSourceImage} className="text-xs text-port-error hover:underline">Clear</button>
+          {/* Mode-specific image / video pickers */}
+          {(mode === 'image' || mode === 'fflf') && (
+            <div className="border border-port-border/50 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-400">
+                  {mode === 'fflf' ? 'First frame (start image)' : 'Source image (image-to-video)'}
+                </span>
+                {(sourceImageFile || sourceImageUpload) && (
+                  <button type="button" onClick={clearSourceImage} className="text-xs text-port-error hover:underline">Clear</button>
+                )}
+              </div>
+              {sourceImageFile && (
+                <div className="flex items-center gap-2">
+                  <img src={`/data/images/${sourceImageFile}`} alt="Source" className="w-16 h-16 object-cover rounded border border-port-border" />
+                  <span className="text-xs text-gray-500 truncate">{sourceImageFile}</span>
+                </div>
+              )}
+              {!sourceImageFile && (
+                <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-white">
+                  <Upload className="w-4 h-4" />
+                  <span>{sourceImageUpload ? sourceImageUpload.name : 'Upload an image'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={generating}
+                    onChange={(e) => setSourceImageUpload(e.target.files?.[0] || null)}
+                    className="hidden"
+                  />
+                </label>
               )}
             </div>
-            {sourceImageFile && (
-              <div className="flex items-center gap-2">
-                <img src={`/data/images/${sourceImageFile}`} alt="Source" className="w-16 h-16 object-cover rounded border border-port-border" />
-                <span className="text-xs text-gray-500 truncate">{sourceImageFile}</span>
+          )}
+
+          {mode === 'fflf' && (
+            <div className="border border-port-border/50 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-400">Last frame (end image)</span>
+                {lastImageFile && (
+                  <button type="button" onClick={clearLastImage} className="text-xs text-port-error hover:underline">Clear</button>
+                )}
               </div>
-            )}
-            {!sourceImageFile && (
-              <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-white">
-                <Upload className="w-4 h-4" />
-                <span>{sourceImageUpload ? sourceImageUpload.name : 'Upload an image'}</span>
-                <input
-                  type="file"
-                  accept="image/*"
+              {lastImageFile ? (
+                <div className="flex items-center gap-2">
+                  <img src={`/data/images/${lastImageFile}`} alt="End frame" className="w-16 h-16 object-cover rounded border border-port-border" />
+                  <span className="text-xs text-gray-500 truncate">{lastImageFile}</span>
+                </div>
+              ) : (
+                <select
+                  value=""
                   disabled={generating}
-                  onChange={(e) => setSourceImageUpload(e.target.files?.[0] || null)}
-                  className="hidden"
-                />
-              </label>
-            )}
-          </div>
+                  onChange={(e) => setLastImageFile(e.target.value || null)}
+                  className="w-full bg-port-bg border border-port-border rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-port-accent disabled:opacity-50"
+                >
+                  <option value="">Pick an image from gallery…</option>
+                  {imageGallery.filter((img) => !img.hidden).slice(0, 50).map((img) => (
+                    <option key={img.filename} value={img.filename}>{img.filename}</option>
+                  ))}
+                </select>
+              )}
+              <p className="text-[11px] text-gray-500 leading-snug">
+                Note: FFLF (two-keyframe) backend support is experimental — current
+                LTX/mlx_video CLI consumes the start frame and treats the last frame
+                as advisory. Generate the end image first via Image Gen, then pick it here.
+              </p>
+            </div>
+          )}
+
+          {mode === 'extend' && (
+            <div className="border border-port-border/50 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-400">Continue from a prior render</span>
+                {extendFromVideoId && (
+                  <button type="button" onClick={() => handleExtendPick('')} className="text-xs text-port-error hover:underline">Clear</button>
+                )}
+              </div>
+              <select
+                value={extendFromVideoId}
+                disabled={generating || extendingFrame}
+                onChange={(e) => handleExtendPick(e.target.value)}
+                className="w-full bg-port-bg border border-port-border rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-port-accent disabled:opacity-50"
+              >
+                <option value="">Pick a previous video…</option>
+                {visibleHistory.slice(0, 50).map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {(v.prompt || v.filename || v.id).slice(0, 80)}
+                  </option>
+                ))}
+              </select>
+              {extendingFrame && (
+                <span className="text-[11px] text-gray-500">Extracting last frame…</span>
+              )}
+              {sourceImageFile && extendFromVideoId && !extendingFrame && (
+                <div className="flex items-center gap-2">
+                  <img src={`/data/images/${sourceImageFile}`} alt="Last frame" className="w-16 h-16 object-cover rounded border border-port-border" />
+                  <span className="text-xs text-gray-500 truncate">Starts from: {sourceImageFile}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             {models.length > 0 && (
@@ -471,7 +834,7 @@ export default function VideoGen() {
             </label>
           </div>
 
-          <div className="flex items-center gap-2 pt-2">
+          <div className="flex flex-wrap items-center gap-2 pt-2">
             {generating ? (
               <button
                 type="button"
@@ -483,12 +846,22 @@ export default function VideoGen() {
             ) : (
               <button
                 type="submit"
-                disabled={!prompt.trim() || notConnected}
+                disabled={!prompt.trim() || notConnected || extendModeBlocked}
                 className="flex items-center gap-2 px-4 py-2 bg-port-accent hover:bg-port-accent/80 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg min-h-[40px]"
+                title={extendModeBlocked ? 'Pick a prior render and wait for the last frame to extract before generating' : undefined}
               >
                 <Sparkles className="w-4 h-4" /> Generate
               </button>
             )}
+            <button
+              type="button"
+              onClick={handleEnqueue}
+              disabled={!canEnqueue}
+              className="flex items-center gap-2 px-4 py-2 border border-port-border text-gray-200 hover:text-white hover:bg-port-border/40 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium rounded-lg min-h-[40px]"
+              title="Add this configuration to the batch queue"
+            >
+              <ListPlus className="w-4 h-4" /> Add to queue
+            </button>
             {progressPct != null && <span className="text-xs text-port-accent">{progressPct}%</span>}
           </div>
 
@@ -535,6 +908,18 @@ export default function VideoGen() {
           )}
         </div>
       </form>
+
+      <BatchQueuePanel
+        queue={queue}
+        onRemove={removeFromQueue}
+        onClear={clearFinishedQueue}
+        summarize={(item) => (
+          <>
+            <span className="uppercase mr-2">{item.params.mode}</span>
+            {item.params.width}×{item.params.height} · {item.params.numFrames}f
+          </>
+        )}
+      />
 
       {visibleHistory.length > 0 && (
         <div className="bg-port-card border border-port-border rounded-xl p-5 space-y-3">
@@ -604,3 +989,4 @@ export default function VideoGen() {
     </div>
   );
 }
+
