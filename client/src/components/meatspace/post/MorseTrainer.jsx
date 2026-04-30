@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Radio, Headphones, Hand, BookOpen, CheckCircle, XCircle, Play, RefreshCw, Volume2 } from 'lucide-react';
+import { ArrowLeft, Radio, Headphones, Hand, CheckCircle, XCircle, Play, RefreshCw, Volume2, GitBranch, List as ListIcon, Ruler, Eraser } from 'lucide-react';
 
 const MORSE_TABLE = {
   A: '.-',     B: '-...',   C: '-.-.',   D: '-..',    E: '.',      F: '..-.',
@@ -14,6 +14,28 @@ const MORSE_TABLE = {
 
 const MORSE_LOOKUP = Object.fromEntries(Object.entries(MORSE_TABLE).map(([k, v]) => [v, k]));
 const MORSE_ENTRIES = Object.entries(MORSE_TABLE);
+
+// Group entries by code length for the "Length" reference view.
+const MORSE_BY_LENGTH = MORSE_ENTRIES.reduce((acc, [ch, code]) => {
+  (acc[code.length] ||= []).push([ch, code]);
+  return acc;
+}, {});
+
+// Binary tree: walk left for `-` (DAH), right for `.` (DIT). Each node's path
+// from the root spells its morse code; missing paths are nulls (e.g. `----`).
+const MORSE_TREE = (() => {
+  const root = { char: '·', code: '', dah: null, dit: null };
+  for (const [ch, code] of MORSE_ENTRIES) {
+    let node = root;
+    for (const sym of code) {
+      const k = sym === '-' ? 'dah' : 'dit';
+      if (!node[k]) node[k] = { char: '', code: node.code + sym, dah: null, dit: null };
+      node = node[k];
+    }
+    node.char = ch;
+  }
+  return root;
+})();
 
 const KOCH_ORDER = ['K', 'M', 'U', 'R', 'E', 'S', 'N', 'A', 'P', 'T', 'L', 'W', 'I', '.', 'J', 'Z', '=', 'F', 'O', 'Y', ',', 'V', 'G', '5', '/', 'Q', '9', '2', 'H', '3', '8', 'B', '?', '4', '7', 'C', '1', 'D', '6', '0', 'X'];
 
@@ -144,10 +166,141 @@ function useAudioContext() {
   return ensureCtx;
 }
 
+// Global, single-source keying decoder. Listens for spacebar (skipping INPUT/
+// TEXTAREA), exposes pointer handlers for the on-screen tap key, and decodes
+// the buffered symbols into letters as silence boundaries elapse. The current
+// in-flight pattern is exposed live so the side widget can highlight a tree
+// path; the committed `decoded` string is exposed so drills can score.
+function useKeyingDecoder({ unitMs, hz, ensureCtx }) {
+  const oscRef = useRef(null);
+  const gainRef = useRef(null);
+  const pressStartRef = useRef(0);
+  const lastReleaseRef = useRef(0);
+  const flushTimerRef = useRef(null);
+  const wordTimerRef = useRef(null);
+  const patternRef = useRef('');
+
+  const [pattern, setPattern] = useState('');
+  const [decoded, setDecoded] = useState('');
+  const [pressing, setPressing] = useState(false);
+
+  const startTone = useCallback(() => {
+    const ctx = ensureCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = hz;
+    gain.gain.value = 0;
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(TONE_GAIN, now + RAMP_SEC);
+    oscRef.current = osc;
+    gainRef.current = gain;
+  }, [ensureCtx, hz]);
+
+  const stopTone = useCallback(() => {
+    const osc = oscRef.current;
+    const gain = gainRef.current;
+    if (!osc || !gain) return;
+    const ctx = ensureCtx();
+    const now = ctx.currentTime;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    gain.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
+    osc.stop(now + 0.02);
+    osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+    oscRef.current = null;
+    gainRef.current = null;
+  }, [ensureCtx]);
+
+  const flushLetter = useCallback(() => {
+    const buf = patternRef.current;
+    if (!buf) return;
+    const ch = MORSE_LOOKUP[buf] || '?';
+    setDecoded((d) => d + ch);
+    patternRef.current = '';
+    setPattern('');
+  }, []);
+
+  const beginPress = useCallback(() => {
+    if (pressing) return;
+    if (flushTimerRef.current) { clearTimeout(flushTimerRef.current); flushTimerRef.current = null; }
+    if (wordTimerRef.current) { clearTimeout(wordTimerRef.current); wordTimerRef.current = null; }
+    setPressing(true);
+    pressStartRef.current = performance.now();
+    startTone();
+  }, [pressing, startTone]);
+
+  const endPress = useCallback(() => {
+    if (!pressing) return;
+    setPressing(false);
+    stopTone();
+    const now = performance.now();
+    const duration = now - pressStartRef.current;
+    const sym = duration < 2 * unitMs ? '.' : '-';
+    patternRef.current += sym;
+    setPattern(patternRef.current);
+    lastReleaseRef.current = now;
+    flushTimerRef.current = setTimeout(flushLetter, 3 * unitMs);
+    wordTimerRef.current = setTimeout(() => setDecoded((d) => d.endsWith(' ') ? d : d + ' '), 7 * unitMs);
+  }, [pressing, stopTone, unitMs, flushLetter]);
+
+  const clear = useCallback(() => {
+    if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+    if (wordTimerRef.current) clearTimeout(wordTimerRef.current);
+    flushTimerRef.current = null;
+    wordTimerRef.current = null;
+    patternRef.current = '';
+    lastReleaseRef.current = 0;
+    setPattern('');
+    setDecoded('');
+  }, []);
+
+  // Capture-phase listener with stopImmediatePropagation prevents other global
+  // spacebar handlers (notably the voice widget's push-to-talk hotkey) from
+  // firing while the user is keying morse. This only suppresses spacebar; the
+  // voice widget's hotkey works normally everywhere else in the app.
+  useEffect(() => {
+    function consume(e) {
+      if (e.code !== 'Space') return false;
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return false;
+      if (e.target && e.target.isContentEditable) return false;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      return true;
+    }
+    function onKeyDown(e) {
+      if (!consume(e) || e.repeat) return;
+      beginPress();
+    }
+    function onKeyUp(e) {
+      if (!consume(e)) return;
+      endPress();
+    }
+    window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('keyup', onKeyUp, true);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('keyup', onKeyUp, true);
+      if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+      if (wordTimerRef.current) clearTimeout(wordTimerRef.current);
+      stopTone();
+    };
+  }, [beginPress, endPress, stopTone]);
+
+  return { pattern, decoded, pressing, beginPress, endPress, clear };
+}
+
 export default function MorseTrainer({ onBack }) {
   const [prefs, setPrefs] = useState(loadPrefs);
   const [mode, setMode] = useState(null);
-  const [showRef, setShowRef] = useState(false);
+  const ensureCtx = useAudioContext();
+  const unitMs = 1.2 / prefs.wpm * 1000;
+  const keying = useKeyingDecoder({ unitMs, hz: prefs.hz, ensureCtx });
 
   function updatePrefs(patch) {
     setPrefs((prev) => {
@@ -163,38 +316,35 @@ export default function MorseTrainer({ onBack }) {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="p-1.5 text-gray-400 hover:text-white bg-port-card border border-port-border rounded-lg transition-colors"
-            aria-label="Back"
-          >
-            <ArrowLeft size={16} />
-          </button>
-          <Radio size={24} className="text-port-accent" />
-          <div>
-            <h2 className="text-xl font-bold text-white">Morse Trainer</h2>
-            <p className="text-sm text-gray-400">Listen, type, and key your way through CW</p>
-          </div>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
         <button
-          onClick={() => setShowRef((v) => !v)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-400 hover:text-white bg-port-card border border-port-border rounded-lg transition-colors"
+          onClick={onBack}
+          className="p-1.5 text-gray-400 hover:text-white bg-port-card border border-port-border rounded-lg transition-colors"
+          aria-label="Back"
         >
-          <BookOpen size={14} />
-          Reference
+          <ArrowLeft size={16} />
         </button>
+        <Radio size={24} className="text-port-accent" />
+        <div>
+          <h2 className="text-xl font-bold text-white">Morse Trainer</h2>
+          <p className="text-sm text-gray-400">Listen, type, and key your way through CW</p>
+        </div>
       </div>
 
-      <SettingsPanel prefs={prefs} updatePrefs={updatePrefs} onResetProgress={resetProgress} />
-
-      {showRef && <ReferenceCard />}
-
-      {!mode && <ModeGrid onPick={setMode} />}
-      {mode === 'copy' && <CopyDrill prefs={prefs} updatePrefs={updatePrefs} onExit={() => setMode(null)} />}
-      {mode === 'send' && <SendDrill prefs={prefs} onExit={() => setMode(null)} />}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_24rem] gap-6">
+        <div className="space-y-6 min-w-0 max-w-2xl">
+          <SettingsPanel prefs={prefs} updatePrefs={updatePrefs} onResetProgress={resetProgress} />
+          {!mode && <ModeGrid onPick={setMode} />}
+          {mode === 'copy' && (
+            <CopyDrill prefs={prefs} updatePrefs={updatePrefs} ensureCtx={ensureCtx} onExit={() => setMode(null)} />
+          )}
+          {mode === 'send' && (
+            <SendDrill keying={keying} onExit={() => setMode(null)} />
+          )}
+        </div>
+        <ReferenceWidget keying={keying} unitMs={unitMs} />
+      </div>
     </div>
   );
 }
@@ -266,17 +416,182 @@ function SliderRow({ label, value, min, max, step = 1, onChange, suffix = '', hi
   );
 }
 
-function ReferenceCard() {
+const REFERENCE_VIEWS = [
+  { id: 'tree', label: 'Tree', icon: GitBranch },
+  { id: 'length', label: 'Length', icon: Ruler },
+  { id: 'list', label: 'List', icon: ListIcon },
+];
+
+function ReferenceWidget({ keying, unitMs }) {
+  const [view, setView] = useState('tree');
+  const liveChar = keying.pattern ? (MORSE_LOOKUP[keying.pattern] || '?') : '';
+
   return (
-    <div className="bg-port-card border border-port-border rounded-lg p-4">
-      <h3 className="text-sm font-medium text-gray-400 mb-3">Reference</h3>
-      <div className="grid grid-cols-4 sm:grid-cols-6 gap-x-3 gap-y-1.5 text-sm">
-        {MORSE_ENTRIES.map(([ch, code]) => (
-          <div key={ch} className="flex items-center gap-2">
-            <span className="text-white font-mono w-4">{ch}</span>
-            <span className="text-port-accent font-mono">{code}</span>
+    <div className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+      <div className="bg-port-card border border-port-border rounded-lg overflow-hidden">
+        <div className="flex border-b border-port-border">
+          {REFERENCE_VIEWS.map((v) => {
+            const Icon = v.icon;
+            const active = view === v.id;
+            return (
+              <button
+                key={v.id}
+                onClick={() => setView(v.id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                  active ? 'bg-port-bg text-port-accent' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Icon size={12} />
+                {v.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="p-4">
+          {view === 'tree' && <TreeView currentPath={keying.pattern} />}
+          {view === 'length' && <LengthView currentPath={keying.pattern} />}
+          {view === 'list' && <ListView currentPath={keying.pattern} />}
+        </div>
+      </div>
+
+      <KeyPad
+        keying={keying}
+        liveChar={liveChar}
+        unitMs={unitMs}
+      />
+    </div>
+  );
+}
+
+function TreeNode({ node, currentPath }) {
+  if (!node) return <div className="flex-1" />;
+  const matched = !!node.char && currentPath === node.code;
+  const onPath = currentPath.length > 0 && currentPath.startsWith(node.code) && node.code !== currentPath;
+  const hasChildren = node.dah || node.dit;
+  const display = node.char || (node.code === '' ? '·' : '');
+
+  return (
+    <div className="flex flex-col items-center min-w-0 flex-1">
+      <div
+        className={`text-[11px] font-mono px-1.5 py-0.5 rounded transition-colors ${
+          matched ? 'bg-port-accent text-white font-bold' :
+          onPath ? 'text-port-accent' :
+          display ? 'text-gray-300' : 'text-gray-700'
+        }`}
+        title={node.code || 'start'}
+      >
+        {display || '·'}
+      </div>
+      {hasChildren && (
+        <div className={`flex gap-0.5 mt-0.5 w-full border-t ${onPath || matched ? 'border-port-accent/40' : 'border-port-border'}`}>
+          <TreeNode node={node.dah} currentPath={currentPath} />
+          <TreeNode node={node.dit} currentPath={currentPath} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TreeView({ currentPath }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-gray-500 mb-2">
+        <span>← dah</span>
+        <span>start</span>
+        <span>dit →</span>
+      </div>
+      <div className="overflow-x-auto pb-1">
+        <div className="min-w-[36rem]">
+          <TreeNode node={MORSE_TREE} currentPath={currentPath} />
+        </div>
+      </div>
+      <p className="text-[10px] text-gray-500 mt-3">
+        Tap or hold space to key. The path you're on lights up.
+      </p>
+    </div>
+  );
+}
+
+function LengthView({ currentPath }) {
+  const lengths = Object.keys(MORSE_BY_LENGTH).map(Number).sort((a, b) => a - b);
+  return (
+    <div className="space-y-3">
+      {lengths.map((len) => (
+        <div key={len}>
+          <div className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">
+            {len} symbol{len > 1 ? 's' : ''}
           </div>
-        ))}
+          <div className="grid grid-cols-3 gap-x-3 gap-y-1 text-sm">
+            {MORSE_BY_LENGTH[len].map(([ch, code]) => {
+              const matched = code === currentPath;
+              return (
+                <div key={ch} className="flex items-center gap-2">
+                  <span className={`font-mono w-4 ${matched ? 'text-port-accent font-bold' : 'text-white'}`}>{ch}</span>
+                  <span className={`font-mono text-xs ${matched ? 'text-port-accent' : 'text-gray-500'}`}>{code}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ListView({ currentPath }) {
+  return (
+    <div className="grid grid-cols-3 gap-x-3 gap-y-1.5 text-sm">
+      {MORSE_ENTRIES.map(([ch, code]) => {
+        const matched = code === currentPath;
+        return (
+          <div key={ch} className="flex items-center gap-2">
+            <span className={`font-mono w-4 ${matched ? 'text-port-accent font-bold' : 'text-white'}`}>{ch}</span>
+            <span className={`font-mono text-xs ${matched ? 'text-port-accent' : 'text-port-accent/60'}`}>{code}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function KeyPad({ keying, liveChar, unitMs }) {
+  const dotMs = Math.round(unitMs);
+  return (
+    <div className="bg-port-card border border-port-border rounded-lg p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">Practice Key</div>
+        <button
+          onClick={keying.clear}
+          className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-port-error transition-colors"
+        >
+          <Eraser size={11} /> Clear
+        </button>
+      </div>
+      <button
+        onMouseDown={keying.beginPress}
+        onMouseUp={keying.endPress}
+        onMouseLeave={() => keying.pressing && keying.endPress()}
+        onTouchStart={(e) => { e.preventDefault(); keying.beginPress(); }}
+        onTouchEnd={(e) => { e.preventDefault(); keying.endPress(); }}
+        className={`w-full select-none py-6 rounded-lg border-2 font-mono text-base transition-colors ${
+          keying.pressing ? 'border-port-accent bg-port-accent/20 text-port-accent' : 'border-port-border bg-port-bg text-gray-400 hover:border-port-accent'
+        }`}
+      >
+        {keying.pressing ? '▮ KEYING' : 'TAP / HOLD SPACE'}
+      </button>
+      <div className="grid grid-cols-2 gap-2 text-center">
+        <div className="bg-port-bg border border-port-border rounded p-2">
+          <div className="text-[9px] uppercase tracking-wide text-gray-500">Path</div>
+          <div className="font-mono text-port-accent text-sm h-5 tracking-widest">{keying.pattern || '—'}</div>
+        </div>
+        <div className="bg-port-bg border border-port-border rounded p-2">
+          <div className="text-[9px] uppercase tracking-wide text-gray-500">Letter</div>
+          <div className={`font-mono text-sm h-5 ${liveChar === '?' ? 'text-port-error' : 'text-white'}`}>{liveChar || '—'}</div>
+        </div>
+      </div>
+      <div className="bg-port-bg border border-port-border rounded p-2">
+        <div className="text-[9px] uppercase tracking-wide text-gray-500 mb-1">Decoded ({dotMs} ms unit)</div>
+        <div className="font-mono text-white text-sm tracking-widest break-all min-h-[1.25rem]">{keying.decoded || '—'}</div>
       </div>
     </div>
   );
@@ -308,8 +623,7 @@ function ModeGrid({ onPick }) {
 
 const ROUND_SIZE = 10;
 
-function CopyDrill({ prefs, updatePrefs, onExit }) {
-  const ensureCtx = useAudioContext();
+function CopyDrill({ prefs, updatePrefs, ensureCtx, onExit }) {
   const [prompt, setPrompt] = useState('');
   const [input, setInput] = useState('');
   const [results, setResults] = useState([]);
@@ -486,144 +800,21 @@ function CopyDrill({ prefs, updatePrefs, onExit }) {
   );
 }
 
-// Each event holds the silence AFTER its symbol (gap to the next press). The
-// final entry's gap is unknown until the user finishes — set to Infinity by
-// the caller before decoding so the last letter gets flushed.
-function decodeKeying(events, unitMs) {
-  let buf = '';
-  let out = '';
-  const flush = () => {
-    if (!buf) return;
-    out += MORSE_LOOKUP[buf] || '?';
-    buf = '';
-  };
-  for (const ev of events) {
-    buf += ev.sym;
-    if (ev.gapAfter >= 7 * unitMs) {
-      flush();
-      out += ' ';
-    } else if (ev.gapAfter >= 3 * unitMs) {
-      flush();
-    }
-  }
-  flush();
-  return out.trim();
-}
-
-function SendDrill({ prefs, onExit }) {
-  const ensureCtx = useAudioContext();
-  const oscRef = useRef(null);
-  const gainRef = useRef(null);
-  const pressStartRef = useRef(0);
-  const lastReleaseRef = useRef(0);
-  const eventsRef = useRef([]);
-  const [pressing, setPressing] = useState(false);
+function SendDrill({ keying, onExit }) {
   const [prompt, setPrompt] = useState(() => pickSendPrompt());
-  const [decoded, setDecoded] = useState('');
   const [feedback, setFeedback] = useState(null);
 
-  const unitMs = 1.2 / prefs.wpm * 1000;
-
-  function startTone() {
-    const ctx = ensureCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = prefs.hz;
-    gain.gain.value = 0;
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    const now = ctx.currentTime;
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(TONE_GAIN, now + RAMP_SEC);
-    oscRef.current = osc;
-    gainRef.current = gain;
-  }
-
-  function stopTone() {
-    const osc = oscRef.current;
-    const gain = gainRef.current;
-    if (!osc || !gain) return;
-    const ctx = ensureCtx();
-    const now = ctx.currentTime;
-    gain.gain.cancelScheduledValues(now);
-    gain.gain.setValueAtTime(gain.gain.value, now);
-    gain.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
-    osc.stop(now + 0.02);
-    osc.onended = () => {
-      osc.disconnect();
-      gain.disconnect();
-    };
-    oscRef.current = null;
-    gainRef.current = null;
-  }
-
-  const beginPress = useCallback(() => {
-    if (pressing) return;
-    setPressing(true);
-    pressStartRef.current = performance.now();
-    startTone();
-  }, [pressing]);
-
-  const endPress = useCallback(() => {
-    if (!pressing) return;
-    setPressing(false);
-    stopTone();
-    const now = performance.now();
-    const duration = now - pressStartRef.current;
-    const gapBefore = lastReleaseRef.current ? pressStartRef.current - lastReleaseRef.current : 0;
-    const sym = duration < 2 * unitMs ? '.' : '-';
-    const events = eventsRef.current;
-    // Each event records the gap AFTER its symbol, but that gap isn't known
-    // until the next press lands — so back-fill the previous event here.
-    if (events.length > 0) events[events.length - 1].gapAfter = gapBefore;
-    events.push({ sym, gapAfter: 0 });
-    lastReleaseRef.current = now;
-  }, [pressing, unitMs]);
-
   function decodeNow() {
-    const events = eventsRef.current;
-    if (events.length === 0) return;
-    events[events.length - 1].gapAfter = Infinity;
-    const text = decodeKeying(events, unitMs);
-    setDecoded(text);
     const target = prompt.toUpperCase();
-    setFeedback({ correct: text === target, decoded: text, target });
-  }
-
-  function clearKeying() {
-    eventsRef.current = [];
-    lastReleaseRef.current = 0;
-    setDecoded('');
-    setFeedback(null);
+    const got = keying.decoded.replace(/\s+/g, ' ').trim().toUpperCase();
+    setFeedback({ correct: got === target, decoded: got, target });
   }
 
   function nextPrompt() {
-    clearKeying();
+    keying.clear();
+    setFeedback(null);
     setPrompt(pickSendPrompt());
   }
-
-  useEffect(() => {
-    function onKeyDown(e) {
-      if (e.code !== 'Space' || e.repeat) return;
-      const tag = (e.target && e.target.tagName) || '';
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-      e.preventDefault();
-      beginPress();
-    }
-    function onKeyUp(e) {
-      if (e.code !== 'Space') return;
-      e.preventDefault();
-      endPress();
-    }
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      stopTone();
-    };
-  }, [beginPress, endPress]);
 
   return (
     <div className="bg-port-card border border-port-border rounded-lg p-6 space-y-5">
@@ -635,22 +826,13 @@ function SendDrill({ prefs, onExit }) {
         </div>
       </div>
 
-      <button
-        onMouseDown={beginPress}
-        onMouseUp={endPress}
-        onMouseLeave={() => pressing && endPress()}
-        onTouchStart={(e) => { e.preventDefault(); beginPress(); }}
-        onTouchEnd={(e) => { e.preventDefault(); endPress(); }}
-        className={`w-full select-none py-12 rounded-lg border-2 font-mono text-lg transition-colors ${
-          pressing ? 'border-port-accent bg-port-accent/20 text-port-accent' : 'border-port-border bg-port-bg text-gray-400 hover:border-port-accent'
-        }`}
-      >
-        {pressing ? '▮ KEYING' : 'HOLD SPACE OR TAP'}
-      </button>
+      <p className="text-xs text-gray-500 text-center">
+        Use the practice key on the right (or hold space) — the tree highlights your path and the decoded text shows below.
+      </p>
 
       <div className="bg-port-bg border border-port-border rounded-lg p-3 min-h-[3rem] text-center">
-        <div className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">Decoded</div>
-        <div className="font-mono text-white text-lg tracking-widest">{decoded || '—'}</div>
+        <div className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">Your sending</div>
+        <div className="font-mono text-white text-lg tracking-widest break-all">{keying.decoded || '—'}</div>
       </div>
 
       {feedback ? (
@@ -678,9 +860,9 @@ function SendDrill({ prefs, onExit }) {
       ) : (
         <div className="flex gap-3">
           <button onClick={decodeNow} className="flex-1 px-4 py-2.5 bg-port-accent hover:bg-port-accent/80 text-white font-medium rounded-lg transition-colors">
-            Decode &amp; Check
+            Check
           </button>
-          <button onClick={clearKeying} className="px-4 py-2.5 bg-port-card border border-port-border hover:border-port-accent text-gray-300 rounded-lg transition-colors">
+          <button onClick={keying.clear} className="px-4 py-2.5 bg-port-card border border-port-border hover:border-port-accent text-gray-300 rounded-lg transition-colors">
             Clear
           </button>
         </div>
