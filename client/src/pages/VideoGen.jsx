@@ -512,7 +512,7 @@ export default function VideoGen() {
   const canEnqueue = prompt.trim() && !notConnected && !extendModeBlocked;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 text-xs">
         {status ? (
           <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full border ${
@@ -558,7 +558,7 @@ export default function VideoGen() {
           Implemented as plain toggle buttons with `aria-pressed` rather than
           WAI-ARIA Tabs, since the mode-specific inputs aren't structured as
           tabpanels and we don't implement roving-tabindex/arrow-key focus. */}
-      <div className="bg-port-card border border-port-border rounded-xl p-1.5 flex flex-wrap gap-1" role="group" aria-label="Video generation mode">
+      <div className="bg-port-card border border-port-border rounded-xl p-1 flex flex-wrap gap-1" role="group" aria-label="Video generation mode">
         {MODES.map(({ id, label, icon: Icon, desc }) => {
           const active = mode === id;
           return (
@@ -568,126 +568,125 @@ export default function VideoGen() {
               aria-pressed={active}
               onClick={() => handleModeChange(id)}
               disabled={generating}
-              className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+              className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
                 active
                   ? 'bg-port-accent text-white shadow'
                   : 'text-gray-400 hover:text-white hover:bg-port-border/40'
               }`}
               title={desc}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-3.5 h-3.5" />
               <span>{label}</span>
             </button>
           );
         })}
       </div>
 
-      <form onSubmit={handleGenerate} className="grid grid-cols-1 lg:grid-cols-[1fr,1.2fr] gap-6">
-        <div className="bg-port-card border border-port-border rounded-xl p-5 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Prompt</label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={4}
-              disabled={generating}
-              className="w-full bg-port-bg border border-port-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-port-accent disabled:opacity-50 resize-y"
-              placeholder="Describe the video you want to generate..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Negative Prompt</label>
-            <textarea
-              value={negativePrompt}
-              onChange={(e) => setNegativePrompt(e.target.value)}
-              rows={2}
-              disabled={generating}
-              className="w-full bg-port-bg border border-port-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-port-accent disabled:opacity-50 resize-y"
-              placeholder="What to avoid..."
-            />
-          </div>
-
-          {/* Mode-specific image / video pickers */}
-          {(mode === 'image' || mode === 'fflf') && (
-            <div className="border border-port-border/50 rounded-lg p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-400">
-                  {mode === 'fflf' ? 'First frame (start image)' : 'Source image (image-to-video)'}
-                </span>
-                {(sourceImageFile || sourceImageUpload) && (
-                  <button type="button" onClick={clearSourceImage} className="text-xs text-port-error hover:underline">Clear</button>
-                )}
-              </div>
-              {sourceImageFile && (
-                <div className="flex items-center gap-2">
-                  <img src={`/data/images/${sourceImageFile}`} alt="Source" className="w-16 h-16 object-cover rounded border border-port-border" />
-                  <span className="text-xs text-gray-500 truncate">{sourceImageFile}</span>
-                </div>
-              )}
-              {!sourceImageFile && (
-                <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-white">
-                  <Upload className="w-4 h-4" />
-                  <span>{sourceImageUpload ? sourceImageUpload.name : 'Upload an image'}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    disabled={generating}
-                    onChange={(e) => setSourceImageUpload(e.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-                </label>
-              )}
+      <form onSubmit={handleGenerate} className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4">
+        <div className="bg-port-card border border-port-border rounded-xl p-4 space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Prompt</label>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={3}
+                disabled={generating}
+                className="w-full bg-port-bg border border-port-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-port-accent disabled:opacity-50 resize-y"
+                placeholder="Describe the video you want to generate..."
+              />
             </div>
-          )}
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Negative Prompt</label>
+              <textarea
+                value={negativePrompt}
+                onChange={(e) => setNegativePrompt(e.target.value)}
+                rows={3}
+                disabled={generating}
+                className="w-full bg-port-bg border border-port-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-port-accent disabled:opacity-50 resize-y"
+                placeholder="What to avoid..."
+              />
+            </div>
+          </div>
 
-          {mode === 'fflf' && (
-            <div className="border border-port-border/50 rounded-lg p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-400">Last frame (end image)</span>
-                {lastImageFile && (
-                  <button type="button" onClick={clearLastImage} className="text-xs text-port-error hover:underline">Clear</button>
+          {(mode === 'image' || mode === 'fflf') && (
+            <div className={`grid gap-2 ${mode === 'fflf' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+              <div className="border border-port-border/50 rounded-lg p-2 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-gray-400">
+                    {mode === 'fflf' ? 'First frame' : 'Source image'}
+                  </span>
+                  {(sourceImageFile || sourceImageUpload) && (
+                    <button type="button" onClick={clearSourceImage} className="text-[11px] text-port-error hover:underline">Clear</button>
+                  )}
+                </div>
+                {sourceImageFile && (
+                  <div className="flex items-center gap-2">
+                    <img src={`/data/images/${sourceImageFile}`} alt="Source" className="w-12 h-12 object-cover rounded border border-port-border shrink-0" />
+                    <span className="text-[11px] text-gray-500 truncate">{sourceImageFile}</span>
+                  </div>
+                )}
+                {!sourceImageFile && (
+                  <label className="flex items-center gap-2 text-[11px] text-gray-400 cursor-pointer hover:text-white">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span className="truncate">{sourceImageUpload ? sourceImageUpload.name : 'Upload an image'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={generating}
+                      onChange={(e) => setSourceImageUpload(e.target.files?.[0] || null)}
+                      className="hidden"
+                    />
+                  </label>
                 )}
               </div>
-              {lastImageFile ? (
-                <div className="flex items-center gap-2">
-                  <img src={`/data/images/${lastImageFile}`} alt="End frame" className="w-16 h-16 object-cover rounded border border-port-border" />
-                  <span className="text-xs text-gray-500 truncate">{lastImageFile}</span>
+              {mode === 'fflf' && (
+                <div className="border border-port-border/50 rounded-lg p-2 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-gray-400">Last frame</span>
+                    {lastImageFile && (
+                      <button type="button" onClick={clearLastImage} className="text-[11px] text-port-error hover:underline">Clear</button>
+                    )}
+                  </div>
+                  {lastImageFile ? (
+                    <div className="flex items-center gap-2">
+                      <img src={`/data/images/${lastImageFile}`} alt="End frame" className="w-12 h-12 object-cover rounded border border-port-border shrink-0" />
+                      <span className="text-[11px] text-gray-500 truncate">{lastImageFile}</span>
+                    </div>
+                  ) : (
+                    <select
+                      value=""
+                      disabled={generating}
+                      onChange={(e) => setLastImageFile(e.target.value || null)}
+                      className="w-full bg-port-bg border border-port-border rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-port-accent disabled:opacity-50"
+                    >
+                      <option value="">Pick from gallery…</option>
+                      {imageGallery.filter((img) => !img.hidden).slice(0, 50).map((img) => (
+                        <option key={img.filename} value={img.filename}>{img.filename}</option>
+                      ))}
+                    </select>
+                  )}
+                  <p className="text-[10px] text-gray-500 leading-snug" title="FFLF backend support is experimental — LTX/mlx_video uses the start frame and treats the last frame as advisory.">
+                    Experimental — last frame is advisory.
+                  </p>
                 </div>
-              ) : (
-                <select
-                  value=""
-                  disabled={generating}
-                  onChange={(e) => setLastImageFile(e.target.value || null)}
-                  className="w-full bg-port-bg border border-port-border rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-port-accent disabled:opacity-50"
-                >
-                  <option value="">Pick an image from gallery…</option>
-                  {imageGallery.filter((img) => !img.hidden).slice(0, 50).map((img) => (
-                    <option key={img.filename} value={img.filename}>{img.filename}</option>
-                  ))}
-                </select>
               )}
-              <p className="text-[11px] text-gray-500 leading-snug">
-                Note: FFLF (two-keyframe) backend support is experimental — current
-                LTX/mlx_video CLI consumes the start frame and treats the last frame
-                as advisory. Generate the end image first via Image Gen, then pick it here.
-              </p>
             </div>
           )}
 
           {mode === 'extend' && (
-            <div className="border border-port-border/50 rounded-lg p-3 space-y-2">
+            <div className="border border-port-border/50 rounded-lg p-2 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-400">Continue from a prior render</span>
+                <span className="text-[11px] font-medium text-gray-400">Continue from a prior render</span>
                 {extendFromVideoId && (
-                  <button type="button" onClick={() => handleExtendPick('')} className="text-xs text-port-error hover:underline">Clear</button>
+                  <button type="button" onClick={() => handleExtendPick('')} className="text-[11px] text-port-error hover:underline">Clear</button>
                 )}
               </div>
               <select
                 value={extendFromVideoId}
                 disabled={generating || extendingFrame}
                 onChange={(e) => handleExtendPick(e.target.value)}
-                className="w-full bg-port-bg border border-port-border rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-port-accent disabled:opacity-50"
+                className="w-full bg-port-bg border border-port-border rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-port-accent disabled:opacity-50"
               >
                 <option value="">Pick a previous video…</option>
                 {visibleHistory.slice(0, 50).map((v) => (
@@ -701,16 +700,16 @@ export default function VideoGen() {
               )}
               {sourceImageFile && extendFromVideoId && !extendingFrame && (
                 <div className="flex items-center gap-2">
-                  <img src={`/data/images/${sourceImageFile}`} alt="Last frame" className="w-16 h-16 object-cover rounded border border-port-border" />
-                  <span className="text-xs text-gray-500 truncate">Starts from: {sourceImageFile}</span>
+                  <img src={`/data/images/${sourceImageFile}`} alt="Last frame" className="w-12 h-12 object-cover rounded border border-port-border shrink-0" />
+                  <span className="text-[11px] text-gray-500 truncate">Starts from: {sourceImageFile}</span>
                 </div>
               )}
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {models.length > 0 && (
-              <div className="col-span-2">
+              <div className="col-span-2 sm:col-span-3">
                 <label className="block text-xs font-medium text-gray-400 mb-1">Model</label>
                 <select
                   value={modelId}
@@ -810,7 +809,7 @@ export default function VideoGen() {
               />
             </div>
 
-            <div className="col-span-2">
+            <div className="col-span-2 sm:col-span-3">
               <label className="block text-xs font-medium text-gray-400 mb-1">Tiling</label>
               <select
                 value={tiling}
@@ -822,7 +821,7 @@ export default function VideoGen() {
               </select>
             </div>
 
-            <label className="col-span-2 flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+            <label className="col-span-2 sm:col-span-3 flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
               <input
                 type="checkbox"
                 checked={disableAudio}
@@ -834,7 +833,7 @@ export default function VideoGen() {
             </label>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 pt-2">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
             {generating ? (
               <button
                 type="button"
@@ -863,29 +862,39 @@ export default function VideoGen() {
               <ListPlus className="w-4 h-4" /> Add to queue
             </button>
             {progressPct != null && <span className="text-xs text-port-accent">{progressPct}%</span>}
+            {(generating || error) && (
+              <span className={`text-xs truncate ${error ? 'text-port-error' : 'text-gray-400'}`}>
+                {error || statusMsg || 'Working...'}
+              </span>
+            )}
           </div>
-
-          {(generating || error) && (
-            <div className={`text-xs ${error ? 'text-port-error' : 'text-gray-400'}`}>
-              {error || statusMsg || 'Working...'}
-            </div>
-          )}
         </div>
 
-        <div className="bg-port-card border border-port-border rounded-xl p-5 space-y-3">
-          <h2 className="text-sm font-medium text-gray-300">Preview</h2>
-          <div className="aspect-video w-full bg-port-bg border border-port-border rounded-lg overflow-hidden flex items-center justify-center relative">
+        <div className="bg-port-card border border-port-border rounded-xl p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide">Preview</h2>
+            {result && (
+              <a
+                href={result.path || `/data/videos/${result.filename}`}
+                download
+                className="text-xs text-port-accent hover:underline"
+              >
+                Download
+              </a>
+            )}
+          </div>
+          <div className="aspect-video max-w-[420px] mx-auto bg-port-bg border border-port-border rounded-lg overflow-hidden flex items-center justify-center relative">
             {result ? (
-              <video src={result.path || `/data/videos/${result.filename}`} controls autoPlay loop className="w-full h-full" />
+              <video src={result.path || `/data/videos/${result.filename}`} controls autoPlay loop preload="metadata" className="w-full h-full" />
             ) : generating ? (
-              <div className="text-gray-500 text-sm flex flex-col items-center gap-2">
+              <div className="text-gray-500 text-xs flex flex-col items-center gap-1.5">
                 <BrailleSpinner />
                 <span>{statusMsg || 'Starting...'}</span>
               </div>
             ) : (
-              <div className="text-gray-600 text-sm flex flex-col items-center gap-2">
-                <Film className="w-12 h-12" />
-                <span>Your generated video will appear here</span>
+              <div className="text-gray-600 text-xs flex flex-col items-center gap-1.5">
+                <Film className="w-8 h-8" />
+                <span>Generated video will appear here</span>
               </div>
             )}
             {generating && progressPct != null && (
@@ -895,16 +904,7 @@ export default function VideoGen() {
             )}
           </div>
           {result && (
-            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
-              <span className="truncate flex-1">{result.filename}</span>
-              <a
-                href={result.path || `/data/videos/${result.filename}`}
-                download
-                className="text-port-accent hover:underline"
-              >
-                Download
-              </a>
-            </div>
+            <div className="text-xs text-gray-400 truncate">{result.filename}</div>
           )}
         </div>
       </form>
@@ -922,9 +922,9 @@ export default function VideoGen() {
       />
 
       {visibleHistory.length > 0 && (
-        <div className="bg-port-card border border-port-border rounded-xl p-5 space-y-3">
+        <div className="bg-port-card border border-port-border rounded-xl p-4 space-y-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-gray-300">Recent renders ({Math.min(visibleHistory.length, 6)} of {visibleHistory.length})</h2>
+            <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide">Recent renders ({Math.min(visibleHistory.length, 6)} of {visibleHistory.length})</h2>
             {visibleHistory.length > 6 && (
               <Link to="/media/history" className="text-xs text-port-accent hover:underline">View all →</Link>
             )}
@@ -948,11 +948,11 @@ export default function VideoGen() {
       )}
 
       {hiddenHistory.length > 0 && (
-        <div className="bg-port-card border border-port-border rounded-xl p-5 space-y-3">
+        <div className="bg-port-card border border-port-border rounded-xl p-4 space-y-2">
           <button
             type="button"
             onClick={() => setShowHidden((s) => !s)}
-            className="flex items-center justify-between w-full text-sm font-medium text-gray-300 hover:text-white"
+            className="flex items-center justify-between w-full text-xs font-medium text-gray-400 uppercase tracking-wide hover:text-white"
           >
             <span>{showHidden ? 'Hide' : 'Show'} hidden ({hiddenHistory.length})</span>
             <span className="text-xs text-gray-500">{showHidden ? '▾' : '▸'}</span>
