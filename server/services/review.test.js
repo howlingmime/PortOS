@@ -9,7 +9,10 @@ vi.mock('fs/promises', () => ({
 
 const emit = vi.fn();
 const reviewEvents = { emit };
-const cosEvents = { on: vi.fn() };
+const registeredHandlers = {};
+const cosEvents = {
+  on: vi.fn((event, handler) => { registeredHandlers[event] = handler; })
+};
 
 vi.mock('./cosEvents.js', () => ({ cosEvents }));
 
@@ -180,6 +183,42 @@ describe('review service', () => {
       const briefing = await getBriefing();
       expect(briefing.source).toBe('none');
       expect(briefing.content).toContain('No CoS daily briefing found yet');
+    });
+  });
+
+  describe('cosEvents bridge', () => {
+    it('auto-completes the matching review item when an agent finishes successfully', async () => {
+      const handler = registeredHandlers['agent:completed'];
+      expect(handler).toBeDefined();
+
+      const items = [
+        { id: 'r1', type: 'cos', status: 'pending', metadata: { referenceId: 'task-42', taskId: 'task-42' } },
+        { id: 'r2', type: 'cos', status: 'pending', metadata: { referenceId: 'task-99', taskId: 'task-99' } }
+      ];
+      readFile.mockResolvedValue(JSON.stringify(items));
+
+      handler({ taskId: 'task-42', result: { success: true } });
+      // Wait a tick for the async chain inside the handler to flush
+      await new Promise(r => setImmediate(r));
+
+      const written = atomicWrite.mock.calls[0][1];
+      const updated = written.find(i => i.id === 'r1');
+      const untouched = written.find(i => i.id === 'r2');
+      expect(updated.status).toBe('completed');
+      expect(untouched.status).toBe('pending');
+    });
+
+    it('does not auto-complete when the agent failed', async () => {
+      const handler = registeredHandlers['agent:completed'];
+      const items = [
+        { id: 'r1', type: 'cos', status: 'pending', metadata: { referenceId: 'task-42', taskId: 'task-42' } }
+      ];
+      readFile.mockResolvedValue(JSON.stringify(items));
+
+      handler({ taskId: 'task-42', result: { success: false, error: 'boom' } });
+      await new Promise(r => setImmediate(r));
+
+      expect(atomicWrite).not.toHaveBeenCalled();
     });
   });
 });
