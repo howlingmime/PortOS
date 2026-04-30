@@ -120,6 +120,7 @@ export const NAV_COMMANDS = [
   { id: 'nav.loops', path: '/loops', label: 'Loops', section: 'System', aliases: ['loops'] },
   { id: 'nav.devtools.processes', path: '/devtools/processes', label: 'Processes', section: 'System', aliases: ['devtools-processes', 'processes'] },
   { id: 'nav.security', path: '/security', label: 'Security', section: 'System', aliases: ['security'] },
+  { id: 'nav.system-health', path: '/system-health', label: 'System Health', section: 'System', aliases: ['system-health', 'system-status', 'memory-usage', 'disk-usage', 'cpu-usage'], keywords: ['memory', 'cpu', 'disk', 'thresholds', 'top processes', 'resource usage'] },
   { id: 'nav.cos.jobs', path: '/cos/jobs', label: 'System Tasks', section: 'System', aliases: ['cos-jobs', 'system-tasks'] },
   { id: 'nav.uploads', path: '/uploads', label: 'Uploads', section: 'System', aliases: ['uploads'] },
 

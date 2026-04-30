@@ -66,6 +66,7 @@ const JiraReports = lazyWithReload(() => import('./pages/JiraReports'));
 const DataManager = lazyWithReload(() => import('./pages/DataManager'));
 const Insights = lazyWithReload(() => import('./pages/Insights'));
 const Instances = lazyWithReload(() => import('./pages/Instances'));
+const SystemHealthPage = lazyWithReload(() => import('./pages/SystemHealthPage'));
 const MeatSpace = lazyWithReload(() => import('./pages/MeatSpace'));
 const Post = lazyWithReload(() => import('./pages/Post'));
 const Review = lazyWithReload(() => import('./pages/Review'));
@@ -158,6 +159,7 @@ export default function App() {
           <Route path="insights" element={<Navigate to="/insights/overview" replace />} />
           <Route path="insights/:tab" element={<Insights />} />
           <Route path="instances" element={<Instances />} />
+          <Route path="system-health" element={<SystemHealthPage />} />
           <Route path="loops" element={<Loops />} />
           <Route path="meatspace" element={<Navigate to="/meatspace/overview" replace />} />
           <Route path="meatspace/:tab" element={<MeatSpace />} />

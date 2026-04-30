@@ -6,6 +6,10 @@ export const getAlertsSummary = (options) => request('/alerts/summary', options)
 // Health
 export const checkHealth = () => request('/system/health');
 export const getSystemHealth = (options) => request('/system/health/details', options);
+export const updateHealthThresholds = (thresholds) => request('/system/health/thresholds', {
+  method: 'PUT',
+  body: JSON.stringify(thresholds)
+});
 
 // Update
 export const getUpdateStatus = () => request('/update/status');

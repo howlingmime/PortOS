@@ -134,7 +134,7 @@ const SystemHealthWidget = memo(function SystemHealthWidget() {
             <MicroGlyph variant="matrix" size={28} intensity={matrixIntensity} />
           </span>
           <Link
-            to="/apps"
+            to="/system-health"
             className="flex items-center gap-1 text-sm text-port-accent hover:text-port-accent/80 transition-colors min-h-[40px] px-2"
           >
             <span className="hidden sm:inline">Details</span>
