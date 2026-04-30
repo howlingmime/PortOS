@@ -237,6 +237,12 @@ export default function VideoGen() {
       setExtendFromVideoId('');
     } else if (next === 'extend') {
       setLastImageFile(null);
+      // Drop any source image carried over from a prior mode — extend will
+      // populate sourceImageFile fresh from the picked video's last frame
+      // via handleExtendPick. Without this, switching from image/fflf into
+      // extend leaves a stale source that gets silently submitted alongside
+      // an empty extendFromVideoId.
+      clearSourceImage();
     }
   };
 
@@ -366,7 +372,9 @@ export default function VideoGen() {
   const removeFromQueue = (id) => {
     setQueue((q) => q.filter((item) => item.id !== id || item.status === 'running'));
   };
-  const clearCompletedQueue = () => {
+  // Drops both successful and errored items — the panel surfaces this as
+  // "Clear finished" so the label matches the behavior.
+  const clearFinishedQueue = () => {
     setQueue((q) => q.filter((item) => item.status !== 'complete' && item.status !== 'error'));
   };
 
@@ -813,7 +821,7 @@ export default function VideoGen() {
       <BatchQueuePanel
         queue={queue}
         onRemove={removeFromQueue}
-        onClear={clearCompletedQueue}
+        onClear={clearFinishedQueue}
         summarize={(item) => (
           <>
             <span className="uppercase mr-2">{item.params.mode}</span>

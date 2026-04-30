@@ -3,7 +3,7 @@ import { Trash2, CheckCircle2, AlertCircle, Loader2, Clock } from 'lucide-react'
 // Shared batch-queue panel used by both Video Gen and Image Gen. The owner
 // page tracks queue state and the worker effect; this component is
 // presentation-only — it renders the list, status icons, and the
-// remove/clear-completed affordances.
+// remove/clear-finished affordances.
 //
 // Each item is { id, status: 'pending'|'running'|'complete'|'error',
 // params: { prompt, mode, ... }, error?, ... }. `summarize` lets the host
@@ -23,7 +23,10 @@ export default function BatchQueuePanel({ queue, onRemove, onClear, summarize })
   // pass in pre-aggregated counts. Distinguishing "running" (1, the actively
   // processing job) from "queued" (pending count) is more accurate than the
   // earlier "X in flight" copy, which lumped both together.
-  const completedCount = queue.filter((q) => q.status === 'complete' || q.status === 'error').length;
+  // "finished" covers both successful and errored items because the clear
+  // action removes both — counting only `complete` would understate what the
+  // button is about to clear.
+  const finishedCount = queue.filter((q) => q.status === 'complete' || q.status === 'error').length;
   const runningCount = queue.filter((q) => q.status === 'running').length;
   const pendingCount = queue.filter((q) => q.status === 'pending').length;
   const queueStatusText =
@@ -41,13 +44,13 @@ export default function BatchQueuePanel({ queue, onRemove, onClear, summarize })
           Batch queue
           <span className="ml-2 text-xs text-gray-500">{queueStatusText}</span>
         </h2>
-        {completedCount > 0 && (
+        {finishedCount > 0 && (
           <button
             type="button"
             onClick={onClear}
             className="text-xs text-gray-400 hover:text-white"
           >
-            Clear completed ({completedCount})
+            Clear finished ({finishedCount})
           </button>
         )}
       </div>
