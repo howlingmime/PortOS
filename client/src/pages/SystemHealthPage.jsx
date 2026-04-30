@@ -29,16 +29,16 @@ export default function SystemHealthPage() {
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
+  const load = async ({ seedDraft = false } = {}) => {
     const data = await api.getSystemHealth({ silent: true }).catch(() => null);
     setHealth(data);
-    if (data?.thresholds) setDraft(data.thresholds);
+    if (data?.thresholds && seedDraft) setDraft(data.thresholds);
     setLoading(false);
   };
 
   useEffect(() => {
-    load();
-    const interval = setInterval(load, 15000);
+    load({ seedDraft: true });
+    const interval = setInterval(() => load(), 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -52,7 +52,7 @@ export default function SystemHealthPage() {
     setSaving(false);
     if (result) {
       toast.success('Thresholds saved');
-      load();
+      load({ seedDraft: true });
     }
   };
 
