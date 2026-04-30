@@ -187,8 +187,15 @@ describe('requestCopilotReview', () => {
     // back to cli: 'gh' and the test would silently pass even if the skip path broke.
     const { mkdtempSync, rmSync } = await import('fs');
     const { tmpdir } = await import('os');
-    const { execSync } = await import('child_process');
+    const { execSync, spawnSync } = await import('child_process');
     const path = await import('path');
+
+    // CI environments without `git` should not fail this test — bail out cleanly.
+    // spawnSync returns { status: null, error } on ENOENT instead of throwing,
+    // so we can probe for git availability without try/catch.
+    const probe = spawnSync('git', ['--version'], { stdio: 'ignore' });
+    if (probe.status !== 0) return;
+
     const repo = mkdtempSync(path.join(tmpdir(), 'portos-git-skip-'));
     try {
       execSync('git init -q', { cwd: repo });
