@@ -7,7 +7,7 @@
  */
 
 import { Router } from 'express';
-import { existsSync } from 'fs';
+import { existsSync, statSync } from 'fs';
 import { unlink } from 'fs/promises';
 import { join, basename, resolve as resolvePath, sep as PATH_SEP } from 'path';
 import { z } from 'zod';
@@ -88,11 +88,19 @@ router.get('/models', (_req, res) => {
 });
 
 // Path-traversal guard: basename() strips dirs, then resolve+prefix-check
-// against PATHS.images so a unicode trick can't escape data/images.
+// against PATHS.images so a unicode trick can't escape data/images. Also
+// reject `.`/`..`/empty basenames and require the resolved entry to be a
+// regular file — otherwise the images-root directory itself would resolve
+// (existsSync is true for dirs) and flow into ffmpeg as an "image path"
+// where it'd fail in confusing ways.
 const resolveGalleryImage = (name) => {
+  const safe = basename(name);
+  if (!safe || safe === '.' || safe === '..') return null;
   const imagesRoot = resolvePath(PATHS.images) + PATH_SEP;
-  const localPath = resolvePath(join(PATHS.images, basename(name)));
-  return localPath.startsWith(imagesRoot) && existsSync(localPath) ? localPath : null;
+  const localPath = resolvePath(join(PATHS.images, safe));
+  if (!localPath.startsWith(imagesRoot) || !existsSync(localPath)) return null;
+  const stat = statSync(localPath, { throwIfNoEntry: false });
+  return stat?.isFile() ? localPath : null;
 };
 
 router.post('/', sourceImageUpload, asyncHandler(async (req, res) => {

@@ -249,7 +249,15 @@ export default function VideoGen() {
   // Extend mode: the user picks a prior video; we extract its last frame
   // (lazily — only when picked, since extraction shells out to ffmpeg) and
   // use that as the source image for image-to-video.
+  //
+  // The pick token guards against a slow-then-fast race: if the user picks
+  // video A, then quickly switches to video B, A's extract response could
+  // arrive after B's and overwrite sourceImageFile with the wrong frame.
+  // Capture the token at request time and only apply the result when it
+  // still matches the latest pick.
+  const extendPickTokenRef = useRef(0);
   const handleExtendPick = async (videoId) => {
+    const token = ++extendPickTokenRef.current;
     setExtendFromVideoId(videoId);
     if (!videoId) { clearSourceImage(); return; }
     setExtendingFrame(true);
@@ -257,6 +265,10 @@ export default function VideoGen() {
       toast.error(err.message || 'Failed to extract last frame');
       return null;
     });
+    // Drop the result if a newer pick has happened in the meantime — the
+    // newer request's setExtendingFrame(false) and setSourceImageFile will
+    // be the source of truth.
+    if (token !== extendPickTokenRef.current) return;
     setExtendingFrame(false);
     if (res?.filename) {
       setSourceImageFile(res.filename);
@@ -386,6 +398,12 @@ export default function VideoGen() {
   // Queue worker — pumps the head of the queue when nothing's running.
   // Runs as an effect so it picks up any newly-enqueued item even while
   // the user is interacting with the form.
+  //
+  // BUSY backoff: the server's `cancel()` keeps `activeProcess` set until
+  // the SIGKILL'd child actually exits (up to ~8s), so a freshly-cancelled
+  // item leaving the running slot here will often hit a 409 VIDEO_GEN_BUSY
+  // when the worker tries to dispatch the next pending item. Treat that as
+  // "not yet" (return the item to pending) instead of marking it errored.
   useEffect(() => {
     if (generating || runningQueueId) return;
     const next = queue.find((item) => item.status === 'pending');
@@ -394,12 +412,25 @@ export default function VideoGen() {
     setQueue((q) => q.map((item) => item.id === next.id ? { ...item, status: 'running', startedAt: Date.now() } : item));
     const payload = { ...next.params };
     if (next._blob) payload.sourceImage = next._blob;
+    let busyRetry = false;
     runGeneration(payload).then((res) => {
       setQueue((q) => q.map((item) => item.id === next.id ? { ...item, status: 'complete', result: res } : item));
     }).catch((err) => {
+      const isBusy = /already in progress|VIDEO_GEN_BUSY|409/i.test(err?.message || '');
+      if (isBusy) {
+        // Bounce the item back to pending after a short delay so the worker
+        // re-tries once the server's previous child has finished cleaning up.
+        busyRetry = true;
+        setQueue((q) => q.map((item) => item.id === next.id ? { ...item, status: 'pending', startedAt: undefined } : item));
+        setTimeout(() => setRunningQueueId((curr) => (curr === next.id ? null : curr)), 1500);
+        return;
+      }
       setQueue((q) => q.map((item) => item.id === next.id ? { ...item, status: 'error', error: err.message } : item));
     }).finally(() => {
-      setRunningQueueId(null);
+      // For the BUSY branch the timeout above releases the slot — releasing
+      // it here too would let the worker immediately re-fire and hit the
+      // same 409 before the server's old child has exited.
+      if (!busyRetry) setRunningQueueId(null);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue, generating, runningQueueId]);

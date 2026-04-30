@@ -28,7 +28,13 @@ vi.mock('../lib/fileUtils.js', () => ({
   PATHS: { images: '/mock/images' },
 }));
 
-vi.mock('fs', () => ({ existsSync: vi.fn(() => true) }));
+vi.mock('fs', () => ({
+  existsSync: vi.fn(() => true),
+  // statSync gates resolveGalleryImage onto regular-file checks — the route
+  // rejects directories, so the mock has to look like a file for the
+  // gallery-image plumbing tests to pass.
+  statSync: vi.fn(() => ({ isFile: () => true })),
+}));
 vi.mock('fs/promises', () => ({ unlink: vi.fn(async () => {}) }));
 
 import * as videoGenService from '../services/videoGen/local.js';
