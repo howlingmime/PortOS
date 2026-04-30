@@ -479,7 +479,7 @@ export default function ImageGen() {
   const notConnected = status && status.connected === false;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2 flex-wrap">
           {status ? (
@@ -539,33 +539,34 @@ export default function ImageGen() {
         </div>
       </div>
 
-      <form onSubmit={handleGenerate} className="grid grid-cols-1 lg:grid-cols-[1fr,1.2fr] gap-6">
-        <div className="bg-port-card border border-port-border rounded-xl p-5 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Prompt</label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={4}
-              disabled={generating}
-              className="w-full bg-port-bg border border-port-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-port-accent disabled:opacity-50 resize-y"
-              placeholder="Describe the image you want to generate..."
-            />
+      <form onSubmit={handleGenerate} className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4">
+        <div className="bg-port-card border border-port-border rounded-xl p-4 space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Prompt</label>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={3}
+                disabled={generating}
+                className="w-full bg-port-bg border border-port-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-port-accent disabled:opacity-50 resize-y"
+                placeholder="Describe the image you want to generate..."
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Negative Prompt</label>
+              <textarea
+                value={negativePrompt}
+                onChange={(e) => setNegativePrompt(e.target.value)}
+                rows={3}
+                disabled={generating}
+                className="w-full bg-port-bg border border-port-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-port-accent disabled:opacity-50 resize-y"
+                placeholder="What to avoid..."
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Negative Prompt</label>
-            <textarea
-              value={negativePrompt}
-              onChange={(e) => setNegativePrompt(e.target.value)}
-              rows={2}
-              disabled={generating}
-              className="w-full bg-port-bg border border-port-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-port-accent disabled:opacity-50 resize-y"
-              placeholder="What to avoid..."
-            />
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {isLocalMode && models.length > 0 && (
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1">Model</label>
@@ -680,13 +681,13 @@ export default function ImageGen() {
 
           {isLocalMode && availableLoras.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">LoRAs</label>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
+              <label className="block text-xs font-medium text-gray-400 mb-1">LoRAs</label>
+              <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
                 {availableLoras.map((lora) => {
                   const selected = selectedLoras.find((s) => s.filename === lora.filename);
                   return (
-                    <div key={lora.filename} className="flex items-center gap-3">
-                      <label className="flex items-center gap-2 cursor-pointer flex-1">
+                    <div key={lora.filename} className="flex items-center gap-2">
+                      <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
                         <input
                           type="checkbox"
                           checked={!!selected}
@@ -697,7 +698,7 @@ export default function ImageGen() {
                           }}
                           className="rounded"
                         />
-                        <span className="text-sm text-gray-300">{lora.name}</span>
+                        <span className="text-xs text-gray-300 truncate">{lora.name}</span>
                       </label>
                       {selected && (
                         <div className="flex items-center gap-2">
@@ -723,54 +724,52 @@ export default function ImageGen() {
 
           {isLocalMode && (
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Init image <span className="text-xs text-gray-500 font-normal">(image-to-image — Flux only)</span>
+              <label className="block text-xs font-medium text-gray-400 mb-1">
+                Init image <span className="text-gray-500 font-normal">(image-to-image — Flux only)</span>
               </label>
               {initImage.previewUrl ? (
                 <div className="flex items-start gap-3">
-                  <div className="relative">
+                  <div className="relative shrink-0">
                     <img
                       src={initImage.previewUrl}
                       alt="Init"
-                      className="w-24 h-24 object-cover rounded-lg border border-port-border bg-port-bg"
+                      className="w-16 h-16 object-cover rounded-lg border border-port-border bg-port-bg"
                     />
                     <button
                       type="button"
                       onClick={handleClearInitImage}
                       disabled={generating}
-                      className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-port-card border border-port-border text-gray-300 hover:text-white hover:bg-port-error/40 flex items-center justify-center disabled:opacity-50"
+                      className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-port-card border border-port-border text-gray-300 hover:text-white hover:bg-port-error/40 flex items-center justify-center disabled:opacity-50"
                       title="Remove init image"
                     >
                       <X className="w-3 h-3" />
                     </button>
                   </div>
-                  <div className="flex-1 space-y-2">
-                    <div className="text-xs text-gray-400 truncate" title={initImage.name}>
-                      {initImage.name}
-                    </div>
-                    <label className="block text-xs text-gray-400">
-                      Strength ({initImageStrength.toFixed(2)}) — lower = closer to source, higher = freer remix
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="text-xs text-gray-400 truncate" title={initImage.name}>{initImage.name}</div>
+                    <label className="block text-[11px] text-gray-500">
+                      Strength {initImageStrength.toFixed(2)}
+                      <input
+                        type="range" min={0} max={1} step={0.05}
+                        value={initImageStrength}
+                        disabled={generating}
+                        onChange={(e) => setInitImageStrength(Number(e.target.value))}
+                        className="w-full accent-port-accent mt-1"
+                      />
                     </label>
-                    <input
-                      type="range" min={0} max={1} step={0.05}
-                      value={initImageStrength}
-                      disabled={generating}
-                      onChange={(e) => setInitImageStrength(Number(e.target.value))}
-                      className="w-full accent-port-accent"
-                    />
                   </div>
                 </div>
               ) : (
-                <label className="flex items-center justify-center gap-2 w-full px-3 py-3 border border-dashed border-port-border rounded-lg text-xs text-gray-400 hover:text-white hover:border-port-accent cursor-pointer transition-colors">
+                <label className="flex items-center justify-center gap-2 w-full px-3 py-2 border border-dashed border-port-border rounded-lg text-xs text-gray-400 hover:text-white hover:border-port-accent cursor-pointer transition-colors">
                   <ImageIcon className="w-4 h-4" />
-                  Upload an image to remix (PNG, JPG, WebP, ≤20MB)
+                  Upload image to remix (PNG/JPG/WebP)
                   <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handlePickInitImage} disabled={generating} />
                 </label>
               )}
             </div>
           )}
 
-          <div className="flex items-center gap-2 pt-2">
+          <div className="flex items-center gap-2 pt-1">
             {generating ? (
               <button
                 type="button"
@@ -789,18 +788,17 @@ export default function ImageGen() {
               </button>
             )}
             {progressPct != null && <span className="text-xs text-port-accent">{progressPct}%</span>}
+            {(generating || error) && (
+              <span className={`text-xs truncate ${error ? 'text-port-error' : 'text-gray-400'}`}>
+                {error || statusMsg || 'Working...'}
+              </span>
+            )}
           </div>
-
-          {(generating || error) && (
-            <div className={`text-xs ${error ? 'text-port-error' : 'text-gray-400'}`}>
-              {error || statusMsg || 'Working...'}
-            </div>
-          )}
         </div>
 
-        <div className="bg-port-card border border-port-border rounded-xl p-5 space-y-3">
+        <div className="bg-port-card border border-port-border rounded-xl p-4 space-y-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-gray-300">Preview</h2>
+            <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide">Preview</h2>
             {result && !generating && (
               <a href={result.path} download className="flex items-center gap-1 text-xs text-port-accent hover:underline">
                 <Download className="w-3 h-3" /> Download
@@ -808,20 +806,20 @@ export default function ImageGen() {
             )}
           </div>
 
-          <div className="aspect-square w-full bg-port-bg border border-port-border rounded-lg overflow-hidden flex items-center justify-center relative">
+          <div className="aspect-square max-w-[360px] mx-auto bg-port-bg border border-port-border rounded-lg overflow-hidden flex items-center justify-center relative">
             {progress?.currentImage ? (
-              <img src={`data:image/png;base64,${progress.currentImage}`} alt="Diffusing..." className="w-full h-full object-contain" />
+              <img src={`data:image/png;base64,${progress.currentImage}`} alt="Diffusing..." decoding="async" className="w-full h-full object-contain" />
             ) : result ? (
-              <img src={result.path} alt={result.prompt} className="w-full h-full object-contain" />
+              <img src={result.path} alt={result.prompt} decoding="async" className="w-full h-full object-contain" />
             ) : generating ? (
               <div className="text-gray-500 text-sm flex flex-col items-center gap-2">
                 <BrailleSpinner />
                 <span>{statusMsg || 'Starting diffusion...'}</span>
               </div>
             ) : (
-              <div className="text-gray-600 text-sm flex flex-col items-center gap-2">
-                <ImageIcon className="w-12 h-12" />
-                <span>Your generated image will appear here</span>
+              <div className="text-gray-600 text-xs flex flex-col items-center gap-1.5">
+                <ImageIcon className="w-8 h-8" />
+                <span>Generated image will appear here</span>
               </div>
             )}
 
@@ -850,9 +848,9 @@ export default function ImageGen() {
       </form>
 
       {visibleGallery.length > 0 && (
-        <div className="bg-port-card border border-port-border rounded-xl p-5 space-y-3">
+        <div className="bg-port-card border border-port-border rounded-xl p-4 space-y-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-gray-300">Recent renders ({Math.min(visibleGallery.length, 6)} of {visibleGallery.length})</h2>
+            <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide">Recent renders ({Math.min(visibleGallery.length, 6)} of {visibleGallery.length})</h2>
             {visibleGallery.length > 6 && (
               <Link to="/media/history" className="text-xs text-port-accent hover:underline">View all →</Link>
             )}
@@ -877,11 +875,11 @@ export default function ImageGen() {
       )}
 
       {hiddenGallery.length > 0 && (
-        <div className="bg-port-card border border-port-border rounded-xl p-5 space-y-3">
+        <div className="bg-port-card border border-port-border rounded-xl p-4 space-y-2">
           <button
             type="button"
             onClick={() => setShowHidden((s) => !s)}
-            className="flex items-center justify-between w-full text-sm font-medium text-gray-300 hover:text-white"
+            className="flex items-center justify-between w-full text-xs font-medium text-gray-400 uppercase tracking-wide hover:text-white"
           >
             <span>{showHidden ? 'Hide' : 'Show'} hidden ({hiddenGallery.length})</span>
             <span className="text-xs text-gray-500">{showHidden ? '▾' : '▸'}</span>

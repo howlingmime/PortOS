@@ -8,6 +8,7 @@
 
 ## Changed
 
+- **Image Gen and Video Gen layouts tightened for above-the-fold density.** Form and preview now render side-by-side on `lg+` (`grid-cols-[3fr_2fr]`) instead of stacking; previews are capped (image `max-w-[360px]`, video `max-w-[420px]`) so they no longer dominate the viewport. Prompt + Negative Prompt sit in two columns on `md+`, parameter grids force three columns on `sm+`, the LTX mode switch and mode-specific image pickers are more compact, and section headers adopt a consistent `text-xs uppercase` style. Status text is hoisted into the Generate button row, video Download moved into the preview header for parity with image. Note: the codebase requires underscore (not comma) separators in Tailwind arbitrary grid template values (e.g. `lg:grid-cols-[3fr_2fr]`); the prior `[1fr,1.2fr]` was silently falling back to a single column.
 - **Worktree policy** clarified in `CLAUDE.md`: TUI sessions edit the main repo directly; worktrees are reserved for unattended CoS sub-agents.
 
 ## Fixed
