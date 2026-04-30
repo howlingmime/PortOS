@@ -93,14 +93,23 @@ router.get('/models', (_req, res) => {
 // regular file — otherwise the images-root directory itself would resolve
 // (existsSync is true for dirs) and flow into ffmpeg as an "image path"
 // where it'd fail in confusing ways.
+//
+// Wrap statSync in try/catch (one of the few "strictly necessary" uses):
+// throwIfNoEntry: false silences ENOENT but not EACCES/permissions or
+// transient I/O errors — those should be treated as "not a valid gallery
+// reference" and produce a clean validation null, not bubble up as a 500.
 const resolveGalleryImage = (name) => {
   const safe = basename(name);
   if (!safe || safe === '.' || safe === '..') return null;
   const imagesRoot = resolvePath(PATHS.images) + PATH_SEP;
   const localPath = resolvePath(join(PATHS.images, safe));
   if (!localPath.startsWith(imagesRoot) || !existsSync(localPath)) return null;
-  const stat = statSync(localPath, { throwIfNoEntry: false });
-  return stat?.isFile() ? localPath : null;
+  try {
+    const stat = statSync(localPath, { throwIfNoEntry: false });
+    return stat?.isFile() ? localPath : null;
+  } catch {
+    return null;
+  }
 };
 
 router.post('/', sourceImageUpload, asyncHandler(async (req, res) => {

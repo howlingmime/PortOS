@@ -173,6 +173,10 @@ export default function VideoGen() {
   // outstanding Promise dangles forever — and the queue worker's .finally()
   // never runs, leaving runningQueueId stuck and freezing further dequeue.
   const runRejectRef = useRef(null);
+  // Per-run abort token. Bumped at the start of each runGeneration() and
+  // again on cancel; runGeneration captures the value at start and bails
+  // when the token has moved on (e.g. POST resolves after cancel).
+  const runTokenRef = useRef(0);
 
   // Batch queue. Each item snapshots the params at enqueue time so the user
   // can keep editing the form while jobs are in flight without affecting the
@@ -257,18 +261,31 @@ export default function VideoGen() {
   // still matches the latest pick.
   const extendPickTokenRef = useRef(0);
   const handleExtendPick = async (videoId) => {
+    // Bumping the token cancels any in-flight extract from a prior pick:
+    // the awaited promise still resolves, but the result-application block
+    // sees the mismatch and bails. Clearing the spinner here too means a
+    // fast-clear (`videoId === ''`) doesn't strand the "Extracting…" UI
+    // when an earlier extract is mid-flight.
     const token = ++extendPickTokenRef.current;
     setExtendFromVideoId(videoId);
-    if (!videoId) { clearSourceImage(); return; }
+    if (!videoId) {
+      clearSourceImage();
+      setExtendingFrame(false);
+      return;
+    }
     setExtendingFrame(true);
     const res = await extractLastFrame(videoId).catch((err) => {
       toast.error(err.message || 'Failed to extract last frame');
       return null;
     });
-    // Drop the result if a newer pick has happened in the meantime — the
-    // newer request's setExtendingFrame(false) and setSourceImageFile will
-    // be the source of truth.
-    if (token !== extendPickTokenRef.current) return;
+    // Stale completion: a newer pick (or clear) is now authoritative. Don't
+    // touch sourceImageFile, but DO clear the spinner if this stale request
+    // was the last one to set it — otherwise the user sees "Extracting…"
+    // forever after a quick clear.
+    if (token !== extendPickTokenRef.current) {
+      setExtendingFrame(false);
+      return;
+    }
     setExtendingFrame(false);
     if (res?.filename) {
       setSourceImageFile(res.filename);
@@ -299,12 +316,23 @@ export default function VideoGen() {
   // Run a single payload through the SSE pipeline. Returns a promise that
   // resolves when the job completes (or rejects on error / cancel). Shared
   // by the inline submit and the queue worker.
+  //
+  // Per-run abort token: the user can press Cancel during the brief window
+  // between generateVideo() POST and its `.then()` resolving with a jobId.
+  // Without a guard, the late `.then()` would still open an EventSource and
+  // start applying SSE updates for a job the UI considers cancelled, AND
+  // could clobber a queue item that's already advanced. handleCancel bumps
+  // runTokenRef; runGeneration captures the token at start and ignores the
+  // POST response (and any SSE messages) when the token no longer matches.
   const runGeneration = (payload) => new Promise((resolve, reject) => {
     setGenerating(true);
     setProgress({ progress: 0 });
     setStatusMsg('Starting...');
     setResult(null);
     setError(null);
+
+    const myToken = ++runTokenRef.current;
+    const isCurrent = () => myToken === runTokenRef.current;
 
     // Wrap settle so the cancel ref is cleared exactly once when the Promise
     // transitions to a final state — guarantees the queue worker's .finally()
@@ -314,11 +342,19 @@ export default function VideoGen() {
     runRejectRef.current = settleReject;
 
     generateVideo(payload).then((data) => {
+      // The user cancelled while we were waiting for the POST to return —
+      // don't open an EventSource at all, and don't touch any state. The
+      // earlier handleCancel() already settled the Promise via runRejectRef.
+      if (!isCurrent()) return;
       const jobId = data.jobId || data.generationId;
       const es = new EventSource(`/api/video-gen/${jobId}/events`);
       eventSourceRef.current = es;
 
       es.onmessage = (ev) => {
+        // A cancel that landed after the EventSource opened would have closed
+        // it, but a stray buffered message could still fire — bail before
+        // touching component state for a run we no longer own.
+        if (!isCurrent()) { es.close(); return; }
         const msg = safeParseJSON(ev.data);
         if (!msg) return;
         if (msg.type === 'status') setStatusMsg(msg.message);
@@ -345,12 +381,14 @@ export default function VideoGen() {
         }
       };
       es.onerror = () => {
+        if (!isCurrent()) { es.close(); return; }
         setError('Lost connection to server');
         setGenerating(false);
         es.close();
         settleReject(new Error('Lost connection to server'));
       };
     }).catch((err) => {
+      if (!isCurrent()) return;
       setError(err.message || 'Video generation failed');
       setGenerating(false);
       toast.error(err.message || 'Video generation failed');
@@ -436,6 +474,10 @@ export default function VideoGen() {
   }, [queue, generating, runningQueueId]);
 
   const handleCancel = async () => {
+    // Bump the run token FIRST so any late `.then()` from the in-flight
+    // generateVideo() POST sees a stale token and bails before opening an
+    // EventSource for a job we've already declared cancelled.
+    runTokenRef.current += 1;
     eventSourceRef.current?.close();
     await cancelVideoGen().catch(() => {});
     setGenerating(false);
