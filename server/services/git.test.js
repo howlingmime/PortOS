@@ -180,32 +180,13 @@ describe('requestCopilotReview', () => {
     if (!result.success) expect(typeof result.error).toBe('string');
   });
 
-  it('returns { success: true, skipped: true } when the repo origin is a non-GitHub forge', async () => {
-    // resolveForgeForRepo reads `git remote get-url origin` from `dir`, so we set up a
-    // throwaway git repo with a gitlab.com remote — this exercises the real cli !== 'gh'
-    // skip path end-to-end without mocking. Without this, a nonexistent dir would fall
-    // back to cli: 'gh' and the test would silently pass even if the skip path broke.
-    const { mkdtempSync, rmSync } = await import('fs');
-    const { tmpdir } = await import('os');
-    const { execSync, spawnSync } = await import('child_process');
-    const path = await import('path');
-
-    // CI environments without `git` should not fail this test — bail out cleanly.
-    // spawnSync returns { status: null, error } on ENOENT instead of throwing,
-    // so we can probe for git availability without try/catch.
-    const probe = spawnSync('git', ['--version'], { stdio: 'ignore' });
-    if (probe.status !== 0) return;
-
-    const repo = mkdtempSync(path.join(tmpdir(), 'portos-git-skip-'));
-    try {
-      execSync('git init -q', { cwd: repo });
-      execSync('git remote add origin git@gitlab.com:group/proj.git', { cwd: repo });
-
-      const result = await requestCopilotReview(repo, 'https://gitlab.com/group/proj/-/merge_requests/1');
-      expect(result).toEqual({ success: true, skipped: true });
-    } finally {
-      rmSync(repo, { recursive: true, force: true });
-    }
+  it('returns { success: true, skipped: true } when the PR URL host is a non-GitHub forge', async () => {
+    // The current implementation short-circuits on the PR URL's host (via
+    // detectForgeCli(parsed.host)) before consulting the repo's origin remote.
+    // A GitLab MR URL therefore skips cleanly regardless of `dir` — no git repo,
+    // no system git binary, no environment-specific setup needed.
+    const result = await requestCopilotReview('/nonexistent-path-for-test', 'https://gitlab.com/group/proj/-/merge_requests/1');
+    expect(result).toEqual({ success: true, skipped: true });
   });
 });
 
