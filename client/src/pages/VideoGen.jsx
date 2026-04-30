@@ -348,12 +348,17 @@ export default function VideoGen() {
 
   const handleGenerate = async (e) => {
     e?.preventDefault?.();
-    if (!prompt.trim() || generating) return;
+    // Mirror the inline submit-button's disabled rules: blank prompt,
+    // already generating, or backend disconnected. Without the disconnected
+    // guard the user could press Enter in the prompt textarea and fire a
+    // request that's guaranteed to fail (and the disabled button would
+    // otherwise have prevented).
+    if (!prompt.trim() || generating || (status && status.connected === false)) return;
     await runGeneration(buildGeneratePayload()).catch(() => {});
   };
 
   const handleEnqueue = () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || (status && status.connected === false)) return;
     const payload = buildGeneratePayload();
     // Strip the File blob for snapshot — re-using a File across multiple
     // queued submissions is fine, but we need a stable JSON-ish summary

@@ -248,8 +248,12 @@ export async function generateVideo({ pythonPath, prompt, negativePrompt = '', m
     broadcastSse(job, { type: 'error', error: reason });
     videoGenEvents.emit('failed', { generationId: jobId, error: reason });
     activeProcess = null;
+    // Spawn failed, so proc.on('close') will never fire — clean up every
+    // temp file we own here, including the multipart upload, otherwise
+    // ENOENT/permission errors leak files in os.tmpdir().
     if (resizedSrcTempPath) unlink(resizedSrcTempPath).catch(() => {});
     if (resizedLastTempPath) unlink(resizedLastTempPath).catch(() => {});
+    if (uploadedTempPath) unlink(uploadedTempPath).catch(() => {});
     closeJobAfterDelay(jobs, jobId);
   });
 

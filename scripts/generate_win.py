@@ -163,7 +163,10 @@ def main():
 
     log('STATUS:Saving video...')
     save_video(result.frames[0], args.output, args.fps)
-    log(f'STATUS:Saved to {args.output}')
+    # Log only the basename — STATUS lines are forwarded over SSE to the
+    # browser, and emitting the absolute server path would leak filesystem
+    # layout. The Node side already knows the full path from the --output arg.
+    log(f'STATUS:Saved to {os.path.basename(args.output)}')
     log('STATUS:Done')
 
 
