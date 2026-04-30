@@ -437,8 +437,11 @@ export async function getReservedPorts() {
   const ports = new Set();
 
   const addPort = (p) => {
-    const n = typeof p === 'number' ? p : parseInt(p, 10);
-    if (Number.isInteger(n) && n > 0) ports.add(n);
+    let n = null;
+    if (typeof p === 'number' && Number.isInteger(p)) n = p;
+    // Strict /^\d+$/ rather than parseInt — '5565abc' should not coerce to 5565.
+    else if (typeof p === 'string' && /^\d+$/.test(p)) n = Number(p);
+    if (n !== null && n >= 1 && n <= 65535) ports.add(n);
   };
 
   for (const app of apps) {

@@ -14,7 +14,9 @@ export const usesPm2 = (type) => !NON_PM2_TYPES.has(type);
 
 /**
  * Find the index of the `}` that matches the `{` at `openBraceIdx`, ignoring
- * braces inside strings and comments. Returns -1 if no match.
+ * braces inside strings (single/double/backtick) and JS comments. Returns -1
+ * if no match. Backticks are treated as opaque so `${...}` interpolations
+ * don't perturb the depth count of the surrounding object.
  */
 function findMatchingBrace(content, openBraceIdx) {
   let depth = 0;
@@ -34,7 +36,7 @@ function findMatchingBrace(content, openBraceIdx) {
     if (inBlockComment && char === '*' && nextChar === '/') { inBlockComment = false; i++; continue; }
     if (inLineComment || inBlockComment) continue;
 
-    if ((char === '"' || char === "'") && prevChar !== '\\') {
+    if ((char === '"' || char === "'" || char === '`') && prevChar !== '\\') {
       if (!inString) { inString = true; stringChar = char; }
       else if (char === stringChar) { inString = false; stringChar = null; }
     }
@@ -265,7 +267,9 @@ export function parseEcosystemConfig(content) {
         const closeIdx = findMatchingBrace(appBlock, openIdx);
         if (closeIdx < 0) continue;
         const envContent = appBlock.substring(openIdx + 1, closeIdx);
-        const portKeyRegex = /\b(PORT|[A-Z][A-Z0-9_]*_PORT)\b\s*:\s*([^,}\n]+)/g;
+        // `['"]?` lets quoted keys like `'PORT': 3000` or `"COINBASE_IPC_PORT": 5565`
+        // match — common in JSON-style ecosystem configs. `\b` still anchors the key.
+        const portKeyRegex = /['"]?\b(PORT|[A-Z][A-Z0-9_]*_PORT)\b['"]?\s*:\s*([^,}\n]+)/g;
         let m;
         while ((m = portKeyRegex.exec(envContent)) !== null) {
           const key = m[1];

@@ -87,4 +87,31 @@ describe('getReservedPorts', () => {
     expect(reserved).not.toContain(0);
     expect(reserved.every(p => Number.isInteger(p) && p > 0)).toBe(true);
   });
+
+  it('rejects garbage strings (e.g. "5565abc") and out-of-range integers', async () => {
+    // parseInt-style coercion would silently accept `'5565abc'` as 5565.
+    // Strict /^\\d+$/ + range check is what keeps a hand-edited apps.json from
+    // smuggling a bogus reservation.
+    readJSONFile.mockResolvedValue({
+      apps: {
+        [PORTOS_APP_ID]: { name: 'PortOS' },
+        'sketchy': {
+          name: 'sketchy',
+          apiPort: '5565abc',     // partially-numeric string
+          uiPort: 99999,          // above 65535
+          processes: [
+            { name: 'a', ports: { api: 5571, weird: '12.5', neg: -1, big: 70000 } },
+          ],
+        },
+      },
+    });
+
+    const reserved = await getReservedPorts();
+    expect(reserved).toContain(5571);
+    expect(reserved).not.toContain(5565);
+    expect(reserved).not.toContain(99999);
+    expect(reserved).not.toContain(70000);
+    expect(reserved).not.toContain(-1);
+    expect(reserved.every(p => Number.isInteger(p) && p >= 1 && p <= 65535)).toBe(true);
+  });
 });

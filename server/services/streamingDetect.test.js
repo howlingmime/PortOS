@@ -129,6 +129,54 @@ describe('parseEcosystemConfig', () => {
     expect(proc.ports).toEqual({ api: 5580 });
   });
 
+  it('captures *_PORT keys when surrounding code uses backtick template literals', () => {
+    // PM2 configs commonly use template literals (script paths, CLI args). The
+    // brace-counter must treat backticks as string delimiters so `${...}` braces
+    // don't perturb depth and miscount the env block close.
+    const content = `
+      module.exports = {
+        apps: [
+          {
+            name: 'tmpl-app',
+            script: \`\${__dirname}/server.js\`,
+            args: \`--port \${5602} --extra \${{x: 1}}\`,
+            env: {
+              PORT: 5602,
+              IPC_PORT: 5603,
+            },
+          },
+        ],
+      };
+    `;
+
+    const { processes } = parseEcosystemConfig(content);
+    const proc = processes.find(p => p.name === 'tmpl-app');
+    expect(proc.ports.api).toBe(5602);
+    expect(proc.ports.ipc).toBe(5603);
+  });
+
+  it('captures *_PORT keys when written with quoted key syntax', () => {
+    // JSON-style ecosystem configs quote env keys.
+    const content = `
+      module.exports = {
+        apps: [
+          {
+            name: 'json-style',
+            env: {
+              'PORT': 5610,
+              "COINBASE_IPC_PORT": 5611,
+            },
+          },
+        ],
+      };
+    `;
+
+    const { processes } = parseEcosystemConfig(content);
+    const proc = processes.find(p => p.name === 'json-style');
+    expect(proc.ports.api).toBe(5610);
+    expect(proc.ports.coinbaseIpc).toBe(5611);
+  });
+
   it('captures *_PORT keys after a nested brace inside the env block', () => {
     // Env values can contain object spreads/ternaries that introduce nested `}`.
     // A naive `\\{[^}]*\\}` env-block regex would truncate at the inner `}` and
