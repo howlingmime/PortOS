@@ -185,16 +185,20 @@ describe('requestCopilotReview', () => {
     // throwaway git repo with a gitlab.com remote — this exercises the real cli !== 'gh'
     // skip path end-to-end without mocking. Without this, a nonexistent dir would fall
     // back to cli: 'gh' and the test would silently pass even if the skip path broke.
-    const { mkdtempSync } = await import('fs');
+    const { mkdtempSync, rmSync } = await import('fs');
     const { tmpdir } = await import('os');
     const { execSync } = await import('child_process');
     const path = await import('path');
     const repo = mkdtempSync(path.join(tmpdir(), 'portos-git-skip-'));
-    execSync('git init -q', { cwd: repo });
-    execSync('git remote add origin git@gitlab.com:group/proj.git', { cwd: repo });
+    try {
+      execSync('git init -q', { cwd: repo });
+      execSync('git remote add origin git@gitlab.com:group/proj.git', { cwd: repo });
 
-    const result = await requestCopilotReview(repo, 'https://gitlab.com/group/proj/-/merge_requests/1');
-    expect(result).toEqual({ success: true, skipped: true });
+      const result = await requestCopilotReview(repo, 'https://gitlab.com/group/proj/-/merge_requests/1');
+      expect(result).toEqual({ success: true, skipped: true });
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });
 

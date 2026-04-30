@@ -203,12 +203,14 @@ After completing your work and before committing, run \`/simplify\` to review th
 
   // Build review loop section if enabled. The agent itself does NOT open the PR
   // or run /do:rpr — by the time the PR exists, the agent has already exited.
-  // The system requests Copilot review automatically after PR creation.
-  // Only meaningful when a PR will actually be created (willOpenPR), since the
-  // Copilot review request is a no-op without a PR URL.
+  // The system requests Copilot review automatically after PR creation on GitHub
+  // PRs. On non-GitHub forges (e.g. GitLab MRs) this step is skipped because the
+  // Copilot reviewer is GitHub-only. Only meaningful when a PR will actually be
+  // created (willOpenPR), since the Copilot review request is a no-op without a
+  // PR URL.
   const reviewLoopSection = willReviewLoop && willOpenPR ? `
 ## Code Review
-After your task completes, the system will request a Copilot code review on the PR automatically. You do not need to open the PR or trigger the review yourself — focus on producing high-quality, well-tested code so the review pass goes cleanly.
+After your task completes, the system will request a Copilot code review automatically for GitHub PRs (the step is skipped for GitLab MRs and other non-GitHub forges). You do not need to open the PR or trigger the review yourself — focus on producing high-quality, well-tested code so the review pass goes cleanly.
 ` : '';
 
   // Build JIRA context section if applicable
@@ -323,7 +325,7 @@ ${skillSection ? `## Task-Type Skill Guidelines\n\n${skillSection}\n` : ''}${too
 - If blocked, explain clearly why
 - Never update the PortOS changelog (\`.changelog/\`) for work on managed apps — the PortOS changelog tracks PortOS core changes only
 - **BTW Messages**: The user may send you additional context while you work. Check for a \`BTW.md\` file in your working directory root — if it exists, read it for important messages from the user. Incorporate that context into your work. Do not delete or modify BTW.md.
-${isTruthyMetaFn(task.metadata?.readOnly) ? `- **This is a read-only task.** Do NOT commit, push, or modify any files in the repository. Only read data and generate reports.` : worktreeInfo && willOpenPR ? `- A pull request will be automatically created when your task completes — do NOT open a PR manually.${willReviewLoop ? ' A Copilot code review will also be requested automatically — do NOT run \`/do:rpr\` or attempt to address review comments yourself; you will have already exited.' : ''}` : worktreeInfo ? `- Your worktree branch will be automatically merged back to the source branch when your task completes — do NOT open a PR.` : ``}
+${isTruthyMetaFn(task.metadata?.readOnly) ? `- **This is a read-only task.** Do NOT commit, push, or modify any files in the repository. Only read data and generate reports.` : worktreeInfo && willOpenPR ? `- On successful completion, the system will push your branch and open a pull request — do NOT open a PR manually. (If the task fails, the worktree is preserved for debugging and no PR is opened.)${willReviewLoop ? ' For GitHub PRs, a Copilot code review will also be requested automatically (skipped on GitLab and other non-GitHub forges) — do NOT run \`/do:rpr\` or attempt to address review comments yourself; you will have already exited.' : ''}` : worktreeInfo ? `- Your worktree branch will be automatically merged back to the source branch when your task completes — do NOT open a PR.` : ``}
 
 ## Git Hygiene (CRITICAL)
 - **Before starting work**, run \`git status\` to verify a clean working tree. Do NOT stash or discard uncommitted changes — other agents may be working concurrently and expecting those changes to be present. If the tree is dirty, only commit files YOU changed for this task.

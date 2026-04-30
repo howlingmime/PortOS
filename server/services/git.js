@@ -496,7 +496,10 @@ export function parsePullRequestUrl(url) {
   // request handlers, not URL validation helpers).
   try { parsed = new URL(url); } catch { return null; }
 
-  const host = parsed.host;
+  // Use hostname (no port) — `gh api --hostname` expects a bare hostname and
+  // chokes on host:port. We don't currently support custom-port forges, but if
+  // we ever do, the port should be plumbed through a separate field.
+  const host = parsed.hostname;
   const segments = parsed.pathname.split('/').filter(Boolean);
 
   // GitHub: /<owner>/<repo>/pull/<number>[/<more>]
