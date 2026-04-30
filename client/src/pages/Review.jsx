@@ -114,13 +114,8 @@ export default function Review() {
     setEditingId(null);
   };
 
-  const applyToAllPending = (apiFn) => {
-    const pendingItems = items.filter(i => i.status === 'pending');
-    return Promise.all(pendingItems.map(i => apiFn(i.id).catch(() => null)));
-  };
-
-  const handleMarkAllRead = () => applyToAllPending(api.dismissReviewItem);
-  const handleCompleteAll = () => applyToAllPending(api.completeReviewItem);
+  const handleMarkAllRead = () => api.bulkUpdateReviewStatus({ status: 'dismissed' }).catch(() => null);
+  const handleCompleteAll = () => api.bulkUpdateReviewStatus({ status: 'completed' }).catch(() => null);
 
   const grouped = items.reduce((acc, item) => {
     if (!acc[item.type]) acc[item.type] = [];

@@ -186,6 +186,58 @@ describe('review service', () => {
     });
   });
 
+  describe('bulkUpdateStatus', () => {
+    it('updates every pending item in a single write when no ids passed', async () => {
+      const { bulkUpdateStatus } = await import('./review.js');
+      const items = [
+        { id: 'a', status: 'pending', metadata: {} },
+        { id: 'b', status: 'pending', metadata: {} },
+        { id: 'c', status: 'completed', metadata: {} }
+      ];
+      readFile.mockResolvedValue(JSON.stringify(items));
+
+      const updated = await bulkUpdateStatus({ status: 'dismissed' });
+
+      expect(updated).toHaveLength(2);
+      expect(atomicWrite).toHaveBeenCalledTimes(1);
+      const written = atomicWrite.mock.calls[0][1];
+      expect(written.find(i => i.id === 'a').status).toBe('dismissed');
+      expect(written.find(i => i.id === 'b').status).toBe('dismissed');
+      expect(written.find(i => i.id === 'c').status).toBe('completed');
+    });
+
+    it('only updates items whose ids are passed in', async () => {
+      const { bulkUpdateStatus } = await import('./review.js');
+      const items = [
+        { id: 'a', status: 'pending', metadata: {} },
+        { id: 'b', status: 'pending', metadata: {} }
+      ];
+      readFile.mockResolvedValue(JSON.stringify(items));
+
+      const updated = await bulkUpdateStatus({ status: 'completed', ids: ['a'] });
+
+      expect(updated).toHaveLength(1);
+      const written = atomicWrite.mock.calls[0][1];
+      expect(written.find(i => i.id === 'a').status).toBe('completed');
+      expect(written.find(i => i.id === 'b').status).toBe('pending');
+    });
+
+    it('skips the write entirely when nothing matches', async () => {
+      const { bulkUpdateStatus } = await import('./review.js');
+      readFile.mockResolvedValue(JSON.stringify([{ id: 'a', status: 'completed', metadata: {} }]));
+
+      const updated = await bulkUpdateStatus({ status: 'dismissed' });
+
+      expect(updated).toEqual([]);
+      expect(atomicWrite).not.toHaveBeenCalled();
+    });
+
+    it('rejects invalid status values', async () => {
+      const { bulkUpdateStatus } = await import('./review.js');
+      await expect(bulkUpdateStatus({ status: 'bogus' })).rejects.toThrow('Invalid status');
+    });
+  });
+
   describe('cosEvents bridge', () => {
     it('auto-completes the matching review item when an agent finishes successfully', async () => {
       const handler = registeredHandlers['agent:completed'];

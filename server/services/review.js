@@ -145,6 +145,39 @@ export async function dismissItem(id) {
 }
 
 /**
+ * Bulk-update many items to the same status in a single read-modify-write.
+ * Concurrent per-item POSTs race on saveItems and silently drop updates;
+ * this endpoint handles the "Complete All" / "Dismiss All" cases atomically.
+ * Pass `ids` to target specific items, or omit to target every pending item.
+ */
+export async function bulkUpdateStatus({ ids, status }) {
+  if (!ITEM_STATUSES.includes(status)) {
+    const err = new Error(`Invalid status: ${status}`);
+    err.status = 400;
+    throw err;
+  }
+
+  const items = await loadItems();
+  const idSet = Array.isArray(ids) && ids.length > 0 ? new Set(ids) : null;
+  const updated = [];
+  const now = new Date().toISOString();
+  for (const item of items) {
+    if (item.status !== 'pending') continue;
+    if (idSet && !idSet.has(item.id)) continue;
+    item.status = status;
+    item.updatedAt = now;
+    updated.push(item);
+  }
+
+  if (updated.length === 0) return [];
+
+  await saveItems(items);
+  console.log(`📋 Review items bulk-${status}: ${updated.length}`);
+  for (const item of updated) reviewEvents.emit('item:updated', item);
+  return updated;
+}
+
+/**
  * Update an item's title and/or description
  */
 export async function updateItem(id, { title, description }) {
