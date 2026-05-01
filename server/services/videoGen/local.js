@@ -11,8 +11,8 @@
  */
 
 import { execFile, spawn } from 'child_process';
-import { existsSync } from 'fs';
-import { unlink, writeFile } from 'fs/promises';
+import { existsSync, statSync } from 'fs';
+import { unlink, rename, writeFile } from 'fs/promises';
 import { join, basename, resolve as resolvePath, sep as PATH_SEP } from 'path';
 import { tmpdir } from 'os';
 import { randomUUID } from 'crypto';
@@ -21,26 +21,19 @@ import { ensureDir, PATHS, readJSONFile, atomicWrite } from '../../lib/fileUtils
 import { ServerError } from '../../lib/errorHandler.js';
 import { videoGenEvents } from './events.js';
 import { broadcastSse, attachSseClient as attachSse, closeJobAfterDelay, PYTHON_NOISE_RE } from '../../lib/sseUtils.js';
+import { getVideoModels, getDefaultVideoModelId, getTextEncoderRepo } from '../../lib/mediaModels.js';
 
 const execFileAsync = promisify(execFile);
 
 const IS_WIN = process.platform === 'win32';
 
-// Platform-specific catalog. macOS = MLX/mlx_video, Windows = diffusers.
-const MODELS_MACOS = {
-  ltx2_unified:       { name: 'LTX-2 Unified (~42 GB)',           repo: 'notapalindrome/ltx2-mlx-av',     steps: 30, guidance: 3.0 },
-  ltx23_unified:      { name: 'LTX-2.3 Unified Beta (~48 GB)',    repo: 'notapalindrome/ltx23-mlx-av',    steps: 25, guidance: 3.0 },
-  ltx23_distilled_q4: { name: 'LTX-2.3 Distilled Q4 (~22 GB)',    repo: 'notapalindrome/ltx23-mlx-av-q4', steps: 25, guidance: 3.0 },
-};
-const MODELS_WINDOWS = {
-  ltx_video: { name: 'LTX-Video 0.9.5 — T2V + I2V (~9.5 GB, auto-downloads)', steps: 25, guidance: 3.0 },
-};
-export const VIDEO_MODELS = IS_WIN ? MODELS_WINDOWS : MODELS_MACOS;
+// Catalog comes from data/media-models.json (see server/lib/mediaModels.js).
+// Cached as a plain object at boot for O(1) lookup by id, matching the prior shape.
+export const VIDEO_MODELS = Object.fromEntries(getVideoModels().map((m) => [m.id, m]));
 
-export const listVideoModels = () =>
-  Object.entries(VIDEO_MODELS).map(([id, m]) => ({ id, ...m }));
+export const listVideoModels = () => getVideoModels();
 
-export const defaultVideoModelId = () => IS_WIN ? 'ltx_video' : 'ltx23_distilled_q4';
+export const defaultVideoModelId = () => getDefaultVideoModelId();
 
 const HISTORY_FILE = join(PATHS.data, 'video-history.json');
 
@@ -116,10 +109,52 @@ const generateThumbnail = async (videoPath, jobId) => {
   });
 };
 
+// mlx-video-with-audio writes mp4s with the moov atom at the END (cv2's
+// VideoWriter default). Browsers loading the gallery with preload="metadata"
+// then have to download the entire file before they can render the
+// first-frame poster, so video tiles flash black until clicked. Remuxing
+// with `-movflags +faststart` rewrites the moov atom to the front of the
+// file. Pure stream copy — no re-encoding, takes a few hundred ms even on
+// long clips. Idea borrowed from mrbizarro/phosphene's codec patch.
+const optimizeForStreaming = async (videoPath) => {
+  const ffmpeg = await findFfmpeg();
+  if (!ffmpeg) return;
+  const tmpPath = `${videoPath}.fs.mp4`;
+  const ok = await new Promise((resolve) => {
+    const proc = spawn(ffmpeg, ['-i', videoPath, '-c', 'copy', '-movflags', '+faststart', '-y', tmpPath], { stdio: 'ignore' });
+    proc.on('close', (code) => resolve(code === 0));
+    proc.on('error', () => resolve(false));
+  });
+  if (!ok) { await unlink(tmpPath).catch(() => {}); return; }
+  // POSIX rename atomically replaces an existing dest in one syscall. On
+  // Windows, fs.rename fails when the destination already exists — but a
+  // simple unlink-first would destroy the rendered video if the subsequent
+  // rename failed (locked file, AV scan, transient permissions). Move the
+  // original aside to a .bak first, then install the optimized file, and
+  // restore the backup on any failure so the worst case is "faststart
+  // skipped", not "rendered video lost".
+  let backupPath = null;
+  try {
+    if (IS_WIN) {
+      backupPath = `${videoPath}.bak.${randomUUID()}`;
+      await rename(videoPath, backupPath).catch((err) => {
+        if (err?.code === 'ENOENT') { backupPath = null; return; }
+        throw err;
+      });
+    }
+    await rename(tmpPath, videoPath);
+    if (backupPath) await unlink(backupPath).catch(() => {});
+  } catch (err) {
+    if (backupPath) await rename(backupPath, videoPath).catch(() => {});
+    await unlink(tmpPath).catch(() => {});
+    console.log(`⚠️ Failed to install streaming-optimized video at ${videoPath}: ${err.message}`);
+  }
+};
+
 export const loadHistory = () => readJSONFile(HISTORY_FILE, []);
 export const saveHistory = (h) => atomicWrite(HISTORY_FILE, h);
 
-const buildArgs = ({ pythonPath, modelId, model, prompt, negativePrompt, width, height, numFrames, fps, steps, guidance, seed, tiling, disableAudio, sourceImagePath, lastImagePath, mode, outputPath }) => {
+const buildArgs = ({ pythonPath, modelId, model, prompt, negativePrompt, width, height, numFrames, fps, steps, guidance, seed, tiling, disableAudio, sourceImagePath, lastImagePath, mode, imageStrength, textEncoderRepo, outputPath }) => {
   if (IS_WIN) {
     const scriptPath = join(PATHS.root, 'scripts', 'generate_win.py');
     const args = [scriptPath, '--model', modelId, '--prompt', prompt, '--height', String(height), '--width', String(width), '--num-frames', String(numFrames), '--fps', String(fps), '--steps', String(steps), '--guidance', String(guidance), '--seed', String(seed), '--output', outputPath];
@@ -140,30 +175,39 @@ const buildArgs = ({ pythonPath, modelId, model, prompt, negativePrompt, width, 
     '--cfg-scale', String(guidance),
     '--output-path', outputPath,
     '--model-repo', model.repo,
-    '--text-encoder-repo', 'mlx-community/gemma-3-12b-it-4bit',
+    '--text-encoder-repo', textEncoderRepo,
     '--tiling', tiling,
   ];
   if (negativePrompt) args.push('--negative-prompt', negativePrompt);
   if (disableAudio) args.push('--no-audio');
-  if (sourceImagePath) args.push('--image', sourceImagePath);
-  // mlx_video.generate_av exposes only single-image conditioning at a chosen
-  // frame index (--image-frame-idx). True FFLF (two keyframes) requires the
-  // wrapper script to support multi-frame conditioning. We only opt into the
-  // last-frame-as-end-frame fallback when the caller explicitly asked for
-  // FFLF and supplied ONLY a last image (no source) — gating on `mode`
-  // matches the comment and avoids accidentally triggering the fallback for
-  // an i2v request that happened to send a `lastImagePath`.
+
+  // Pick a single conditioning image and frame index. mlx_video.generate_av
+  // accepts only one --image so true FFLF (both keyframes) isn't supported;
+  // when only a last image was supplied for FFLF, we condition the LAST
+  // latent frame instead. --image-frame-idx is a LATENT index — LTX
+  // compression is `1 + (videoFrames - 1) / 8`, so passing a raw video
+  // frame count silently fails the conditioning shape check.
+  let condImage = sourceImagePath;
+  let condFrameIdx = null;
   if (mode === 'fflf' && lastImagePath && !sourceImagePath) {
-    args.push('--image', lastImagePath, '--image-frame-idx', String(Math.max(0, numFrames - 1)));
+    condImage = lastImagePath;
+    condFrameIdx = Math.max(0, Math.floor((Number(numFrames) - 1) / 8));
   } else if (mode === 'fflf' && lastImagePath && sourceImagePath) {
-    // Both frames provided. mlx_video CLI can't currently consume both —
-    // log so the user knows their last image is advisory.
     console.log(`⚠️ FFLF requested but mlx_video CLI only supports single-frame conditioning — last image ignored`);
+  }
+  if (condImage) {
+    args.push('--image', condImage);
+    if (condFrameIdx != null) args.push('--image-frame-idx', String(condFrameIdx));
+    // --image-strength uses mask = 1.0 - strength: 1.0 preserves the source
+    // latent, 0.0 fully denoises (= T2V). mlx_video's help text describes
+    // this inverted. Omit when no caller value so mlx_video's default (1.0)
+    // applies.
+    if (imageStrength != null) args.push('--image-strength', String(imageStrength));
   }
   return { bin: pythonPath, args };
 };
 
-export async function generateVideo({ pythonPath, prompt, negativePrompt = '', modelId = defaultVideoModelId(), width = 768, height = 512, numFrames = 121, fps = 24, steps, guidanceScale, seed, tiling = 'auto', disableAudio = false, sourceImagePath = null, uploadedTempPath = null, lastImagePath = null, mode = null }) {
+export async function generateVideo({ pythonPath, prompt, negativePrompt = '', modelId = defaultVideoModelId(), width = 768, height = 512, numFrames = 121, fps = 24, steps, guidanceScale, seed, tiling = 'auto', disableAudio = false, sourceImagePath = null, uploadedTempPath = null, lastImagePath = null, mode = null, imageStrength = null }) {
   if (!pythonPath) throw new ServerError('Python path not configured — set it in Settings > Image Gen', { status: 400, code: 'VIDEO_GEN_NOT_CONFIGURED' });
   if (!prompt?.trim()) throw new ServerError('Prompt is required', { status: 400, code: 'VALIDATION_ERROR' });
   // Enforce the single-activeProcess invariant — without this a double-submit
@@ -172,6 +216,12 @@ export async function generateVideo({ pythonPath, prompt, negativePrompt = '', m
 
   const model = VIDEO_MODELS[modelId];
   if (!model) throw new ServerError(`Unknown video model: ${modelId}`, { status: 400, code: 'VALIDATION_ERROR' });
+  // macOS/mlx_video requires a HuggingFace repo id — Windows doesn't (the
+  // diffusers wrapper hardcodes Lightricks/LTX-Video). A user-edited registry
+  // entry missing `repo` would otherwise pass `undefined` into spawn args.
+  if (!IS_WIN && (typeof model.repo !== 'string' || model.repo.length === 0)) {
+    throw new ServerError(`Video model "${modelId}" is missing the required \`repo\` field in data/media-models.json`, { status: 500, code: 'VIDEO_MODEL_MISCONFIGURED' });
+  }
 
   await ensureDir(PATHS.videos);
   await ensureDir(PATHS.videoThumbnails);
@@ -184,6 +234,9 @@ export async function generateVideo({ pythonPath, prompt, negativePrompt = '', m
   const actualSeed = seed != null && seed !== '' ? Number(seed) : Math.floor(Math.random() * 2147483647);
   const actualSteps = steps ? Number(steps) : model.steps;
   const actualGuidance = guidanceScale != null && guidanceScale !== '' ? Number(guidanceScale) : model.guidance;
+  // Caller may pass null/'' to use mlx_video's default (1.0 = preserve source).
+  const actualImageStrength = imageStrength != null && imageStrength !== '' ? Number(imageStrength) : null;
+  const actualTextEncoderRepo = getTextEncoderRepo();
   const parsedNumFrames = Number(numFrames);
   const parsedFps = Number(fps);
 
@@ -226,7 +279,7 @@ export async function generateVideo({ pythonPath, prompt, negativePrompt = '', m
   const job = { ...meta, clients: [], status: 'running' };
   jobs.set(jobId, job);
 
-  const { bin, args } = buildArgs({ pythonPath, modelId, model, prompt, negativePrompt, width: w, height: h, numFrames: parsedNumFrames, fps: parsedFps, steps: actualSteps, guidance: actualGuidance, seed: actualSeed, tiling, disableAudio, sourceImagePath: resolvedSourceImage, lastImagePath: resolvedLastImage, mode, outputPath });
+  const { bin, args } = buildArgs({ pythonPath, modelId, model, prompt, negativePrompt, width: w, height: h, numFrames: parsedNumFrames, fps: parsedFps, steps: actualSteps, guidance: actualGuidance, seed: actualSeed, tiling, disableAudio, sourceImagePath: resolvedSourceImage, lastImagePath: resolvedLastImage, mode, imageStrength: actualImageStrength, textEncoderRepo: actualTextEncoderRepo, outputPath });
 
   console.log(`🎬 Generating video [${jobId.slice(0, 8)}]: ${modelId} ${w}x${h} frames=${parsedNumFrames} steps=${actualSteps}`);
   videoGenEvents.emit('started', { generationId: jobId, totalSteps: actualSteps, ...meta });
@@ -239,6 +292,15 @@ export async function generateVideo({ pythonPath, prompt, negativePrompt = '', m
   delete childEnv.PYTHONPATH;
   const proc = spawn(bin, args, { env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
   activeProcess = proc;
+  // Hold a sleep-prevention lock for the lifetime of the python child, so a
+  // 90s+ render doesn't get aborted by display/system sleep on a laptop. -w
+  // makes caffeinate self-exit when our pid does, so no manual cleanup is
+  // needed and a server crash mid-render still releases the assertion.
+  // macOS-only — `caffeinate` is a darwin binary; gating on `!IS_WIN` would
+  // also fire on Linux and emit a pointless ENOENT every render.
+  if (process.platform === 'darwin' && proc.pid) {
+    spawn('caffeinate', ['-i', '-w', String(proc.pid)], { stdio: 'ignore', detached: false }).on('error', () => {});
+  }
   // Without an 'error' handler, a missing/non-executable pythonPath would
   // crash the server with an unhandled error event.
   proc.on('error', (err) => {
@@ -259,46 +321,61 @@ export async function generateVideo({ pythonPath, prompt, negativePrompt = '', m
 
   let outputBuf = '';
 
+  // Returns true when the line was a known progress/status message (already
+  // broadcast over SSE) or python-noise — caller should suppress logging.
+  // Returns false for unhandled lines that are worth raw-logging.
   const handleLine = (raw) => {
     const line = raw.trim();
-    if (!line || PYTHON_NOISE_RE.test(line)) return;
+    if (!line) return true;
+    if (PYTHON_NOISE_RE.test(line)) return true;
     if (line.startsWith('STATUS:')) {
       broadcastSse(job, { type: 'status', message: line.slice(7) });
-    } else if (line.startsWith('STAGE:')) {
+      return true;
+    }
+    if (line.startsWith('STAGE:')) {
       const parts = line.split(':');
       const step = parseInt(parts[3], 10) || 0;
       const total = parseInt(parts[4], 10) || 1;
       broadcastSse(job, { type: 'progress', progress: step / total, message: parts.slice(5).join(':') });
       videoGenEvents.emit('progress', { generationId: jobId, progress: step / total, step, totalSteps: total });
-    } else if (line.startsWith('DOWNLOAD:')) {
-      broadcastSse(job, { type: 'status', message: `Downloading model... ${line.slice(9)}` });
-    } else {
-      const m = line.match(/(\d+)%\|/);
-      if (m) {
-        const pct = parseInt(m[1], 10) / 100;
-        broadcastSse(job, { type: 'progress', progress: pct, message: line });
-        videoGenEvents.emit('progress', { generationId: jobId, progress: pct });
-      }
+      return true;
     }
+    if (line.startsWith('DOWNLOAD:')) {
+      broadcastSse(job, { type: 'status', message: `Downloading model... ${line.slice(9)}` });
+      return true;
+    }
+    const m = line.match(/(\d+)%\|/);
+    if (m) {
+      const pct = parseInt(m[1], 10) / 100;
+      broadcastSse(job, { type: 'progress', progress: pct, message: line });
+      videoGenEvents.emit('progress', { generationId: jobId, progress: pct });
+      return true;
+    }
+    return false;
   };
 
   proc.stdout.on('data', (chunk) => {
     outputBuf += chunk.toString();
     const lines = outputBuf.split('\n');
     outputBuf = lines.pop();
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      // mlx_video emits a single JSON line on stdout when finished —
-      // capture it for the metadata sidecar.
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+      // mlx_video emits one JSON line on stdout when finished — capture it
+      // for the result metadata; otherwise raw-log so we can debug failures.
       try {
-        const parsed = JSON.parse(line.trim());
+        const parsed = JSON.parse(line);
         if (parsed.video_path) job.resultJson = parsed;
+        continue;
       } catch { /* not JSON */ }
+      console.log(`🐍-out [${jobId.slice(0, 8)}] ${line}`);
     }
   });
 
   proc.stderr.on('data', (chunk) => {
-    for (const line of chunk.toString().split(/[\n\r]+/)) handleLine(line);
+    for (const raw of chunk.toString().split(/[\n\r]+/)) {
+      if (!handleLine(raw)) console.log(`🐍 [${jobId.slice(0, 8)}] ${raw.trim()}`);
+    }
   });
 
   proc.on('close', async (code, signal) => {
@@ -322,6 +399,7 @@ export async function generateVideo({ pythonPath, prompt, negativePrompt = '', m
       videoGenEvents.emit('failed', { generationId: jobId, error: reason });
     } else {
       job.status = 'complete';
+      await optimizeForStreaming(outputPath);
       const thumbnail = await generateThumbnail(outputPath, jobId);
       const history = await loadHistory();
       history.unshift({ ...meta, thumbnail });
@@ -351,13 +429,57 @@ export async function extractLastFrame(historyId) {
   if (!existsSync(videoPath)) throw new ServerError('Video file not found on disk', { status: 404, code: 'NOT_FOUND' });
 
   await ensureDir(PATHS.images);
+  // Same path-traversal concern as `item.filename` above — `item.id` could
+  // contain path separators or `..` if history.json was tampered with.
+  // generateVideo writes ids via randomUUID() (matches /^[a-f0-9-]{36}$/),
+  // so reject anything else outright.
+  if (!/^[a-f0-9-]{36}$/i.test(item.id)) {
+    throw new ServerError('Invalid history id', { status: 400, code: 'VALIDATION_ERROR' });
+  }
   const frameFilename = `lastframe-${item.id}.png`;
   const framePath = join(PATHS.images, frameFilename);
+  // Cache hit: ffmpeg-extracted frames are deterministic for a given video,
+  // so a file already on disk is reusable. UI clicks "Continue" repeatedly
+  // (palette → continue, gallery → continue, etc.) and re-extracting on
+  // every click was wasting 1–2s per click + spawning ffmpeg children.
+  // Validate non-zero size — a prior ffmpeg crash could leave a 0-byte
+  // placeholder, which would otherwise be served as a broken image forever.
+  // Treat ANY stat failure (EACCES, EIO, etc.) as a cache miss rather than
+  // letting it abort the request.
+  const safeStatSize = (path) => {
+    try {
+      const s = statSync(path, { throwIfNoEntry: false });
+      return s ? s.size : null;
+    } catch {
+      return null;
+    }
+  };
+  const cachedSize = safeStatSize(framePath);
+  if (cachedSize != null && cachedSize > 0) {
+    return { filename: frameFilename, path: `/data/images/${frameFilename}` };
+  }
+  if (cachedSize === 0) await unlink(framePath).catch(() => {});
 
   return new Promise((resolve, reject) => {
-    const proc = spawn(ffmpeg, ['-sseof', '-0.1', '-i', videoPath, '-vframes', '1', '-q:v', '2', '-y', framePath], { stdio: 'ignore' });
-    proc.on('close', (code) => {
-      if (code !== 0) return reject(new ServerError('Failed to extract last frame', { status: 500, code: 'FFMPEG_FAILED' }));
+    // -sseof -1.0 seeks 1s before end. The previous -0.1 was too tight on
+    // videos with audio (B-frames + AV mux push the last keyframe earlier
+    // than 100 ms from EOF), and ffmpeg silently returned 0 frames while
+    // sometimes still exiting 0 — leaving a phantom-success log + missing
+    // file. The output file gets a -update 1 flag so ffmpeg overwrites
+    // any partial file from a prior failed run instead of erroring.
+    const proc = spawn(ffmpeg, ['-sseof', '-1.0', '-i', videoPath, '-update', '1', '-vframes', '1', '-q:v', '2', '-y', framePath], { stdio: 'ignore' });
+    proc.on('close', async (code) => {
+      // safeStatSize swallows throws so the async handler can't leak an
+      // unhandled rejection on transient stat errors — null is treated as
+      // "extraction failed".
+      const writtenSize = safeStatSize(framePath);
+      if (code !== 0 || writtenSize == null || writtenSize === 0) {
+        // A 0-byte file is a partial extraction, not a cache-worthy result —
+        // delete it so the next call retries instead of returning a broken
+        // image from the cache hit above.
+        if (writtenSize === 0) await unlink(framePath).catch(() => {});
+        return reject(new ServerError('Failed to extract last frame', { status: 500, code: 'FFMPEG_FAILED' }));
+      }
       console.log(`🎞️ Extracted last frame: ${frameFilename}`);
       resolve({ filename: frameFilename, path: `/data/images/${frameFilename}` });
     });
@@ -462,5 +584,6 @@ export async function deleteHistoryItem(id) {
     if (thumbFile) await unlink(thumbFile).catch(() => {});
   }
   await saveHistory(history.filter((h) => h.id !== id));
+  console.log(`🗑️ Deleted video: ${item.filename}`);
   return { ok: true };
 }

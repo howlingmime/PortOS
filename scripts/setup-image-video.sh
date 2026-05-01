@@ -46,11 +46,21 @@ echo "📦 Installing image generation packages (mflux + deps)..."
 
 if [[ "$INSTALL_VIDEO" == "1" ]]; then
   if is_macos; then
-    echo "📦 Installing video generation packages (mlx_video + mlx_vlm)..."
+    echo "📦 Installing video generation packages (mlx-video-with-audio + mlx_vlm)..."
+    # NOTE: the package on PyPI named just 'mlx_video' is unrelated (video
+    # loading utilities). The LTX-2 generation backend lives at
+    # mlx-video-with-audio (provides the `mlx_video.generate_av` module).
+    # Pin >=0.1.35 — earlier versions silently broke I2V on split-format /
+    # quantized models like LTX-2.3 distilled-Q4 by failing to load the VAE
+    # encoder, causing the conditioned frame to render as gray fog.
+    # Both packages provide an `import mlx_video` module, so a prior install
+    # of the wrong one shadows the right one. Uninstall first to remove the
+    # ambiguity for users upgrading from earlier setup-image-video.sh runs.
+    "$PYTHON_BIN" -m pip uninstall --yes mlx_video >/dev/null 2>&1 || true
     "$PYTHON_BIN" -m pip install --upgrade --user \
       mlx \
       mlx_vlm \
-      mlx_video
+      "mlx-video-with-audio>=0.1.35"
   else
     echo "📦 Installing video generation packages (diffusers + torch)..."
     "$PYTHON_BIN" -m pip install --upgrade --user \
