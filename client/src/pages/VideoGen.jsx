@@ -650,7 +650,16 @@ export default function VideoGen() {
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) => setSourceImageUpload(e.target.files?.[0] || null)}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        // Clear any gallery pick + URL param when an upload is
+                        // chosen — otherwise the preview keeps rendering the
+                        // old gallery image (src prefers sourceImageFile) while
+                        // the POST sends `req.file` from the upload, which
+                        // looks like the wrong image was used.
+                        if (file && (sourceImageFile || incomingSourceImage)) clearSourceImage();
+                        setSourceImageUpload(file);
+                      }}
                       className="hidden"
                     />
                   </label>

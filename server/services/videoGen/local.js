@@ -127,15 +127,25 @@ const optimizeForStreaming = async (videoPath) => {
   });
   if (!ok) { await unlink(tmpPath).catch(() => {}); return; }
   // POSIX rename atomically replaces an existing dest in one syscall. On
-  // Windows, fs.rename fails when the destination already exists, so every
-  // successful render would log a warning and skip faststart. Unlink first
-  // there — non-atomic (brief window with no file) but preserves the
-  // optimization. If the eventual rename still fails, clean up the tmp file
-  // so we don't slowly fill data/videos with .fs.mp4 leaks.
+  // Windows, fs.rename fails when the destination already exists — but a
+  // simple unlink-first would destroy the rendered video if the subsequent
+  // rename failed (locked file, AV scan, transient permissions). Move the
+  // original aside to a .bak first, then install the optimized file, and
+  // restore the backup on any failure so the worst case is "faststart
+  // skipped", not "rendered video lost".
+  let backupPath = null;
   try {
-    if (IS_WIN) await unlink(videoPath).catch((err) => { if (err?.code !== 'ENOENT') throw err; });
+    if (IS_WIN) {
+      backupPath = `${videoPath}.bak.${randomUUID()}`;
+      await rename(videoPath, backupPath).catch((err) => {
+        if (err?.code === 'ENOENT') { backupPath = null; return; }
+        throw err;
+      });
+    }
     await rename(tmpPath, videoPath);
+    if (backupPath) await unlink(backupPath).catch(() => {});
   } catch (err) {
+    if (backupPath) await rename(backupPath, videoPath).catch(() => {});
     await unlink(tmpPath).catch(() => {});
     console.log(`⚠️ Failed to install streaming-optimized video at ${videoPath}: ${err.message}`);
   }
