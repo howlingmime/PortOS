@@ -79,6 +79,19 @@ const seedIfMissing = () => {
   console.log(`📝 Seeded media model registry: ${REGISTRY_FILE}`);
 };
 
+// Merge user-edited registry over DEFAULT_REGISTRY so missing top-level keys
+// (e.g. someone deletes `video` or saves `{}`) don't blow up consumers that
+// assume `reg.video.macos`. We don't deep-merge arrays — if the user defines
+// `video.macos`, that's their list, full stop.
+const normalizeRegistry = (parsed) => {
+  const safe = parsed && typeof parsed === 'object' ? parsed : {};
+  return {
+    ...DEFAULT_REGISTRY,
+    ...safe,
+    video: { ...DEFAULT_REGISTRY.video, ...(safe.video || {}) },
+  };
+};
+
 export const loadMediaModels = () => {
   if (cached) return cached;
   seedIfMissing();
@@ -87,12 +100,14 @@ export const loadMediaModels = () => {
   // an exception here aborts startup. Fall back to the in-memory defaults
   // and surface the error in logs so the operator can fix the file.
   const raw = readFileSync(REGISTRY_FILE, 'utf-8');
+  let parsed;
   try {
-    cached = JSON.parse(raw);
+    parsed = JSON.parse(raw);
   } catch (err) {
     console.log(`⚠️ Failed to parse ${REGISTRY_FILE} (${err.message}) — using built-in defaults`);
-    cached = DEFAULT_REGISTRY;
+    parsed = DEFAULT_REGISTRY;
   }
+  cached = normalizeRegistry(parsed);
   return cached;
 };
 
@@ -107,7 +122,19 @@ export const getVideoModels = () => {
 
 export const getDefaultVideoModelId = () => {
   const reg = loadMediaModels();
-  return IS_WIN ? reg.video.defaultWindows : reg.video.defaultMacos;
+  const configuredId = IS_WIN ? reg.video.defaultWindows : reg.video.defaultMacos;
+  // Validate against the platform's available (non-broken) list — a typo or
+  // a model marked broken on this platform would otherwise surface as
+  // "Unknown video model" the first time the UI tries to use the default.
+  const available = getVideoModels();
+  if (available.some((m) => m.id === configuredId)) return configuredId;
+  const fallback = available[0]?.id;
+  if (fallback) {
+    console.log(`⚠️ Unknown default video model "${configuredId}" for ${IS_WIN ? 'windows' : 'macos'}; falling back to "${fallback}"`);
+    return fallback;
+  }
+  console.log(`⚠️ Unknown default video model "${configuredId}" for ${IS_WIN ? 'windows' : 'macos'}; no available models to fall back to`);
+  return configuredId;
 };
 
 export const getImageModels = () => {

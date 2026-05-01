@@ -130,4 +130,82 @@ describe('mediaModels registry', () => {
     expect(typeof id).toBe('string');
     expect(id.length).toBeGreaterThan(0);
   });
+
+  it('normalizes a registry missing the video key without crashing consumers', async () => {
+    // Simulates a user editing media-models.json down to just textEncoders.
+    // Without normalization, getVideoModels() / buildAppModels() would throw
+    // at module import-time and take down the server.
+    writeFileSync(registryFile, JSON.stringify({
+      image: [],
+      textEncoders: [{ id: 't', label: 't', repo: 'r' }],
+      selectedTextEncoder: 't',
+    }));
+    const { loadMediaModels, getVideoModels, getDefaultVideoModelId } = await import('./mediaModels.js');
+    const reg = loadMediaModels();
+    expect(reg.video).toBeDefined();
+    expect(Array.isArray(reg.video.macos)).toBe(true);
+    expect(Array.isArray(reg.video.windows)).toBe(true);
+    expect(getVideoModels().length).toBeGreaterThan(0);
+    expect(typeof getDefaultVideoModelId()).toBe('string');
+  });
+
+  it('normalizes an empty object registry by merging defaults', async () => {
+    writeFileSync(registryFile, JSON.stringify({}));
+    const { loadMediaModels } = await import('./mediaModels.js');
+    const reg = loadMediaModels();
+    expect(reg.video.defaultMacos).toBeDefined();
+    expect(reg.textEncoders.length).toBeGreaterThan(0);
+  });
+
+  it('getDefaultVideoModelId falls back to first available when configured id is unknown', async () => {
+    const platformKey = process.platform === 'win32' ? 'windows' : 'macos';
+    const otherKey = process.platform === 'win32' ? 'macos' : 'windows';
+    writeFileSync(registryFile, JSON.stringify({
+      video: {
+        macos: [],
+        windows: [],
+        [platformKey]: [
+          { id: 'real-model', name: 'Real' },
+          { id: 'other', name: 'Other' },
+        ],
+        [otherKey]: [],
+        defaultMacos: 'nonexistent-typo',
+        defaultWindows: 'nonexistent-typo',
+      },
+      image: [],
+      textEncoders: [{ id: 't', label: 't', repo: 'r' }],
+      selectedTextEncoder: 't',
+    }));
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { getDefaultVideoModelId } = await import('./mediaModels.js');
+    expect(getDefaultVideoModelId()).toBe('real-model');
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('falling back'));
+    logSpy.mockRestore();
+  });
+
+  it('getDefaultVideoModelId skips broken-on-platform models when falling back', async () => {
+    const platformKey = process.platform === 'win32' ? 'windows' : 'macos';
+    const here = process.platform === 'win32' ? 'windows' : 'macos';
+    const otherKey = process.platform === 'win32' ? 'macos' : 'windows';
+    writeFileSync(registryFile, JSON.stringify({
+      video: {
+        macos: [],
+        windows: [],
+        [platformKey]: [
+          { id: 'broken-here', name: 'Broken', broken: here },
+          { id: 'works', name: 'Works' },
+        ],
+        [otherKey]: [],
+        defaultMacos: 'broken-here',
+        defaultWindows: 'broken-here',
+      },
+      image: [],
+      textEncoders: [{ id: 't', label: 't', repo: 'r' }],
+      selectedTextEncoder: 't',
+    }));
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { getDefaultVideoModelId } = await import('./mediaModels.js');
+    expect(getDefaultVideoModelId()).toBe('works');
+    logSpy.mockRestore();
+  });
 });

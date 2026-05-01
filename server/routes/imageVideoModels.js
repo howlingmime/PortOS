@@ -40,7 +40,7 @@ const buildAppModels = () => {
     if (!m.repo) return;
     out[m.repo.replace(/\//g, '--')] = `${m.name} ${suffix}`;
   };
-  for (const m of [...(reg.video.macos || []), ...(reg.video.windows || [])]) addEntry(m, '(Video)');
+  for (const m of [...(reg.video?.macos || []), ...(reg.video?.windows || [])]) addEntry(m, '(Video)');
   for (const t of (reg.textEncoders || [])) addEntry({ name: t.label, repo: t.repo }, '(Text Encoder)');
   return out;
 };
