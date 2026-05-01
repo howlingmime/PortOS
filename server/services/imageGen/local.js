@@ -22,13 +22,11 @@ import { ensureDir, PATHS, safeJSONParse } from '../../lib/fileUtils.js';
 import { ServerError } from '../../lib/errorHandler.js';
 import { imageGenEvents } from '../imageGenEvents.js';
 import { broadcastSse, attachSseClient as attachSse, closeJobAfterDelay, PYTHON_NOISE_RE } from '../../lib/sseUtils.js';
+import { resolveFlux2Python, FLUX2_VENV_DEFAULT } from '../../lib/pythonSetup.js';
 
 const IS_WIN = process.platform === 'win32';
 
-// Catalog comes from data/media-models.json (see server/lib/mediaModels.js).
-// `broken: 'macos' | 'windows'` in the registry hides a model per-platform
-// (e.g. Flux 2 Klein needs CUDA, so it's broken on macOS).
-import { getImageModels } from '../../lib/mediaModels.js';
+import { getImageModels, isFlux2 } from '../../lib/mediaModels.js';
 
 export const IMAGE_MODELS = Object.fromEntries(getImageModels().map((m) => [m.id, m]));
 
@@ -66,7 +64,68 @@ export const cancel = () => {
   return true;
 };
 
-const buildArgs = ({ pythonPath, modelId, prompt, negativePrompt, width, height, steps, guidance, seed, quantize, outputPath, loraPaths, loraScales, stepwiseDir, initImagePath, initImageStrength }) => {
+export const buildArgs = ({ pythonPath, model, prompt, negativePrompt, width, height, steps, guidance, seed, quantize, outputPath, loraPaths, loraScales, stepwiseDir, initImagePath, initImageStrength }) => {
+  const modelId = model?.id;
+  if (isFlux2(model)) {
+    if (!model.repo) {
+      throw new ServerError(
+        `FLUX.2 model "${modelId}" is missing the 'repo' field in data/media-models.json`,
+        { status: 500, code: 'IMAGE_GEN_FLUX2_MISCONFIGURED' },
+      );
+    }
+    const quantization = model.quantization || 'sdnq';
+    if (quantization !== 'sdnq' && quantization !== 'int8') {
+      throw new ServerError(
+        `FLUX.2 model "${modelId}" has unsupported quantization "${quantization}" (supported: sdnq, int8)`,
+        { status: 500, code: 'IMAGE_GEN_FLUX2_MISCONFIGURED' },
+      );
+    }
+    if (quantization === 'sdnq' && !model.tokenizerRepo) {
+      throw new ServerError(
+        `FLUX.2 SDNQ model "${modelId}" requires 'tokenizerRepo' (the gated base repo for the tokenizer)`,
+        { status: 500, code: 'IMAGE_GEN_FLUX2_MISCONFIGURED' },
+      );
+    }
+    if (quantization === 'int8' && !model.basePipelineRepo) {
+      throw new ServerError(
+        `FLUX.2 Int8 model "${modelId}" requires 'basePipelineRepo' (the gated base repo for VAE/scheduler)`,
+        { status: 500, code: 'IMAGE_GEN_FLUX2_MISCONFIGURED' },
+      );
+    }
+    const flux2Python = resolveFlux2Python();
+    if (!flux2Python) {
+      throw new ServerError(
+        `FLUX.2 venv not found. Run \`INSTALL_FLUX2=1 bash scripts/setup-image-video.sh\` to bootstrap it (expected at ${FLUX2_VENV_DEFAULT}).`,
+        { status: 400, code: 'IMAGE_GEN_FLUX2_NOT_INSTALLED' },
+      );
+    }
+    const scriptPath = join(PATHS.root, 'scripts', 'flux2_macos.py');
+    // No --metadata flag: local.js's proc.on('close') already writes the
+    // canonical sidecar at <jobId>.metadata.json after a successful exit.
+    // Letting the runner write its own would duplicate work and the JS
+    // sidecar would clobber any flux2-specific fields anyway.
+    const args = [
+      scriptPath,
+      '--model', modelId,
+      '--quantization', quantization,
+      '--repo', model.repo,
+      '--prompt', prompt,
+      '--height', String(height),
+      '--width', String(width),
+      '--steps', String(steps),
+      '--guidance', String(guidance ?? 0),
+      '--seed', String(seed),
+      '--output', outputPath,
+    ];
+    if (model.tokenizerRepo) args.push('--tokenizer-repo', model.tokenizerRepo);
+    if (model.basePipelineRepo) args.push('--base-pipeline-repo', model.basePipelineRepo);
+    if (negativePrompt) args.push('--negative-prompt', negativePrompt);
+    if (initImagePath) args.push('--image-path', initImagePath);
+    if (initImagePath && initImageStrength != null) args.push('--image-strength', String(initImageStrength));
+    if (stepwiseDir) args.push('--stepwise-image-output-dir', stepwiseDir);
+    return { bin: flux2Python, args };
+  }
+
   if (IS_WIN) {
     // imagine_win.py does not implement i2i — silently drop the init-image
     // args here so the request still produces a normal txt2img result rather
@@ -82,7 +141,6 @@ const buildArgs = ({ pythonPath, modelId, prompt, negativePrompt, width, height,
       ],
     };
   }
-  // macOS: mflux-generate sits next to the python binary in the venv
   const bin = join(dirname(pythonPath), 'mflux-generate');
   const args = ['--model', modelId, '--prompt', prompt, '--height', String(height), '--width', String(width), '--steps', String(steps), '--seed', String(seed), '--quantize', String(quantize), '--output', outputPath, '--metadata'];
   if (guidance > 0) args.push('--guidance', String(guidance));
@@ -99,14 +157,32 @@ const buildArgs = ({ pythonPath, modelId, prompt, negativePrompt, width, height,
 };
 
 export async function generateImage({ pythonPath, prompt, negativePrompt = '', modelId = 'dev', width = 1024, height = 1024, steps, guidance, seed, quantize = '8', loraFilenames = [], loraPaths = [], loraScales = [], initImagePath = null, initImageStrength = null }) {
-  if (!pythonPath) throw new ServerError('Python path not configured — set it in Settings > Image Gen', { status: 400, code: 'IMAGE_GEN_NOT_CONFIGURED' });
   if (!prompt?.trim()) throw new ServerError('Prompt is required', { status: 400, code: 'VALIDATION_ERROR' });
   // Enforce the single-activeProcess invariant the rest of this module relies
   // on — without this, a double-click on Generate would orphan the first
   // child (cancel() can only kill the one stored in activeProcess).
   if (activeProcess) throw new ServerError('A generation is already in progress — cancel it before starting another', { status: 409, code: 'IMAGE_GEN_BUSY' });
-  const model = IMAGE_MODELS[modelId];
-  if (!model || model.broken) throw new ServerError(`Unknown or unsupported model: ${modelId}`, { status: 400, code: 'VALIDATION_ERROR' });
+  // Use the registry cache view (which applies the per-platform `broken`
+  // filter via getImageModels) rather than the module-load IMAGE_MODELS
+  // snapshot. Note: loadMediaModels memoizes on first read — on-disk edits
+  // to data/media-models.json still need a server restart to apply.
+  // Don't re-check model.broken here: getImageModels() already filtered
+  // current-platform entries; an extra truthiness check would also reject
+  // entries broken on the OTHER platform (e.g. 'windows' on a macOS box).
+  const model = getImageModels().find((m) => m.id === modelId);
+  if (!model) throw new ServerError(`Unknown or unsupported model: ${modelId}`, { status: 400, code: 'VALIDATION_ERROR' });
+  if (!isFlux2(model) && !pythonPath) {
+    throw new ServerError('Python path not configured — set it in Settings > Image Gen', { status: 400, code: 'IMAGE_GEN_NOT_CONFIGURED' });
+  }
+  // FLUX.2 runner doesn't apply LoRAs yet — reject up-front so the user
+  // doesn't end up with a metadata sidecar that records LoRAs the renderer
+  // silently dropped.
+  if (isFlux2(model) && (loraFilenames.length > 0 || loraPaths.length > 0)) {
+    throw new ServerError(
+      'LoRAs are not supported for FLUX.2 models yet — clear the LoRA selection or pick a Flux 1 model.',
+      { status: 400, code: 'IMAGE_GEN_FLUX2_LORA_UNSUPPORTED' },
+    );
+  }
 
   await ensureDir(PATHS.images);
   await ensureDir(PATHS.loras);
@@ -159,7 +235,7 @@ export async function generateImage({ pythonPath, prompt, negativePrompt = '', m
   // per inference step here; we watch and stream the latest as `currentImage`.
   const stepwiseDir = await mkdtemp(join(tmpdir(), 'portos-stepwise-'));
 
-  const { bin, args } = buildArgs({ pythonPath, modelId, prompt, negativePrompt, width: Number(width), height: Number(height), steps: actualSteps, guidance: actualGuidance, seed: actualSeed, quantize, outputPath, loraPaths: validLoras, loraScales, stepwiseDir, initImagePath: validInitImagePath, initImageStrength: validInitImageStrength });
+  const { bin, args } = buildArgs({ pythonPath, model, prompt, negativePrompt, width: Number(width), height: Number(height), steps: actualSteps, guidance: actualGuidance, seed: actualSeed, quantize, outputPath, loraPaths: validLoras, loraScales, stepwiseDir, initImagePath: validInitImagePath, initImageStrength: validInitImageStrength });
 
   console.log(`🎨 Generating image [${jobId.slice(0, 8)}] local: ${modelId} ${width}x${height} steps=${actualSteps}`);
   imageGenEvents.emit('started', { generationId: jobId, totalSteps: actualSteps });
