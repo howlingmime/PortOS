@@ -81,6 +81,10 @@ import toolsRoutes from './routes/tools.js';
 import imageGenRoutes from './routes/imageGen.js';
 import videoGenRoutes from './routes/videoGen.js';
 import videoTimelineRoutes from './routes/videoTimeline.js';
+import mediaJobsRoutes from './routes/mediaJobs.js';
+import creativeDirectorRoutes from './routes/creativeDirector.js';
+import { initMediaJobQueue } from './services/mediaJobQueue/index.js';
+import { recoverInFlightProjects } from './services/creativeDirector/recovery.js';
 import imageVideoModelsRoutes from './routes/imageVideoModels.js';
 import sdapiRoutes from './routes/sdapi.js';
 import openclawRoutes from './routes/openclaw.js';
@@ -314,12 +318,18 @@ app.use('/api/tools', toolsRoutes);
 app.use('/api/image-gen', imageGenRoutes);
 app.use('/api/video-gen', videoGenRoutes);
 app.use('/api/video-timeline', videoTimelineRoutes);
+app.use('/api/media-jobs', mediaJobsRoutes);
+app.use('/api/creative-director', creativeDirectorRoutes);
 app.use('/api/image-video/models', imageVideoModelsRoutes);
 // AUTOMATIC1111-compatible surface for tailnet clients — gated by
 // settings.imageGen.expose.a1111 so it returns 403 unless the user opted in.
 app.use('/sdapi/v1', sdapiRoutes);
 app.use('/api/openclaw', openclawRoutes);
 app.use('/api/ask', askRoutes);
+
+// initMediaJobQueue is awaited as part of the startup chain below so that
+// data/ exists and the worker loop is running before /api/video-gen or
+// /api/image-gen can enqueue (otherwise persist() can race with ensureDir).
 
 // Initialize agent automation scheduler and action executor
 automationScheduler.init().catch(err => console.error(`❌ Agent scheduler init failed: ${err.message}`));
@@ -439,8 +449,22 @@ app.use(errorMiddleware);
 // race conditions where brain mutations arrive before the sync log is ready
 ensureSelf()
   .then(() => initSyncLog())
+  .then(() => initMediaJobQueue())
   .then(() => {
-    // Start server only after sync log is initialized
+    // Fire-and-forget — resume any Creative Director projects that were mid-
+    // flight when the server died. The queue reload above just reclassified
+    // their renders as 'failed (interrupted by restart)'; this nudges the
+    // orchestrator so projects don't sit frozen waiting for listeners that
+    // no longer exist. Doesn't block startup.
+    recoverInFlightProjects().catch((e) => console.log(`⚠️ CD boot recovery failed: ${e.message}`));
+  })
+  .then(() => {
+    // Start server only after sync log + media job queue are initialized.
+    // initMediaJobQueue failure is fatal: the queue owns persistence + SSE
+    // + temp-file cleanup for /api/video-gen and local /api/image-gen, and
+    // accepting requests with a half-init queue silently corrupts state
+    // (persist() throws, SSE streams degrade). Catch + crash via the
+    // outer .catch(...process.exit) below.
     httpServer.listen(PORT, HOST, () => {
       // One canonical "where do I open this" banner — :5555 is always user-facing
       // (HTTP or HTTPS), :PORTOS_HTTP_PORT (default 5553) is the loopback HTTP

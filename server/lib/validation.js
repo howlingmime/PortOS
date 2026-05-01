@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ServerError } from './errorHandler.js';
+import { ASPECT_RATIOS, QUALITIES, PROJECT_STATUSES, SCENE_STATUSES } from './creativeDirectorPresets.js';
 
 // =============================================================================
 // AGENT PERSONALITY SCHEMAS
@@ -598,3 +599,102 @@ export function sanitizeTaskMetadata(raw) {
   }
   return hasKeys ? { ...clean } : null;
 }
+
+
+// =============================================================================
+// CREATIVE DIRECTOR SCHEMAS
+// =============================================================================
+
+export const creativeDirectorAspectRatioSchema = z.enum(ASPECT_RATIOS);
+export const creativeDirectorQualitySchema = z.enum(QUALITIES);
+
+// Top-level project create. modelId is required because each LTX variant
+// has a different speed/VRAM/quality profile and the project locks it at
+// creation. targetDurationSeconds is capped at 600 (10 min) per the v1 plan
+// — much beyond that and the agent's treatment quality drifts hard.
+// Strict basename: rejects path separators and the exact `.`/`..` segments.
+// Used for both startingImageFile (project create) and sourceImageFile
+// (per-scene) since both feed into `join(PATHS.images, ...)` later. The
+// downstream consumers also do a resolve+prefix-check against PATHS.images
+// (sceneRunner.js) — that's the real traversal guard; this validator just
+// catches the obvious bad values at the route boundary. Note: a substring
+// check on `..` would over-reject legitimate names like `my..image.png`,
+// so we only reject the exact dot segments and rely on prefix-checks for
+// the actual escape protection.
+const safeBasename = z.string()
+  .max(256)
+  .regex(/^[^/\\]+$/, 'must be a basename (no path separators)')
+  .refine((v) => v !== '.' && v !== '..',
+    'must not be `.` or `..`');
+
+export const creativeDirectorProjectCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  aspectRatio: creativeDirectorAspectRatioSchema,
+  quality: creativeDirectorQualitySchema,
+  modelId: z.string().min(1).max(64),
+  targetDurationSeconds: z.number().int().min(5).max(600),
+  styleSpec: z.string().max(5000).default(''),
+  startingImageFile: safeBasename.nullable().optional(),
+  userStory: z.string().max(10000).nullable().optional(),
+  // Test/dev knobs. Both default false. Smoke-test fixtures set these.
+  disableAudio: z.boolean().optional().default(false),
+  autoAcceptScenes: z.boolean().optional().default(false),
+});
+
+// Update is restricted to a few editable fields. modelId / aspectRatio /
+// quality / targetDurationSeconds are locked at creation — changing them
+// mid-project would invalidate already-rendered segments.
+export const creativeDirectorProjectUpdateSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  styleSpec: z.string().max(5000).optional(),
+  userStory: z.string().max(10000).nullable().optional(),
+  status: z.enum(PROJECT_STATUSES).optional(),
+  finalVideoId: z.string().max(64).nullable().optional(),
+  timelineProjectId: z.string().max(64).nullable().optional(),
+  failureReason: z.string().max(500).nullable().optional(),
+}).strict();
+
+// One scene in the treatment, written by the agent on the treatment task.
+export const creativeDirectorSceneSchema = z.object({
+  sceneId: z.string().min(1).max(64),
+  order: z.number().int().min(0),
+  intent: z.string().min(1).max(1000),
+  prompt: z.string().min(1).max(2000),
+  negativePrompt: z.string().max(2000).optional().default(''),
+  durationSeconds: z.number().min(1).max(10),
+  useContinuationFromPrior: z.boolean().default(false),
+  sourceImageFile: safeBasename.nullable().optional(),
+  status: z.enum(SCENE_STATUSES).default('pending'),
+  retryCount: z.number().int().min(0).max(10).default(0),
+  renderedJobId: z.string().max(64).nullable().optional(),
+  evaluation: z.object({
+    score: z.number().min(0).max(1).optional(),
+    notes: z.string().max(2000).optional(),
+    accepted: z.boolean(),
+    sampledAt: z.string().optional(),
+  }).nullable().optional(),
+});
+
+// The full treatment doc the agent writes after the planning task.
+export const creativeDirectorTreatmentSchema = z.object({
+  logline: z.string().min(1).max(500),
+  synopsis: z.string().min(1).max(5000),
+  scenes: z.array(creativeDirectorSceneSchema).min(1).max(120),
+});
+
+// Used by the agent when finishing a scene render.
+export const creativeDirectorSceneUpdateSchema = z.object({
+  // Full SCENE_STATUSES — the evaluator agent flips a scene back to 'pending'
+  // (with an updated prompt + bumped retryCount) to request a re-render; see
+  // creativeDirectorPrompts.js and completionHook.js's advanceAfterSceneSettled.
+  status: z.enum(SCENE_STATUSES).optional(),
+  retryCount: z.number().int().min(0).max(10).optional(),
+  renderedJobId: z.string().max(64).nullable().optional(),
+  prompt: z.string().min(1).max(2000).optional(),
+  evaluation: z.object({
+    score: z.number().min(0).max(1).optional(),
+    notes: z.string().max(2000).optional(),
+    accepted: z.boolean(),
+    sampledAt: z.string().optional(),
+  }).nullable().optional(),
+}).strict();

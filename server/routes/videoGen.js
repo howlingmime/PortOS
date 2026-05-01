@@ -8,25 +8,24 @@
 
 import { Router } from 'express';
 import { existsSync, statSync } from 'fs';
-import { unlink } from 'fs/promises';
-import { join, basename, resolve as resolvePath, sep as PATH_SEP } from 'path';
+import { copyFile, unlink } from 'fs/promises';
+import { randomUUID } from 'crypto';
+import { join, basename, resolve as resolvePath, sep as PATH_SEP, extname } from 'path';
 import { z } from 'zod';
 import { asyncHandler, ServerError } from '../lib/errorHandler.js';
 import { uploadSingle } from '../lib/multipart.js';
-import { PATHS } from '../lib/fileUtils.js';
+import { PATHS, ensureDir } from '../lib/fileUtils.js';
 import { getSettings } from '../services/settings.js';
 import {
   listVideoModels,
   defaultVideoModelId,
-  generateVideo,
-  attachSseClient,
-  cancel,
   loadHistory,
   deleteHistoryItem,
   setHistoryItemHidden,
   extractLastFrame,
   stitchVideos,
 } from '../services/videoGen/local.js';
+import { enqueueJob, attachSseClient, cancelJob, listJobs } from '../services/mediaJobQueue/index.js';
 
 const router = Router();
 
@@ -114,23 +113,74 @@ const resolveGalleryImage = (name) => {
 };
 
 router.post('/', sourceImageUpload, asyncHandler(async (req, res) => {
+  // Pre-enqueue cleanup hook: every throw path below MUST drop the multipart
+  // temp upload (Multer wrote it before this handler ran). Without this a
+  // configuration/validation error leaks the upload in the OS temp dir.
+  const cleanupTempUpload = async () => {
+    if (req.file?.path) await unlink(req.file.path).catch(() => {});
+  };
   const parsed = generateBodySchema.safeParse(req.body);
   if (!parsed.success) {
+    await cleanupTempUpload();
     throw new ServerError(`Validation failed: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ')}`, { status: 400, code: 'VALIDATION_ERROR' });
   }
   const body = parsed.data;
   const s = await getSettings();
   const pythonPath = s.imageGen?.local?.pythonPath || null;
+  // Reject up-front when the local python isn't configured. Without this,
+  // the queue would happily accept the job, return 200/queued, and only
+  // surface the failure asynchronously on SSE — which then pollutes the
+  // persisted queue with a doomed entry.
+  if (!pythonPath) {
+    await cleanupTempUpload();
+    throw new ServerError(
+      'Local video generation is not configured (settings.imageGen.local.pythonPath is missing).',
+      { status: 400, code: 'VIDEO_GEN_NOT_CONFIGURED' },
+    );
+  }
+  // Validate modelId synchronously (when supplied). Without this the queue
+  // would happily accept a typo'd modelId and fail asynchronously inside
+  // the worker — leaving a persisted, doomed queue entry.
+  if (body.modelId) {
+    const known = listVideoModels();
+    if (!known.some((m) => m.id === body.modelId)) {
+      await cleanupTempUpload();
+      throw new ServerError(
+        `Unknown modelId: ${body.modelId}`,
+        { status: 400, code: 'VIDEO_GEN_UNKNOWN_MODEL' },
+      );
+    }
+  }
 
   let sourceImagePath = null;
   let uploadedTempPath = null;
   if (req.file) {
-    sourceImagePath = req.file.path;
-    // Hand the multipart upload's temp path to the service so it can unlink
-    // it in the proc.on('close') cleanup — covers both the success path
-    // (after ffmpeg consumed it for resize) and the no-ffmpeg fallback path
-    // (where the python child reads it directly and we can't unlink earlier).
-    uploadedTempPath = req.file.path;
+    // Copy the multipart upload into a durable location under data/uploads
+    // before enqueueing. The Multer temp file lives in the OS temp dir —
+    // which gets reaped by macOS on reboot, and might be missing entirely
+    // when the queue replays a persisted `queued` job after a server
+    // restart. Copying here gives the worker a stable path that survives
+    // restarts; the worker unlinks it on completion or cancel.
+    await ensureDir(PATHS.uploads);
+    const ext = extname(req.file.originalname || req.file.path) || '.bin';
+    const durablePath = join(PATHS.uploads, `video-source-${randomUUID()}${ext}`);
+    // copyFile can throw on disk-full / permission errors. If it does we
+    // need to clean up: drop the multipart temp upload AND the half-written
+    // durablePath (copyFile may have created a zero-byte sentinel before
+    // bailing). Without this, a failed POST leaks files in /tmp + data/uploads.
+    try {
+      await copyFile(req.file.path, durablePath);
+    } catch (err) {
+      await unlink(durablePath).catch(() => {});
+      await cleanupTempUpload();
+      throw new ServerError(
+        `Failed to stage upload to durable location: ${err.message}`,
+        { status: 500, code: 'VIDEO_GEN_UPLOAD_STAGE_FAILED' },
+      );
+    }
+    await unlink(req.file.path).catch(() => {});
+    sourceImagePath = durablePath;
+    uploadedTempPath = durablePath;
   } else if (body.sourceImageFile) {
     sourceImagePath = resolveGalleryImage(body.sourceImageFile);
   }
@@ -138,8 +188,11 @@ router.post('/', sourceImageUpload, asyncHandler(async (req, res) => {
   // FFLF end-frame: gallery-pick only. Same path-traversal guard.
   const lastImagePath = body.lastImageFile ? resolveGalleryImage(body.lastImageFile) : null;
 
-  try {
-    const result = await generateVideo({
+  // Enqueue rather than spawn synchronously — the mediaJobQueue worker will
+  // run this when no other render is in flight. Caller never sees BUSY.
+  const { jobId, position, status } = enqueueJob({
+    kind: 'video',
+    params: {
       pythonPath,
       prompt: body.prompt,
       negativePrompt: body.negativePrompt || '',
@@ -158,14 +211,15 @@ router.post('/', sourceImageUpload, asyncHandler(async (req, res) => {
       lastImagePath,
       mode: body.mode,
       imageStrength: body.imageStrength,
-    });
-    res.json(result);
-  } catch (err) {
-    // generateVideo threw before scheduling the proc.on('close') cleanup
-    // (e.g. PYTHON not configured, BUSY, validation) — drop the upload now.
-    if (uploadedTempPath) await unlink(uploadedTempPath).catch(() => {});
-    throw err;
-  }
+    },
+  });
+  // Match the legacy response shape (jobId, generationId, filename, model,
+  // mode) so existing client code keeps working; add status+position for
+  // the queue. Resolve the effective model NOW — when modelId is omitted
+  // the worker will default it inside generateVideo, but the response
+  // needs to surface what the gallery / history will record.
+  const effectiveModel = body.modelId || defaultVideoModelId();
+  res.json({ jobId, generationId: jobId, filename: `${jobId}.mp4`, model: effectiveModel, mode: 'local', status, position });
 }));
 
 router.get('/:jobId/events', (req, res) => {
@@ -173,10 +227,34 @@ router.get('/:jobId/events', (req, res) => {
   if (!ok) res.status(404).json({ error: 'Job not found or expired' });
 });
 
-router.post('/cancel', (_req, res) => {
-  const cancelled = cancel();
-  res.json({ ok: cancelled });
-});
+router.post('/cancel', asyncHandler(async (req, res) => {
+  // Cancel selection rules, in priority order:
+  //   1. Explicit body.jobId — cancel exactly that job (queued or running).
+  //      Required for users with multiple in-flight renders.
+  //   2. No jobId — cancel the currently-running video job (legacy behavior).
+  //   3. No running job — cancel the newest queued video job so the user can
+  //      take back a submission they regret while it's still in line.
+  const requestedJobId = typeof req.body?.jobId === 'string' && req.body.jobId.trim()
+    ? req.body.jobId.trim()
+    : undefined;
+  if (requestedJobId) {
+    // Validate that the jobId is a video job before cancelling, so a stray
+    // image jobId from another tab doesn't accidentally cancel here.
+    const job = listJobs({ kind: 'video' }).find((j) => j.id === requestedJobId);
+    if (!job) return res.json({ ok: false, reason: 'video job not found' });
+    if (job.status !== 'queued' && job.status !== 'running') {
+      return res.json({ ok: false, reason: `job already ${job.status}` });
+    }
+    return res.json(await cancelJob(job.id));
+  }
+  const running = listJobs({ kind: 'video', status: 'running' });
+  if (running.length) return res.json(await cancelJob(running[0].id));
+  // No running render — cancel the newest queued video instead so the user
+  // can pull back a submission before it starts.
+  const queued = listJobs({ kind: 'video', status: 'queued' });
+  if (queued.length) return res.json(await cancelJob(queued[queued.length - 1].id));
+  res.json({ ok: false, reason: 'no active or queued video render' });
+}));
 
 router.get('/history', asyncHandler(async (_req, res) => {
   res.json(await loadHistory());

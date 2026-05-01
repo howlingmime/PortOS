@@ -1068,6 +1068,18 @@ export async function handleAgentCompletion(agentId, exitCode, success, duration
     await handlePipelineProgression(task, agentId, effectiveSuccess);
   }
 
+  // Advance Creative Director task chain if applicable. After a Creative
+  // Director agent task (treatment or evaluate) finishes, the orchestrator
+  // decides what comes next and enqueues it. Scene rendering and final
+  // stitching run server-side rather than as separate CoS tasks, so they
+  // never reach this hook directly. Failure marks the project failed; the
+  // user can resume from the UI.
+  if (task?.metadata?.creativeDirector) {
+    const { handleCreativeDirectorCompletion } = await import('./creativeDirector/completionHook.js');
+    handleCreativeDirectorCompletion(task, agentId, effectiveSuccess)
+      .catch((err) => console.log(`⚠️ creativeDirector completion hook failed: ${err.message}`));
+  }
+
   // Clean up ephemeral BTW.md before worktree removal
   await cleanupBtwFile(agentState?.metadata?.workspacePath);
 

@@ -19,6 +19,9 @@ import { validateRequest } from '../lib/validation.js';
 import { optionalUpload } from '../lib/multipart.js';
 import * as imageGen from '../services/imageGen/index.js';
 import { local, IMAGE_GEN_MODES } from '../services/imageGen/index.js';
+import { enqueueJob, attachSseClient as attachQueueSseClient, cancelJob, listJobs } from '../services/mediaJobQueue/index.js';
+import { getSettings } from '../services/settings.js';
+import { getImageModels, isFlux2 } from '../lib/mediaModels.js';
 import {
   REQUIRED_PACKAGES, detectPython, checkPackages, installPackages,
   isExternallyManaged, createVenv, isAllowedPython, pipNameFor,
@@ -139,6 +142,56 @@ router.post('/generate', initImageUpload, asyncHandler(async (req, res) => {
   if (uploadedInitTempPath) {
     res.on('close', () => { unlink(uploadedInitTempPath).catch(() => {}); });
   }
+  // Mode resolution: explicit per-request override > settings default. Only
+  // local-mode goes through the mediaJobQueue (it's the GPU-bound backend that
+  // used to throw BUSY). External and Codex backends remain synchronous —
+  // they don't share Metal/MLX resources so no queue is needed.
+  const settings = await getSettings();
+  const mode = data.mode || settings.imageGen?.mode || 'external';
+  if (mode === 'local') {
+    const py = settings.imageGen?.local?.pythonPath || null;
+    // Pre-validate config: mflux models need pythonPath, FLUX.2 doesn't
+    // (it uses its own bundled venv). Without this guard, the queue would
+    // accept the job and only surface the failure async over SSE.
+    const allModels = getImageModels();
+    // Reject a typo'd modelId synchronously rather than enqueueing a doomed
+    // job. When omitted, fall through to the default ('dev'-ish) — the
+    // worker does the same lookup so behavior stays consistent.
+    if (data.modelId && !allModels.some((m) => m.id === data.modelId)) {
+      throw new ServerError(
+        `Unknown modelId: ${data.modelId}`,
+        { status: 400, code: 'IMAGE_GEN_UNKNOWN_MODEL' },
+      );
+    }
+    const selectedModel = allModels.find((m) => m.id === data.modelId)
+      ?? allModels.find((m) => m.id === 'dev')
+      ?? allModels[0];
+    if (selectedModel && !isFlux2(selectedModel) && !py) {
+      throw new ServerError(
+        'Local image generation is not configured (settings.imageGen.local.pythonPath is missing).',
+        { status: 400, code: 'IMAGE_GEN_NOT_CONFIGURED' },
+      );
+    }
+    const { jobId, position, status } = enqueueJob({
+      kind: 'image',
+      params: { pythonPath: py, ...data },
+    });
+    // Surface the effective model so the response matches the
+    // non-queued path's `model` field. Use the same `selectedModel`
+    // resolution as the validation block above so the response reflects
+    // the actual fallback chain (caller modelId → 'dev' → allModels[0])
+    // rather than just the requested id.
+    return res.json({
+      jobId,
+      generationId: jobId,
+      filename: `${jobId}.png`,
+      path: `/data/images/${jobId}.png`,
+      mode: 'local',
+      model: selectedModel?.id || data.modelId || 'dev',
+      status,
+      position,
+    });
+  }
   res.json(await imageGen.generateImage(data));
 }));
 
@@ -160,17 +213,39 @@ router.get('/gallery', asyncHandler(async (_req, res) => {
   res.json(await local.listGallery());
 }));
 
-// SSE progress stream. Local + Codex both produce job-keyed SSE; the
-// dispatcher picks the right provider for whichever owns the job.
+// SSE progress stream. Local renders run via the mediaJobQueue and emit
+// `queued` → `started` → `progress` → `complete` events; the queue owns the
+// SSE attachment for those. Codex still produces job-keyed SSE through its
+// own provider — fall through to the dispatcher when the queue doesn't know
+// the job. External backend has no SSE (it's blocking).
 router.get('/:jobId/events', (req, res) => {
-  const ok = imageGen.attachSseClient(req.params.jobId, res);
-  if (!ok) res.status(404).json({ error: 'Job not found or expired' });
+  if (attachQueueSseClient(req.params.jobId, res)) return;
+  if (imageGen.attachSseClient(req.params.jobId, res)) return;
+  res.status(404).json({ error: 'Job not found or expired' });
 });
 
-router.post('/cancel', (_req, res) => {
+router.post('/cancel', asyncHandler(async (req, res) => {
+  // Cancel selection rules, in priority order:
+  //   1. Explicit body.jobId — cancel that queued/running local image job.
+  //      Required for users with multiple in-flight renders.
+  //   2. No jobId — cancel the newest queued/running local image job (most
+  //      recent activity wins, matching the user's last "submit" gesture).
+  //   3. No queue match — fall through to the codex-mode cancel.
+  const requestedJobId = typeof req.body?.jobId === 'string' && req.body.jobId.trim()
+    ? req.body.jobId.trim()
+    : undefined;
+  const cancellable = listJobs({ kind: 'image' })
+    .filter((j) => j.status === 'queued' || j.status === 'running');
+  if (requestedJobId) {
+    const target = cancellable.find((j) => j.id === requestedJobId);
+    if (target) return res.json(await cancelJob(target.id));
+    // jobId not in our queue — fall through (could be a codex job).
+  } else if (cancellable.length) {
+    return res.json(await cancelJob(cancellable[cancellable.length - 1].id));
+  }
   const cancelled = imageGen.cancel();
   res.json({ ok: cancelled });
-});
+}));
 
 router.delete('/:filename', asyncHandler(async (req, res) => {
   res.json(await local.deleteImage(req.params.filename));
