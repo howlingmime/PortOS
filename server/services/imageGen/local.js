@@ -23,6 +23,7 @@ import { ServerError } from '../../lib/errorHandler.js';
 import { imageGenEvents } from '../imageGenEvents.js';
 import { broadcastSse, attachSseClient as attachSse, closeJobAfterDelay, PYTHON_NOISE_RE } from '../../lib/sseUtils.js';
 import { resolveFlux2Python, FLUX2_VENV_DEFAULT } from '../../lib/pythonSetup.js';
+import { hfTokenEnv } from '../../lib/hfToken.js';
 
 const IS_WIN = process.platform === 'win32';
 
@@ -241,7 +242,7 @@ export async function generateImage({ pythonPath, prompt, negativePrompt = '', m
   imageGenEvents.emit('started', { generationId: jobId, totalSteps: actualSteps });
   activeJob = { ...meta, generationId: jobId, totalSteps: actualSteps, step: 0, progress: 0, currentImage: null, mode: 'local' };
 
-  const proc = spawn(bin, args, { env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const proc = spawn(bin, args, { env: { ...process.env, ...(await hfTokenEnv()) }, stdio: ['ignore', 'pipe', 'pipe'] });
   activeProcess = proc;
   // Without an 'error' handler, a missing/non-executable pythonPath would
   // crash the server with an unhandled error event.

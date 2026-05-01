@@ -15,6 +15,8 @@ import { ImageGenTab } from '../components/settings/ImageGenTab';
 import MediaCard from '../components/media/MediaCard';
 import MediaLightbox from '../components/media/MediaLightbox';
 import { normalizeImage } from '../components/media/normalize';
+import Flux2InstallModal from '../components/imageGen/Flux2InstallModal';
+import Flux2TokenBanner from '../components/imageGen/Flux2TokenBanner';
 import {
   Image as ImageIcon, Sparkles, Download, RefreshCw, Settings as SettingsIcon,
   Dice5, AlertTriangle, X, Film, Cloud, Cpu, Terminal
@@ -60,6 +62,7 @@ export default function ImageGen() {
   // selection of a flux2 model so we don't make an extra request when the
   // user is only using mflux/external/codex.
   const [flux2Status, setFlux2Status] = useState(null);
+  const [flux2InstallOpen, setFlux2InstallOpen] = useState(false);
 
   const [selectedMode, setSelectedMode] = useState(null);
   const [availableBackends, setAvailableBackends] = useState([]);
@@ -278,18 +281,31 @@ export default function ImageGen() {
   const resolutionLabel = matchedResolution?.label || `${width}×${height}`;
   const isFlux2Model = currentModel?.runner === 'flux2';
 
+  const refreshFlux2Status = useCallback((signal) => {
+    return fetch('/api/image-gen/setup/flux2-status', { signal })
+      .then((r) => r.ok ? r.json() : null)
+      .then((s) => { if (s) setFlux2Status(s); })
+      .catch(() => {});
+  }, []);
+
+  // Memoized so Flux2InstallModal's EventSource effect doesn't re-fire on
+  // every parent re-render (gallery / generating / progress state churn
+  // would otherwise tear down the SSE connection mid-install).
+  const handleFlux2ModalClose = useCallback(() => setFlux2InstallOpen(false), []);
+  const handleFlux2InstallComplete = useCallback(() => {
+    refreshFlux2Status();
+    toast.success('FLUX.2 runtime installed');
+  }, [refreshFlux2Status]);
+
   useEffect(() => {
     if (!isFlux2Model) { setFlux2Status(null); return; }
     // Abort the in-flight request when the user switches models before it
     // resolves — otherwise a stale response could re-show the banner for
     // a non-flux2 selection.
     const controller = new AbortController();
-    fetch('/api/image-gen/setup/flux2-status', { signal: controller.signal })
-      .then((r) => r.ok ? r.json() : null)
-      .then((s) => { if (s) setFlux2Status(s); })
-      .catch(() => {});
+    refreshFlux2Status(controller.signal);
     return () => controller.abort();
-  }, [isFlux2Model, modelId]);
+  }, [isFlux2Model, modelId, refreshFlux2Status]);
 
   const flux2Issue = isFlux2Model && flux2Status
     ? (!flux2Status.venvInstalled ? 'venv' : !flux2Status.hfTokenPresent ? 'token' : null)
@@ -593,19 +609,27 @@ export default function ImageGen() {
           </div>
 
           {flux2Issue === 'venv' && (
-            <div className="rounded-lg border border-port-warning/40 bg-port-warning/10 px-3 py-2 text-xs text-port-warning">
-              FLUX.2 venv not found at <code className="text-white">{flux2Status.expectedVenvPath}</code>.
-              Run <code className="text-white">INSTALL_FLUX2=1 bash scripts/setup-image-video.sh</code> to bootstrap it.
+            <div className="rounded-lg border border-port-warning/40 bg-port-warning/10 px-3 py-3 text-xs text-port-warning flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                FLUX.2 runtime isn't installed yet. PortOS can set it up automatically
+                — torch + diffusers download, ~3-10 min on first run.
+              </div>
+              <button
+                type="button"
+                onClick={() => setFlux2InstallOpen(true)}
+                disabled={generating}
+                className="self-start sm:self-auto whitespace-nowrap inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-port-accent text-white text-xs font-medium hover:bg-port-accent/80 disabled:opacity-50"
+              >
+                <Sparkles size={14} />
+                Install FLUX.2
+              </button>
             </div>
           )}
           {flux2Issue === 'token' && (
-            <div className="rounded-lg border border-port-warning/40 bg-port-warning/10 px-3 py-2 text-xs text-port-warning">
-              FLUX.2-klein is gated. Accept the license at{' '}
-              <a href={flux2Status.licenseUrl} target="_blank" rel="noreferrer" className="underline text-white">
-                huggingface.co/black-forest-labs/FLUX.2-klein-4B
-              </a>{' '}
-              and export <code className="text-white">HF_TOKEN=…</code> before running PortOS.
-            </div>
+            <Flux2TokenBanner
+              licenseUrl={flux2Status.licenseUrl}
+              onSaved={refreshFlux2Status}
+            />
           )}
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -963,6 +987,12 @@ export default function ImageGen() {
       <Drawer open={settingsOpen} onClose={closeSettings} title="Media Generation Settings">
         <ImageGenTab />
       </Drawer>
+
+      <Flux2InstallModal
+        open={flux2InstallOpen}
+        onClose={handleFlux2ModalClose}
+        onComplete={handleFlux2InstallComplete}
+      />
     </div>
   );
 }

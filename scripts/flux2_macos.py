@@ -190,11 +190,18 @@ def make_stepwise_callback(stepwise_dir: str, pipe):
     if shift is None:
         shift = 0.0
 
+    fired = {"count": 0, "saved": 0}
+
     @torch.no_grad()
     def cb(pipe, step_index, _timestep, callback_kwargs):
+        fired["count"] += 1
         latents = callback_kwargs.get("latents")
         if latents is None:
+            if step_index == 0:
+                print("⚠️ stepwise: latents missing from callback_kwargs", file=sys.stderr)
             return callback_kwargs
+        if step_index == 0:
+            print(f"🖼️  stepwise: callback live, latents.shape={tuple(latents.shape)}", file=sys.stderr)
         # Best-effort decode. Errors here must not abort generation — the
         # final image is still produced after the last step.
         try:
@@ -206,10 +213,12 @@ def make_stepwise_callback(stepwise_dir: str, pipe):
             # for 256px thumbnails but wasteful at 1024px.
             img.thumbnail((512, 512), Image.LANCZOS)
             img.save(out / f"step_{step_index + 1}.png", "PNG", optimize=False)
+            fired["saved"] += 1
         except Exception as err:
-            print(f"⚠️ stepwise preview failed at step {step_index}: {err}", file=sys.stderr)
+            print(f"⚠️ stepwise preview failed at step {step_index}: {type(err).__name__}: {err}", file=sys.stderr)
         return callback_kwargs
 
+    cb._stats = fired
     return cb
 
 
@@ -315,6 +324,10 @@ def main() -> None:
         result = pipe(**pipe_kwargs)
     image = result.images[0]
     image.save(args.output)
+
+    if callback is not None and hasattr(callback, "_stats"):
+        s = callback._stats
+        print(f"🖼️  stepwise summary: callback fired {s['count']} times, saved {s['saved']} previews", file=sys.stderr)
 
     if args.metadata:
         write_sidecar(
