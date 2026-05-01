@@ -1,5 +1,19 @@
 {
   "stages": {
+    "cd-treatment": {
+      "name": "Creative Director — Treatment",
+      "description": "Plan a long-form generated-video project: write the logline, synopsis, and scene-by-scene treatment.",
+      "model": "default",
+      "returnsJson": false,
+      "variables": []
+    },
+    "cd-evaluate": {
+      "name": "Creative Director — Scene Evaluation",
+      "description": "Evaluate a freshly-rendered scene against the project style spec and scene intent. Reads multi-frame samples to judge intent across the full clip timeline.",
+      "model": "default",
+      "returnsJson": false,
+      "variables": []
+    },
     "app-detection": {
       "name": "App Detection",
       "description": "Analyze a project directory and detect its configuration",
