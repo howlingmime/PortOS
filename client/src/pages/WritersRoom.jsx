@@ -115,15 +115,6 @@ export default function WritersRoom() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-port-border bg-port-card">
-        <button
-          onClick={toggleLibrary}
-          className="hidden md:inline-flex items-center justify-center w-6 h-6 text-gray-400 hover:text-white"
-          title={libraryCollapsed ? 'Show library' : 'Hide library'}
-          aria-label={libraryCollapsed ? 'Show library' : 'Hide library'}
-          aria-expanded={!libraryCollapsed}
-        >
-          {libraryCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-        </button>
         <NotebookPen className="w-5 h-5 text-port-accent" />
         <h1 className="text-xl font-bold text-white">Writers Room</h1>
         <span className="text-xs text-gray-500 hidden md:inline">Folders, works, drafts, and write-for-10 sprints</span>
@@ -156,7 +147,15 @@ export default function WritersRoom() {
             </button>
           </aside>
         ) : (
-          <aside className="border-b md:border-b-0 md:border-r border-port-border bg-port-card/40 px-3 py-3 overflow-y-auto max-h-64 md:max-h-none">
+          <aside className="border-b md:border-b-0 md:border-r border-port-border bg-port-card/40 px-3 py-3 overflow-y-auto max-h-64 md:max-h-none relative">
+            <button
+              onClick={toggleLibrary}
+              className="hidden md:inline-flex absolute top-2 right-2 p-1 text-gray-500 hover:text-white"
+              title="Hide library"
+              aria-label="Hide library"
+            >
+              <PanelLeftClose size={14} />
+            </button>
             <LibraryPane
               folders={folders}
               works={works}
