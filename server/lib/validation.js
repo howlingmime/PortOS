@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ServerError } from './errorHandler.js';
 import { ASPECT_RATIOS, QUALITIES, PROJECT_STATUSES, SCENE_STATUSES } from './creativeDirectorPresets.js';
+import { WORK_KINDS, WORK_STATUSES } from './writersRoomPresets.js';
 
 // =============================================================================
 // AGENT PERSONALITY SCHEMAS
@@ -464,6 +465,59 @@ export const restoreRequestSchema = z.object({
   subdirFilter: z.string().optional().nullable(),
   dryRun: z.boolean().optional().default(true)
 });
+
+// =============================================================================
+// WRITERS ROOM SCHEMAS
+// =============================================================================
+
+export const writersRoomWorkKindSchema = z.enum(WORK_KINDS);
+export const writersRoomWorkStatusSchema = z.enum(WORK_STATUSES);
+
+// IDs are either null (unfiled / unattached) or a non-empty trimmed string.
+// Zod runs chain steps in declared order, so .trim() MUST come before .min(1)
+// — otherwise a whitespace-only string passes min(1), then trim() collapses
+// it to '' after the guard already accepted it. Same gotcha applies to all
+// the .min(1).trim() pairs below.
+const wrIdNullable = z.string().trim().min(1).max(100).nullable();
+
+export const writersRoomFolderCreateSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  parentId: wrIdNullable.optional(),
+  sortOrder: z.number().int().optional()
+}).strict();
+
+export const writersRoomWorkCreateSchema = z.object({
+  title: z.string().trim().min(1).max(300),
+  kind: writersRoomWorkKindSchema.optional().default('short-story'),
+  folderId: wrIdNullable.optional()
+}).strict();
+
+export const writersRoomWorkUpdateSchema = z.object({
+  title: z.string().trim().min(1).max(300).optional(),
+  kind: writersRoomWorkKindSchema.optional(),
+  status: writersRoomWorkStatusSchema.optional(),
+  folderId: wrIdNullable.optional()
+}).strict();
+
+export const writersRoomDraftSaveSchema = z.object({
+  body: z.string().max(5_000_000) // 5 MB ceiling — well over a long novel in plain text
+}).strict();
+
+export const writersRoomSnapshotSchema = z.object({
+  label: z.string().trim().min(1).max(100).optional()
+}).strict();
+
+export const writersRoomExerciseCreateSchema = z.object({
+  workId: wrIdNullable.optional(),
+  prompt: z.string().max(2000).optional().default(''),
+  durationSeconds: z.number().int().min(60).max(3600).default(600),
+  startingWords: z.number().int().min(0).default(0)
+}).strict();
+
+export const writersRoomExerciseFinishSchema = z.object({
+  endingWords: z.number().int().min(0).optional(),
+  appendedText: z.string().max(100000).nullable().optional()
+}).strict();
 
 // =============================================================================
 // FEATURE AGENT SCHEMAS
