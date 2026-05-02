@@ -85,7 +85,10 @@ function segId(seq) {
 }
 
 export function buildSegmentIndex(text) {
-  if (!text) return [];
+  // Whitespace-only counts as empty too — otherwise '   ' would emit a
+  // phantom "(untitled)" segment in the outline panel of a brand-new draft
+  // where the user has only hit space/enter a couple times.
+  if (!text || !String(text).trim()) return [];
   const headingRe = /^(#{1,3})\s+(.+)$/gm;
   const matches = [];
   let m;
@@ -181,13 +184,14 @@ async function loadManifest(workId) {
   // SyntaxError bubbling out of JSON.parse.
   const parsed = safeJSONParse(content, null, { allowArray: false, logError: true, context: path });
   if (parsed === null) {
-    // Don't leak the on-disk path to the client; keep it in context for the
-    // server logs (errorHandler emits context to logs but only message + code
-    // to the response body).
+    // Log the absolute path server-side for debugging, but keep it OUT of
+    // the ServerError — errorHandler ships both message AND context to the
+    // client response body, so anything in context leaks to the UI.
+    console.warn(`⚠️ wr: corrupted manifest at ${path} (work ${workId})`);
     throw new ServerError(`Corrupted writers-room manifest for ${workId}`, {
       status: 500,
       code: 'CORRUPTED_MANIFEST',
-      context: { workId, path },
+      context: { workId },
     });
   }
   return parsed;

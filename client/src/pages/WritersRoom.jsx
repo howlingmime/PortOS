@@ -4,7 +4,6 @@ import { NotebookPen, Timer } from 'lucide-react';
 import LibraryPane from '../components/writers-room/LibraryPane';
 import WorkEditor from '../components/writers-room/WorkEditor';
 import ExercisePanel from '../components/writers-room/ExercisePanel';
-import toast from '../components/ui/Toast';
 import {
   listWritersRoomFolders,
   listWritersRoomWorks,
@@ -60,39 +59,31 @@ export default function WritersRoom() {
     navigate(`/writers-room/works/${id}`);
   };
 
-  const handleWorkChange = async (updated, opts = {}) => {
-    let next = updated;
-    if (opts.reload) {
-      const fresh = await getWritersRoomWork(updated.id).catch(() => null);
-      if (!mountedRef.current) return;
-      if (!fresh) {
-        // Reload failed — `updated` came from setWritersRoomActiveDraft and
-        // lacks activeDraftBody, so setActiveWork(updated) would blank the
-        // editor. Skip the swap; the previous activeWork (and its body) stay
-        // visible and the user can retry the version-switch click.
-        toast.error('Could not load that draft version');
-        return;
-      }
-      next = fresh;
-    }
-    setActiveWork(next);
+  const handleWorkChange = (updated) => {
+    // Caller (WorkEditor) hands us the freshest manifest + activeDraftBody —
+    // the server-side endpoints (PUT draft, POST snapshot, PATCH version,
+    // PATCH work) all return the full shape now, so no separate reload is
+    // required and there's no inconsistency window between server pointer
+    // and client view.
+    if (!mountedRef.current) return;
+    setActiveWork(updated);
     // Splice the updated row into the library list (title / status / word
     // count) without refetching N manifests on every save.
     setWorks((prev) => {
-      const activeDraft = (next.drafts || []).find((d) => d.id === next.activeDraftVersionId);
+      const activeDraft = (updated.drafts || []).find((d) => d.id === updated.activeDraftVersionId);
       const summary = {
-        id: next.id,
-        folderId: next.folderId,
-        title: next.title,
-        kind: next.kind,
-        status: next.status,
-        activeDraftVersionId: next.activeDraftVersionId,
+        id: updated.id,
+        folderId: updated.folderId,
+        title: updated.title,
+        kind: updated.kind,
+        status: updated.status,
+        activeDraftVersionId: updated.activeDraftVersionId,
         wordCount: activeDraft?.wordCount ?? 0,
-        draftCount: (next.drafts || []).length,
-        createdAt: next.createdAt,
-        updatedAt: next.updatedAt,
+        draftCount: (updated.drafts || []).length,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
       };
-      const idx = prev.findIndex((w) => w.id === next.id);
+      const idx = prev.findIndex((w) => w.id === updated.id);
       const merged = idx < 0 ? summary : { ...prev[idx], ...summary };
       const others = idx < 0 ? prev : [...prev.slice(0, idx), ...prev.slice(idx + 1)];
       // Library is sorted by updatedAt desc — re-sort after the merge so a

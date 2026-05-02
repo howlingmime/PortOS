@@ -143,8 +143,9 @@ export default function WorkEditor({ work, onChange }) {
       return null;
     });
     if (!updated || !mountedRef.current) return;
-    // Reload via parent so body comes from the server's active version
-    onChange?.(updated, { reload: true });
+    // PATCH /works/:id/versions/:draftId now returns manifest + activeDraftBody
+    // in one round-trip, so no separate reload is needed.
+    onChange?.(updated);
   };
 
   const activeDraft = useMemo(

@@ -78,9 +78,13 @@ router.post('/works/:id/versions', asyncHandler(async (req, res) => {
 }));
 
 router.patch('/works/:id/versions/:draftId', asyncHandler(async (req, res) => {
-  // Only one operation supported here today: set the active draft pointer.
-  // Routes stays a PATCH so future label/contentHash updates can land cleanly.
-  res.json(await setActiveDraft(req.params.id, req.params.draftId));
+  // Set the active draft pointer AND return the new active body in the same
+  // response. This collapses what used to be a PATCH-then-GET round-trip on
+  // the client and eliminates the inconsistency window where the server's
+  // active pointer had advanced but the client still showed the old body.
+  await setActiveDraft(req.params.id, req.params.draftId);
+  const { manifest, body } = await getWorkWithBody(req.params.id);
+  res.json({ ...manifest, activeDraftBody: body });
 }));
 
 router.get('/works/:id/versions/:draftId', asyncHandler(async (req, res) => {
