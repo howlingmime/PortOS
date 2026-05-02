@@ -304,15 +304,14 @@ export default function WorkEditor({ work, onChange }) {
             // to our value), and set the matching text color the same way for
             // visual consistency across themes.
             style={readingTheme === 'light'
-              ? { '--port-input-bg': '#f5f1e8', color: '#1a1a1a' }
+              ? { '--port-input-bg': 'var(--wr-reading-paper)', color: '#1a1a1a' }
               : undefined}
             className="w-full h-full resize-none px-6 py-6 font-serif text-base leading-relaxed focus:outline-none"
             spellCheck
           />
           <div
-            style={readingTheme === 'light' ? { backgroundColor: 'rgba(245, 241, 232, 0.85)' } : undefined}
             className={`absolute bottom-2 right-3 flex items-center gap-3 text-[11px] px-2 py-1 rounded ${
-              readingTheme === 'light' ? 'text-gray-700' : 'text-gray-500 bg-port-bg/80'
+              readingTheme === 'light' ? 'text-gray-700 bg-[var(--wr-reading-paper)]/85' : 'text-gray-500 bg-port-bg/80'
             }`}
           >
             <span>{wordCount.toLocaleString()} words</span>

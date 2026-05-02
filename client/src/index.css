@@ -31,6 +31,10 @@
   --port-text-muted: 163 163 163;
   --port-control-text: 212 212 216;
   --port-focus-ring: 59 130 246;
+  /* Writers Room "light reading" theme — sepia paper tone used by the prose
+     textarea, the AI panel's Evaluate/Format/Adapt result containers, and
+     the per-scene cards. Centralized so the shade can be tweaked once. */
+  --wr-reading-paper: #f5f1e8;
   --port-bg-alpha: 1;
   --port-card-alpha: 1;
   --port-border-alpha: 1;
@@ -437,7 +441,6 @@ html[data-port-theme="blueprint-ops"] header :is(h1, h2, h3) {
 :is(input, textarea, select, [contenteditable="true"], [contenteditable=""]):focus-visible {
   outline: 1px solid rgb(var(--port-focus-ring) / 0.35);
   outline-offset: 0;
-  box-shadow: none;
 }
 
 /* Accessibility: Remove focus outline for mouse users while keeping it for keyboard */
