@@ -20,8 +20,8 @@ export const NAV_COMMANDS = [
   { id: 'nav.media.models', path: '/media/models', label: 'Media Models', section: 'Create', aliases: ['media-models', 'image-models', 'video-models', 'huggingface', 'loras'], keywords: ['hf cache', 'lora', 'model storage', 'disk'] },
   { id: 'nav.media.settings', path: '/media/image?settings=1', label: 'Media Gen Settings', section: 'Create', aliases: ['media-settings', 'image-gen-settings', 'sd-settings', 'video-gen-settings'] },
   { id: 'nav.writers-room', path: '/writers-room', label: 'Writers Room', section: 'Create', aliases: ['writers-room', 'writersroom', 'writer', 'write', 'studio', 'novel'], keywords: ['prose', 'screenplay', 'story', 'draft', 'manuscript', 'literary', 'novel', 'short story'] },
-  { id: 'nav.prompts', path: '/prompts', label: 'Prompts', section: 'AI', aliases: ['prompts'] },
-  { id: 'nav.providers', path: '/ai', label: 'Providers', section: 'AI', aliases: ['providers', 'ai-providers'] },
+  { id: 'nav.settings.prompts', path: '/prompts', label: 'Prompts', section: 'Settings', aliases: ['prompts'] },
+  { id: 'nav.settings.providers', path: '/ai', label: 'Providers', section: 'Settings', aliases: ['providers', 'ai-providers'] },
 
   { id: 'nav.brain.inbox', path: '/brain/inbox', label: 'Inbox', section: 'Brain', aliases: ['brain', 'brain-inbox', 'inbox'] },
   { id: 'nav.brain.config', path: '/brain/config', label: 'Config', section: 'Brain', aliases: ['brain-config'] },

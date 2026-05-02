@@ -97,14 +97,6 @@ const navItems = [
   { to: '/review', label: 'Review Hub', icon: ClipboardList, single: true },
   { to: '/city', label: 'CyberCity', icon: Building2, single: true },
   { separator: true },
-  {
-    label: 'AI',
-    icon: Bot,
-    children: [
-      { to: '/prompts', label: 'Prompts', icon: FileText },
-      { to: '/ai', label: 'Providers', icon: Bot }
-    ]
-  },
   { label: 'Apps', icon: Package, dynamic: 'apps', defaultTo: '/apps', children: [] },
   {
     label: 'Brain',
@@ -260,6 +252,8 @@ const navItems = [
       { to: '/settings/database', label: 'Database', icon: Database },
       { to: '/settings/general', label: 'General', icon: Settings },
       { to: '/settings/mortalloom', label: 'MortalLoom', icon: Activity },
+      { to: '/prompts', label: 'Prompts', icon: FileText },
+      { to: '/ai', label: 'Providers', icon: Bot },
       { to: '/settings/telegram', label: 'Telegram', icon: MessageSquare },
       { to: '/settings/voice', label: 'Voice', icon: Mic }
     ]
@@ -764,19 +758,20 @@ export default function Layout() {
             location.pathname.startsWith('/goals') ||
             location.pathname.startsWith('/insights') ||
             location.pathname.startsWith('/meatspace') ||
+            location.pathname.startsWith('/media') ||
             location.pathname.startsWith('/messages') ||
             location.pathname.startsWith('/post') ||
             location.pathname === '/review' ||
+            location.pathname.startsWith('/settings') ||
             location.pathname.startsWith('/wiki') ||
+            location.pathname.startsWith('/writers-room') ||
             location.pathname.startsWith('/agents') ||
             location.pathname === '/shell' ||
             location.pathname.startsWith('/city') ||
             /^\/apps\/[^/]+/.test(location.pathname);
-          // Dashboard's grid widgets flex across the full content area; skip the max-w-7xl cap so wide monitors don't show huge side margins.
-          const isFluid = location.pathname === '/';
           return (
             <main id="main-content" className={`flex-1 ${isFullWidth ? 'overflow-hidden' : 'overflow-auto p-4 md:p-6'}`}>
-              {isFullWidth || isFluid ? <Outlet /> : <div className="max-w-7xl mx-auto"><Outlet /></div>}
+              <Outlet />
             </main>
           );
         })()}
