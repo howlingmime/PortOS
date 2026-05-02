@@ -192,10 +192,10 @@ export default function AiPanel({ work, onApplyFormat, readingTheme = 'dark' }) 
                       <div className="text-port-error text-[11px] whitespace-pre-wrap">{full.error || 'Unknown error'}</div>
                     )}
                     {full?.status === 'succeeded' && full.kind === 'evaluate' && (
-                      <EvaluateResult result={full.result} />
+                      <EvaluateResult result={full.result} readingTheme={readingTheme} />
                     )}
                     {full?.status === 'succeeded' && full.kind === 'format' && (
-                      <FormatResult result={full.result} onApply={(text) => onApplyFormat?.(text)} />
+                      <FormatResult result={full.result} onApply={(text) => onApplyFormat?.(text)} readingTheme={readingTheme} />
                     )}
                     {full?.status === 'succeeded' && full.kind === 'script' && (
                       <ScriptResult
@@ -218,37 +218,40 @@ export default function AiPanel({ work, onApplyFormat, readingTheme = 'dark' }) 
   );
 }
 
-function EvaluateResult({ result }) {
+function EvaluateResult({ result, readingTheme = 'dark' }) {
   if (!result) return null;
+  const light = readingTheme === 'light';
   return (
-    <div className="space-y-2 text-[11px] text-gray-300">
-      {result.logline && <div><span className="text-gray-500 uppercase text-[9px]">Logline</span><div className="italic">{result.logline}</div></div>}
-      {result.summary && <div><span className="text-gray-500 uppercase text-[9px]">Summary</span><div>{result.summary}</div></div>}
+    <div className={`space-y-2 text-[11px] rounded p-2 ${light ? 'bg-[#f5f1e8] text-gray-900' : 'text-gray-300'}`}>
+      {result.logline && <div><span className={light ? 'text-gray-600 uppercase text-[9px]' : 'text-gray-500 uppercase text-[9px]'}>Logline</span><div className="italic">{result.logline}</div></div>}
+      {result.summary && <div><span className={light ? 'text-gray-600 uppercase text-[9px]' : 'text-gray-500 uppercase text-[9px]'}>Summary</span><div>{result.summary}</div></div>}
       {result.themes?.length > 0 && (
         <div>
-          <span className="text-gray-500 uppercase text-[9px]">Themes</span>
+          <span className={light ? 'text-gray-600 uppercase text-[9px]' : 'text-gray-500 uppercase text-[9px]'}>Themes</span>
           <div className="flex flex-wrap gap-1 mt-0.5">
-            {result.themes.map((t, i) => <span key={i} className="px-1.5 py-0.5 bg-port-card border border-port-border rounded text-[10px]">{t}</span>)}
+            {result.themes.map((t, i) => (
+              <span key={i} className={`px-1.5 py-0.5 border rounded text-[10px] ${light ? 'bg-white border-gray-300 text-gray-800' : 'bg-port-card border-port-border'}`}>{t}</span>
+            ))}
           </div>
         </div>
       )}
       {result.strengths?.length > 0 && (
         <div>
-          <span className="text-gray-500 uppercase text-[9px]">Strengths</span>
-          <ul className="list-disc list-inside space-y-0.5 mt-0.5 text-gray-400">
+          <span className={light ? 'text-gray-600 uppercase text-[9px]' : 'text-gray-500 uppercase text-[9px]'}>Strengths</span>
+          <ul className={`list-disc list-inside space-y-0.5 mt-0.5 ${light ? 'text-gray-800' : 'text-gray-400'}`}>
             {result.strengths.map((s, i) => <li key={i}>{s}</li>)}
           </ul>
         </div>
       )}
       {result.issues?.length > 0 && (
         <div>
-          <span className="text-gray-500 uppercase text-[9px]">Issues</span>
+          <span className={light ? 'text-gray-600 uppercase text-[9px]' : 'text-gray-500 uppercase text-[9px]'}>Issues</span>
           <ul className="space-y-1 mt-0.5">
             {result.issues.map((iss, i) => (
               <li key={i} className={`pl-2 border-l-2 ${SEVERITY_COLOR[iss.severity] || SEVERITY_COLOR.minor}`}>
                 <div className="text-[10px] uppercase tracking-wide opacity-80">{iss.severity || 'minor'} · {iss.category || 'note'}</div>
                 <div>{iss.note}</div>
-                {iss.excerpt && <div className="text-gray-500 italic mt-0.5">"{iss.excerpt}"</div>}
+                {iss.excerpt && <div className={`italic mt-0.5 ${light ? 'text-gray-700' : 'text-gray-500'}`}>"{iss.excerpt}"</div>}
               </li>
             ))}
           </ul>
@@ -256,7 +259,7 @@ function EvaluateResult({ result }) {
       )}
       {result.suggestions?.length > 0 && (
         <div>
-          <span className="text-gray-500 uppercase text-[9px]">Suggestions</span>
+          <span className={light ? 'text-gray-600 uppercase text-[9px]' : 'text-gray-500 uppercase text-[9px]'}>Suggestions</span>
           <ul className="space-y-1 mt-0.5">
             {result.suggestions.map((s, i) => (
               <li key={i} className="pl-2 border-l-2 border-port-accent/40">
@@ -271,13 +274,14 @@ function EvaluateResult({ result }) {
   );
 }
 
-function FormatResult({ result, onApply }) {
+function FormatResult({ result, onApply, readingTheme = 'dark' }) {
   const text = result?.formattedBody || '';
   if (!text) return <div className="text-gray-500">Format pass returned no text.</div>;
+  const light = readingTheme === 'light';
   return (
     <div className="space-y-2 text-[11px]">
       <div className="flex items-center justify-between">
-        <span className="text-gray-500 uppercase text-[9px]">Cleaned prose ({text.length.toLocaleString()} chars)</span>
+        <span className={light ? 'text-gray-600 uppercase text-[9px]' : 'text-gray-500 uppercase text-[9px]'}>Cleaned prose ({text.length.toLocaleString()} chars)</span>
         <button
           onClick={() => onApply?.(text)}
           className="flex items-center gap-1 px-2 py-1 bg-port-accent text-white rounded text-[10px] hover:bg-port-accent/80"
@@ -286,7 +290,9 @@ function FormatResult({ result, onApply }) {
           <Check size={10} /> Apply to draft
         </button>
       </div>
-      <pre className="whitespace-pre-wrap font-serif text-gray-300 bg-port-bg border border-port-border rounded p-2 max-h-64 overflow-y-auto">{text}</pre>
+      <pre className={`whitespace-pre-wrap font-serif border rounded p-2 max-h-64 overflow-y-auto ${
+        light ? 'text-gray-900 bg-[#f5f1e8] border-gray-300' : 'text-gray-300 bg-port-bg border-port-border'
+      }`}>{text}</pre>
     </div>
   );
 }

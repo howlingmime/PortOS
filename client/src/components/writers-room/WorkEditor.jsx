@@ -298,14 +298,23 @@ export default function WorkEditor({ work, onChange }) {
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Start writing… Use # Chapter, ## Scene, ### Beat headings to outline."
-            className={`w-full h-full resize-none px-6 py-6 font-serif text-base leading-relaxed focus:outline-none ${
-              readingTheme === 'light' ? 'bg-[#f5f1e8] text-gray-900' : 'bg-port-bg text-gray-100'
-            }`}
+            // The theme system applies `background: var(--port-input-bg) !important`
+            // to every textarea, so a regular Tailwind `bg-...` class can't win.
+            // Override --port-input-bg inline (the !important rule then resolves
+            // to our value), and set the matching text color the same way for
+            // visual consistency across themes.
+            style={readingTheme === 'light'
+              ? { '--port-input-bg': '#f5f1e8', color: '#1a1a1a' }
+              : undefined}
+            className="w-full h-full resize-none px-6 py-6 font-serif text-base leading-relaxed focus:outline-none"
             spellCheck
           />
-          <div className={`absolute bottom-2 right-3 flex items-center gap-3 text-[11px] px-2 py-1 rounded ${
-            readingTheme === 'light' ? 'text-gray-600 bg-[#f5f1e8]/80' : 'text-gray-500 bg-port-bg/80'
-          }`}>
+          <div
+            style={readingTheme === 'light' ? { backgroundColor: 'rgba(245, 241, 232, 0.85)' } : undefined}
+            className={`absolute bottom-2 right-3 flex items-center gap-3 text-[11px] px-2 py-1 rounded ${
+              readingTheme === 'light' ? 'text-gray-700' : 'text-gray-500 bg-port-bg/80'
+            }`}
+          >
             <span>{wordCount.toLocaleString()} words</span>
             {dirty && <span className="text-port-warning">● unsaved</span>}
           </div>
