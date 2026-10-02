@@ -61,6 +61,14 @@ const catalogMocks = vi.hoisted(() => {
 });
 vi.mock('./catalogDB.js', () => catalogMocks);
 
+// The Universe Builder expansion/refine are exercised in their own suites; here
+// they are spies so the aesthetic step's PERSISTENCE contract can be driven with
+// a response shape the real LLM can produce (a key the model omitted).
+const expandSpy = vi.fn();
+const refineSpy = vi.fn();
+vi.mock('./universeBuilderExpand.js', () => ({ expandWorldTemplate: (...a) => expandSpy(...a) }));
+vi.mock('./universeBuilderRefine.js', () => ({ refineWorldPrompts: (...a) => refineSpy(...a) }));
+
 const sb = await import('./storyBuilder.js');
 const seriesSvc = await import('./pipeline/series.js');
 const universeSvc = await import('./universeBuilder.js');
@@ -70,6 +78,8 @@ beforeEach(() => {
   fileStore.clear();
   uuidCounter = 0;
   stageRunnerSpy = undefined;
+  expandSpy.mockReset();
+  refineSpy.mockReset();
   catalogMocks.listIngredients.mockReset();
   catalogMocks.linkIngredientsToSeries.mockReset();
   // Default: the batch resolve returns nothing (each test overrides as needed),
@@ -1152,5 +1162,40 @@ describe('storyBuilder — cross-machine sync wire (#730)', () => {
     await expect(sb.getStorySession('stb-tomb')).rejects.toMatchObject({ code: sb.ERR_NOT_FOUND });
     const withDeleted = await sb.getStorySession('stb-tomb', { includeDeleted: true });
     expect(withDeleted.deleted).toBe(true);
+  });
+});
+
+describe('storyBuilder — universeAesthetic persistence', () => {
+  // Regression: expandWorldTemplate/refineWorldPrompts return `null` for a
+  // scalar the LLM OMITTED and `''` for one it deliberately cleared. Forwarding
+  // the `null` into updateUniverse (which treats every key present in the patch
+  // as an intentional write) wiped a premise/styleNotes the user already had
+  // whenever a response came back partial.
+  it('keeps a stored premise/styleNotes when the expansion omits those keys', async () => {
+    const s = await sb.createStorySession({ title: 'Salt Run', seedIdea: 'a foundry city goes silent' });
+    await universeSvc.updateUniverse(s.universeId, {
+      starterPrompt: 'a foundry city goes silent',
+      premise: 'established premise',
+      styleNotes: 'established style notes',
+    });
+    expandSpy.mockResolvedValue({ logline: 'a new logline', premise: null, styleNotes: null });
+
+    await sb.generateStep(s.id, 'universeAesthetic');
+
+    const universe = await universeSvc.getUniverse(s.universeId);
+    expect(universe.logline).toBe('a new logline');
+    expect(universe.premise).toBe('established premise');
+    expect(universe.styleNotes).toBe('established style notes');
+  });
+
+  it('applies an explicit empty string from a refine as a clear', async () => {
+    const s = await sb.createStorySession({ title: 'Salt Run', seedIdea: 'seed' });
+    await universeSvc.updateUniverse(s.universeId, { styleNotes: 'established style notes' });
+    refineSpy.mockResolvedValue({ logline: null, premise: null, styleNotes: '' });
+
+    await sb.refineStep(s.id, 'universeAesthetic', { feedback: 'drop the style notes' });
+
+    const universe = await universeSvc.getUniverse(s.universeId);
+    expect(universe.styleNotes).toBe('');
   });
 });

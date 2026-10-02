@@ -879,6 +879,18 @@ export async function generateIssuesFromArc(id, options = {}) {
 
 // ── Generate / refine delegation ──────────────────────────────────────────
 
+// Narrative scalars come back from the Universe Builder expansion/refine as
+// `null` when the LLM omitted the key and `''` when it deliberately cleared the
+// field (see the trimField contract in universeBuilderExpand.js). updateUniverse
+// treats every key PRESENT in the patch as an intentional write, so forwarding a
+// `null` clears a premise/styleNotes the user already had. Send only the keys
+// the model actually answered.
+const narrativeScalarPatch = (out) => Object.fromEntries(
+  ['logline', 'premise', 'styleNotes']
+    .filter((k) => out?.[k] !== null && out?.[k] !== undefined)
+    .map((k) => [k, out[k]]),
+);
+
 // Each step's generate delegates to the existing service that owns its content,
 // then persists into the universe/series record. Returns the LLM result so the
 // route can surface runId / changes / rationale.
@@ -950,9 +962,7 @@ export async function generateStep(id, stepId, options = {}) {
     });
     emit('Saving…', 'persist');
     const updated = await updateUniverse(session.universeId, {
-      logline: expanded.logline,
-      premise: expanded.premise,
-      styleNotes: expanded.styleNotes,
+      ...narrativeScalarPatch(expanded),
       ...(expanded.influences ? { influences: expanded.influences } : {}),
     });
     return { result: updated, providerId: expanded.providerId, model: expanded.model };
@@ -1033,9 +1043,7 @@ export async function refineStep(id, stepId, { feedback, entryId, providerId, mo
     });
     emit('Saving…', 'persist');
     const updated = await updateUniverse(session.universeId, {
-      logline: refined.logline,
-      premise: refined.premise,
-      styleNotes: refined.styleNotes,
+      ...narrativeScalarPatch(refined),
       ...(refined.influences ? { influences: refined.influences } : {}),
     });
     return { result: updated, changes: refined.changes || [], rationale: refined.rationale || '' };
